@@ -1,0 +1,29 @@
+{
+  "name": "@price-tracker/api",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@orpc/client": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@price-tracker/auth": "workspace:*",
+    "@price-tracker/db": "workspace:*",
+    "@price-tracker/env": "workspace:*",
+    "dotenv": "catalog:",
+    "next": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@price-tracker/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

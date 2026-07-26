@@ -1,0 +1,24 @@
+{
+  "name": "@price-tracker/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@price-tracker/db": "workspace:*",
+    "@price-tracker/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@price-tracker/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
