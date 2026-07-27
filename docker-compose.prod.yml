@@ -1,0 +1,42 @@
+# Production override. Layer it on top of the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   pnpm docker:prod:up            # the same thing
+#
+# What it changes: the database is the PostgreSQL instance already running on
+# the host (PLAN.md §3), not a container. `DATABASE_URL` is required — there is
+# no sensible default for someone else's database.
+
+services:
+  # Not used in production. A profile no one enables is how a service defined
+  # in the base file gets switched off from an override; nothing depends on it
+  # here, so nothing tries to start it.
+  postgres:
+    profiles:
+      - local-postgres
+
+  migrate:
+    # The host's Postgres is outside compose's view, so there is no
+    # `service_healthy` condition to wait on. The entrypoint retries the
+    # connection instead (packages/db/docker-entrypoint.sh), which is also what
+    # makes the stack come back cleanly after a host reboot, when the
+    # containers routinely start before Postgres has finished.
+    depends_on: !reset null
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+    # A no-op on Docker Desktop, which already resolves the name; required on
+    # Linux, where host.docker.internal otherwise does not exist (PLAN.md §3).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  web:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

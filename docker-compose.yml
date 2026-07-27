@@ -1,6 +1,50 @@
+# Local-development stack: Postgres in a container, alongside the same three
+# app services production runs.
+#
+# For a real deployment, layer the production override on top — it points the
+# apps at the Postgres instance already running on the host and switches this
+# file's `postgres` service off:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# (or `pnpm docker:prod:up`, which is the same thing). See README.md.
+
 name: price-tracker
 
+# `apps/web/.env` is the file the rest of the repo already uses in development.
+# The root `.env` is what a deployment writes, and comes second so it wins when
+# both exist. Neither is required; anything missing falls back to the defaults
+# below, or is simply unset (HA_URL / HA_WEBHOOK_ID are optional by design).
+x-env-files: &env-files
+  - path: apps/web/.env
+    required: false
+  - path: .env
+    required: false
+
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/price-tracker
+  NODE_ENV: production
+  # Every timestamp the worker schedules and the UI renders is derived from
+  # this; leaving containers on UTC while the host is not is a quiet way to
+  # make "last checked" wrong by an hour for half the year.
+  TZ: ${TZ:-Europe/London}
+
 services:
+  # One-shot: applies migrations, then exits. `web` and `worker` are gated
+  # behind it completing successfully, so a failed migration stops the whole
+  # deployment rather than letting the apps boot against an old schema.
+  migrate:
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
+    init: true
+    env_file: *env-files
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   web:
     build:
       context: .
@@ -8,16 +52,14 @@ services:
     init: true
     ports:
       - "3001:3001"
-    env_file:
-      - path: apps/web/.env
-        required: false
+    env_file: *env-files
     environment:
-      BETTER_AUTH_URL: http://localhost:3001
-      CORS_ORIGIN: http://localhost:3001
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/price-tracker
+      <<: *app-environment
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -32,6 +74,23 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    init: true
+    env_file: *env-files
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # The worker waits up to 30s for in-flight checks on SIGTERM; give it room
+    # to finish rather than having Docker kill it mid-write.
+    stop_grace_period: 40s
+    restart: unless-stopped
+
+  # Development only. The production override disables this service — see
+  # docker-compose.prod.yml.
   postgres:
     image: postgres:18
     container_name: price-tracker-postgres
