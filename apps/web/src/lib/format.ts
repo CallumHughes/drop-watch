@@ -34,13 +34,6 @@ export function formatPrice(price: string, currency: string | null): string {
   );
 }
 
-/** Signed, for deltas: "+£3.00" reads better than "£3.00" next to a target. */
-export function formatSignedPrice(price: string, currency: string | null): string {
-  const positive = !price.startsWith("-");
-  const magnitude = positive ? price : price.slice(1);
-  return `${positive ? "+" : "−"}${formatPrice(magnitude, currency)}`;
-}
-
 /** "3 minutes ago" / "in 2 hours", from a timestamp on either side of now. */
 export function formatRelative(when: Date, now = Date.now()): string {
   const deltaMs = when.getTime() - now;

@@ -10,7 +10,8 @@
  *
  * Prices stay decimal strings from `numeric(12,2)` all the way to the UI, and
  * the derived numbers (target distance, percentage change) are computed in
- * integer minor units — see `../decimal`.
+ * integer minor units — see `../decimal`. The derivation itself lives in
+ * `../summary`; this module only queries.
  */
 
 import { ORPCError } from "@orpc/server";
@@ -22,9 +23,9 @@ import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/produ
 import { asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { percentChange, subtract } from "../decimal";
 import { protectedProcedure } from "../index";
 import { getSenderBoss } from "../queue";
+import { type PriceSample, type ProductSummary, pulledInNextCheckAt, summarise } from "../summary";
 
 /** Points behind each dashboard sparkline. Enough shape, one small query. */
 const SPARKLINE_POINTS = 24;
@@ -52,39 +53,12 @@ const MAX_DROP_PERCENT = 99;
 /** Matches what `numeric(12,2)` accepts, so a bad target never reaches Postgres. */
 const PRICE_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
 
-/** One observation. `price` is a decimal string; `inStock` is null when unknown. */
-export interface PriceSample {
-  /** The currency the page quoted, which is what `price` is denominated in. */
-  currency: string;
-  inStock: boolean | null;
-  observedAt: Date;
-  price: string;
-}
-
 /**
  * Re-exported so `apps/web` can name these shapes without taking a dependency
  * on `@price-tracker/db` — the UI reads the API, not the database.
  */
 export type { CheckRun, Product } from "@price-tracker/db/schema/products";
-
-/** The `check_run_status` enum, as a union. */
-export type CheckStatus = CheckRun["status"];
-
-/** A product card's worth of derived state. */
-export interface ProductSummary {
-  /** Signed percentage from the previous point to the latest, one decimal place. */
-  changePercent: string | null;
-  /** Length of the current run of non-`ok` checks. Zero means healthy. */
-  consecutiveFailures: number;
-  /** Oldest first, so a sparkline can be drawn straight from it. */
-  history: PriceSample[];
-  lastCheck: CheckRun | null;
-  latest: PriceSample | null;
-  previous: PriceSample | null;
-  product: Product;
-  /** `latest - targetPrice`. Negative means the target has been met. */
-  targetDelta: string | null;
-}
+export type { CheckStatus, PriceSample, ProductSummary } from "../summary";
 
 const productIdInput = z.object({ id: z.uuid() });
 
@@ -174,38 +148,6 @@ async function recentRuns(limit: number): Promise<Map<string, CheckRun[]>> {
     byProduct.set(run.productId, runs);
   }
   return byProduct;
-}
-
-/**
- * How many checks in a row have failed, newest first.
- *
- * A 304 is recorded as `ok` with no price point, so a page that simply has not
- * changed never trips the badge.
- */
-function countLeadingFailures(runs: CheckRun[]): number {
-  let failures = 0;
-  for (const run of runs) {
-    if (run.status === "ok") {
-      break;
-    }
-    failures += 1;
-  }
-  return failures;
-}
-
-function summarise(product: Product, samples: PriceSample[], runs: CheckRun[]): ProductSummary {
-  const latest = samples.at(-1) ?? null;
-  const previous = samples.at(-2) ?? null;
-  return {
-    changePercent: latest && previous ? percentChange(previous.price, latest.price) : null,
-    consecutiveFailures: countLeadingFailures(runs),
-    history: samples,
-    lastCheck: runs[0] ?? null,
-    latest,
-    previous,
-    product,
-    targetDelta: latest && product.targetPrice ? subtract(latest.price, product.targetPrice) : null,
-  };
 }
 
 /** The most recent `limit` price points for one product, oldest first. */
@@ -341,6 +283,10 @@ export const productsRouter = {
     .handler(async ({ input }): Promise<ProductSummary> => {
       const product = await loadProduct(input.id);
       const patch = buildPatch(input);
+      const nextCheckAt = pulledInNextCheckAt(product, input.intervalMinutes, new Date());
+      if (nextCheckAt) {
+        patch.nextCheckAt = nextCheckAt;
+      }
       if (Object.keys(patch).length === 0) {
         return await summariseOne(product);
       }

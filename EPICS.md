@@ -86,7 +86,7 @@ Depends on Epics 2 + 3.
 **Done when:** seeded products are checked on schedule and history accumulates; a
 killed-and-restarted worker resumes cleanly.
 
-## Epic 5 — Read UI + API procedures
+## Epic 5 — Read UI + API procedures ✅ (done 2026-07-27)
 
 Depends on Epic 3 (Epic 4 makes it interesting).
 

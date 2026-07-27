@@ -38,11 +38,20 @@ function TargetDistance({
   if (!targetDelta) {
     return <span className="text-muted-foreground">{target}</span>;
   }
-  const met = targetDelta.startsWith("-");
-  const magnitude = met ? targetDelta.slice(1) : targetDelta;
+  // The `target` rule fires at price ≤ target, so landing exactly on it counts
+  // as met, and reads better as "at target" than as "£0.00 over target".
+  const under = targetDelta.startsWith("-");
+  const exact = Number(targetDelta) === 0;
+  const magnitude = under ? targetDelta.slice(1) : targetDelta;
   return (
-    <span className={met ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>
-      {formatPrice(magnitude, currency)} {met ? "under" : "over"} {target}
+    <span
+      className={
+        under || exact ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+      }
+    >
+      {exact
+        ? `at ${target}`
+        : `${formatPrice(magnitude, currency)} ${under ? "under" : "over"} ${target}`}
     </span>
   );
 }

@@ -18,6 +18,8 @@ type AlertRule = Product["rules"][number];
  * rejects an out-of-range value before the round trip does.
  */
 const MIN_INTERVAL_MINUTES = 5;
+/** A week, matching the router. Anything longer is a bookmark, not a tracker. */
+const MAX_INTERVAL_MINUTES = 10_080;
 const MAX_JITTER_PERCENT = 100;
 const MIN_DROP_PERCENT = 1;
 const MAX_DROP_PERCENT = 99;
@@ -147,6 +149,7 @@ export function TrackingSettingsForm({ product }: { product: Product }) {
         <Field htmlFor={intervalId} label="Check every (minutes)">
           <Input
             id={intervalId}
+            max={MAX_INTERVAL_MINUTES}
             min={MIN_INTERVAL_MINUTES}
             onChange={onIntervalChange}
             required
