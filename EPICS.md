@@ -56,7 +56,7 @@ Pure logic, no DB or network calls inside extract/rules.
 **Done when:** correct prices from 5+ real URLs across different sites; parser
 suite green.
 
-## Epic 3 — Domain schema (`packages/db`)
+## Epic 3 — Domain schema (`packages/db`) ✅ (done 2026-07-27)
 
 Can run in parallel with Epic 2.
 

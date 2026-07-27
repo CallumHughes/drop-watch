@@ -8,6 +8,13 @@
       "when": 1785098159399,
       "tag": "0000_known_fabian_cortez",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785162064330,
+      "tag": "0001_skinny_siren",
+      "breakpoints": true
     }
   ]
 }
