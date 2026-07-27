@@ -1,13 +1,16 @@
 "use client";
 
+import { buttonVariants } from "@price-tracker/ui/components/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@price-tracker/ui/components/empty";
 import { Skeleton } from "@price-tracker/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 import { ProductCard } from "@/components/products/product-card";
 import { LIVE_REFETCH_MS } from "@/lib/format";
@@ -39,10 +42,13 @@ export default function Dashboard() {
       <Empty>
         <EmptyHeader>
           <EmptyTitle>Nothing tracked yet</EmptyTitle>
-          <EmptyDescription>
-            Seed the database or add a product to start recording price history.
-          </EmptyDescription>
+          <EmptyDescription>Add a product URL to start recording price history.</EmptyDescription>
         </EmptyHeader>
+        <EmptyContent>
+          <Link className={buttonVariants()} href="/products/new">
+            Add product
+          </Link>
+        </EmptyContent>
       </Empty>
     );
   }

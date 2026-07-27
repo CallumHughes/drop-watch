@@ -1,5 +1,7 @@
 import { auth } from "@price-tracker/auth";
+import { buttonVariants } from "@price-tracker/ui/components/button";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import Dashboard from "./dashboard";
@@ -21,11 +23,16 @@ export default async function DashboardPage() {
 
   return (
     <main className="container mx-auto max-w-6xl overflow-y-auto px-4 py-6">
-      <header className="mb-6">
-        <h1 className="font-medium text-xl">Tracked products</h1>
-        <p className="text-muted-foreground text-sm">
-          Signed in as {session.user.email}. Prices refresh automatically.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-medium text-xl">Tracked products</h1>
+          <p className="text-muted-foreground text-sm">
+            Signed in as {session.user.email}. Prices refresh automatically.
+          </p>
+        </div>
+        <Link className={buttonVariants()} href="/products/new">
+          Add product
+        </Link>
       </header>
       <Dashboard />
     </main>
