@@ -10,13 +10,17 @@
     }
   },
   "scripts": {
+    "check-types": "tsc --noEmit",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx --env-file-if-exists=../../apps/web/.env src/seed.ts"
   },
   "dependencies": {
+    "@price-tracker/core": "workspace:*",
     "@price-tracker/env": "workspace:*",
+    "better-auth": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0",
@@ -26,6 +30,7 @@
     "@price-tracker/config": "workspace:*",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }
