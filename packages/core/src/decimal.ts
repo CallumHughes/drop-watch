@@ -5,6 +5,10 @@
  * on the way to a "£3.20 under target" badge (PLAN.md §10). Everything here
  * works in integer minor units via `bigint`, so the values the UI renders are
  * exactly the values Postgres stores.
+ *
+ * Lives in `core` rather than beside the API's summary code because the alert
+ * rules need the same arithmetic: "is this at or below target" and "is this a
+ * 10% drop" are precisely the comparisons that must not go through a float.
  */
 
 /** `numeric(12,2)`, optionally signed. Anything else is a bug, not user input. */

@@ -114,7 +114,7 @@ Depends on Epics 2 + 5.
 **Done when:** a product can be added end to end from a URL, including one that
 requires a manual selector.
 
-## Epic 7 — Alerting + Home Assistant
+## Epic 7 — Alerting + Home Assistant ✅ (done 2026-07-27)
 
 Depends on Epic 4; does not block Epics 5–6.
 

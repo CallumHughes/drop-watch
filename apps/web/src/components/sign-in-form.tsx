@@ -16,7 +16,11 @@ const selectSubmitState = (state: { canSubmit: boolean; isSubmitting: boolean })
   isSubmitting: state.isSubmitting,
 });
 
-export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
+/**
+ * @param onSwitchToSignUp - omitted once an account exists, which closes signup
+ *   for good on this single-user tracker.
+ */
+export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: () => void }) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
 
@@ -131,15 +135,17 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
         </form.Subscribe>
       </form>
 
-      <div className="mt-4 text-center">
-        <Button
-          className="text-indigo-600 hover:text-indigo-800"
-          onClick={onSwitchToSignUp}
-          variant="link"
-        >
-          Need an account? Sign Up
-        </Button>
-      </div>
+      {onSwitchToSignUp ? (
+        <div className="mt-4 text-center">
+          <Button
+            className="text-indigo-600 hover:text-indigo-800"
+            onClick={onSwitchToSignUp}
+            variant="link"
+          >
+            Need an account? Sign Up
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
