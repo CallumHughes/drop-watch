@@ -7,11 +7,16 @@
  * database — the router does the querying, this does the arithmetic, and that
  * split is what makes the failure badge, the target distance and the schedule
  * clamp unit-testable without a Postgres connection.
+ *
+ * The failure streak itself comes from `core/rules` rather than being counted
+ * again here: the dashboard's badge and the worker's "tracker broken" alarm
+ * have to mean the same thing by "failing", and one implementation is how that
+ * stays true.
  */
 
+import { percentChange, subtract } from "@price-tracker/core/decimal";
+import { countLeadingFailures } from "@price-tracker/core/rules";
 import type { CheckRun, Product } from "@price-tracker/db/schema/products";
-
-import { percentChange, subtract } from "./decimal";
 
 /** One observation. `price` is a decimal string; `inStock` is null when unknown. */
 export interface PriceSample {
@@ -39,23 +44,6 @@ export interface ProductSummary {
   product: Product;
   /** `latest - targetPrice`. Zero or negative means the target has been met. */
   targetDelta: string | null;
-}
-
-/**
- * How many checks in a row have failed, newest first.
- *
- * A 304 is recorded as `ok` with no price point, so a page that simply has not
- * changed never trips the badge.
- */
-export function countLeadingFailures(runs: readonly CheckRun[]): number {
-  let failures = 0;
-  for (const run of runs) {
-    if (run.status === "ok") {
-      break;
-    }
-    failures += 1;
-  }
-  return failures;
 }
 
 /**

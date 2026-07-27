@@ -1,19 +1,36 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
+import Loader from "@/components/loader";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
+import { orpc } from "@/utils/orpc";
 
+/**
+ * Sign-in, plus account creation only while this instance has no account at
+ * all.
+ *
+ * The tracker is single-user (PLAN.md §8), so the sign-up form exists purely to
+ * bootstrap an install whose seed script was never run. Once an account exists
+ * the switch disappears — and the endpoint refuses regardless, since hiding a
+ * form is presentation, not security.
+ */
 export default function LoginPage() {
-  const [showSignIn, setShowSignIn] = useState(false);
+  const signupOpen = useQuery(orpc.signupOpen.queryOptions());
+  const [showSignUp, setShowSignUp] = useState(false);
 
-  const handleSwitchToSignUp = useCallback(() => setShowSignIn(false), []);
-  const handleSwitchToSignIn = useCallback(() => setShowSignIn(true), []);
+  const handleSwitchToSignUp = useCallback(() => setShowSignUp(true), []);
+  const handleSwitchToSignIn = useCallback(() => setShowSignUp(false), []);
 
-  return showSignIn ? (
-    <SignInForm onSwitchToSignUp={handleSwitchToSignUp} />
-  ) : (
+  if (signupOpen.isPending) {
+    return <Loader />;
+  }
+
+  return showSignUp && signupOpen.data ? (
     <SignUpForm onSwitchToSignIn={handleSwitchToSignIn} />
+  ) : (
+    <SignInForm onSwitchToSignUp={signupOpen.data ? handleSwitchToSignUp : undefined} />
   );
 }

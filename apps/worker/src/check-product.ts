@@ -8,7 +8,8 @@
  * picks it up again. Delivery is at-least-once, as it is with any queue: a
  * crash can cost a repeated check, never a corrupt or missing one.
  *
- * Alerting is deliberately absent — that is Epic 7.
+ * Alerting runs *after* that transaction commits, deliberately outside it and
+ * deliberately unable to fail the check — see `./alerting`.
  */
 
 import type { ExtractionResult, ExtractorStrategy } from "@price-tracker/core/extract";
@@ -20,6 +21,7 @@ import type { NewCheckRun, NewPricePoint, Product } from "@price-tracker/db/sche
 import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/products";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
+import { runAlerting } from "./alerting";
 import { type CheckOutcome, toCheckOutcome } from "./outcome";
 import { nextCheckAt } from "./schedule";
 
@@ -241,4 +243,12 @@ async function runCheck(productId: string, source: CheckSource): Promise<void> {
     log.warn(outcome.error ?? "check failed");
   }
   log.emit();
+
+  // After the commit and after the log line: the measurement is safe whatever
+  // Home Assistant does next.
+  await runAlerting({
+    outcome,
+    pricePointWritten: write.pricePoint !== null,
+    product,
+  });
 }

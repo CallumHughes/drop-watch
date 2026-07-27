@@ -1,7 +1,7 @@
 import type { CheckRun, Product } from "@price-tracker/db/schema/products";
 import { describe, expect, it } from "vitest";
 
-import { countLeadingFailures, type PriceSample, pulledInNextCheckAt, summarise } from "./summary";
+import { type PriceSample, pulledInNextCheckAt, summarise } from "./summary";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
@@ -52,26 +52,8 @@ function product(overrides: Partial<Product> = {}): Product {
   };
 }
 
-describe("countLeadingFailures", () => {
-  it("is zero when the most recent check succeeded", () => {
-    expect(countLeadingFailures([run("ok", 1), run("http_error", 2), run("timeout", 3)])).toBe(0);
-  });
-
-  it("counts only the current run of failures", () => {
-    expect(
-      countLeadingFailures([
-        run("timeout", 1),
-        run("http_error", 2),
-        run("ok", 3),
-        run("timeout", 4),
-      ])
-    ).toBe(2);
-  });
-
-  it("is zero with no history at all", () => {
-    expect(countLeadingFailures([])).toBe(0);
-  });
-});
+// The streak count itself is covered in `@price-tracker/core/rules`, where it
+// lives; what belongs here is that a summary surfaces it.
 
 describe("summarise", () => {
   it("takes the newest sample as latest, given oldest-first input", () => {
