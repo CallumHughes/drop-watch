@@ -9,21 +9,28 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "@price-tracker/auth": "workspace:*",
+    "@price-tracker/core": "workspace:*",
     "@price-tracker/db": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
+    "evlog": "^2.22.0",
     "next": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

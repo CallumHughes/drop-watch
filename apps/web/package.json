@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
+    "check-types": "tsc --noEmit",
     "start": "next start"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "recharts": "^3.7.1",
     "sonner": "catalog:",
     "zod": "catalog:"
   },
