@@ -13,14 +13,20 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test-url": "tsx src/bin/test-url.ts",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
+    "domhandler": "^6.0.1",
+    "p-queue": "^9.3.3",
+    "undici": "^8.9.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
     "@types/node": "^22.13.14",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

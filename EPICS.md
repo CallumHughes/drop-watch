@@ -40,7 +40,7 @@ Small — most of the plan's Phase 1 already happened at scaffold time.
 **Done when:** `pnpm dev` runs web + worker, both import `db` and `core` cleanly,
 and `pnpm test` passes.
 
-## Epic 2 — Extraction engine (`packages/core`)
+## Epic 2 — Extraction engine (`packages/core`) ✅ (done 2026-07-27)
 
 Pure logic, no DB or network calls inside extract/rules.
 
