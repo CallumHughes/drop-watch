@@ -54,10 +54,21 @@ const PRICE_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
 
 /** One observation. `price` is a decimal string; `inStock` is null when unknown. */
 export interface PriceSample {
+  /** The currency the page quoted, which is what `price` is denominated in. */
+  currency: string;
   inStock: boolean | null;
   observedAt: Date;
   price: string;
 }
+
+/**
+ * Re-exported so `apps/web` can name these shapes without taking a dependency
+ * on `@price-tracker/db` — the UI reads the API, not the database.
+ */
+export type { CheckRun, Product } from "@price-tracker/db/schema/products";
+
+/** The `check_run_status` enum, as a union. */
+export type CheckStatus = CheckRun["status"];
 
 /** A product card's worth of derived state. */
 export interface ProductSummary {
@@ -96,6 +107,7 @@ async function recentSamples(limit: number): Promise<Map<string, PriceSample[]>>
   const ranked = db.$with("ranked_price_points").as(
     db
       .select({
+        currency: pricePoints.currency,
         inStock: pricePoints.inStock,
         observedAt: pricePoints.observedAt,
         price: pricePoints.price,
@@ -117,7 +129,12 @@ async function recentSamples(limit: number): Promise<Map<string, PriceSample[]>>
   const byProduct = new Map<string, PriceSample[]>();
   for (const row of rows) {
     const samples = byProduct.get(row.productId) ?? [];
-    samples.push({ inStock: row.inStock, observedAt: row.observedAt, price: row.price });
+    samples.push({
+      currency: row.currency,
+      inStock: row.inStock,
+      observedAt: row.observedAt,
+      price: row.price,
+    });
     byProduct.set(row.productId, samples);
   }
   return byProduct;
@@ -195,6 +212,7 @@ function summarise(product: Product, samples: PriceSample[], runs: CheckRun[]): 
 async function loadSamples(productId: string, limit: number): Promise<PriceSample[]> {
   const rows = await db
     .select({
+      currency: pricePoints.currency,
       inStock: pricePoints.inStock,
       observedAt: pricePoints.observedAt,
       price: pricePoints.price,
