@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
@@ -13,11 +15,14 @@
     "@price-tracker/db": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "drizzle-orm": "^0.45.2",
+    "evlog": "^2.22.0",
+    "pg-boss": "^12.26.3",
     "tsx": "catalog:"
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
     "@types/node": "^22.13.14",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
