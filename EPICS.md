@@ -101,7 +101,7 @@ Depends on Epic 3 (Epic 4 makes it interesting).
 
 **Done when:** seeded products render with live-updating history charts.
 
-## Epic 6 — Add-product flow
+## Epic 6 — Add-product flow ✅ (done 2026-07-27)
 
 Depends on Epics 2 + 5.
 

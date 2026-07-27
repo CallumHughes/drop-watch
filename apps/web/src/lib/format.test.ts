@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDuration, formatPrice, formatRelative, formatStock } from "./format";
+import { formatDuration, formatPrice, formatRelative, formatStock, productHost } from "./format";
 
 /** Intl inserts a narrow no-break space in some locales; normalise for comparison. */
 function plain(value: string): string {
@@ -63,5 +63,20 @@ describe("formatStock", () => {
     expect(formatStock(true)).toBe("In stock");
     expect(formatStock(false)).toBe("Out of stock");
     expect(formatStock(null)).toBe("Stock unknown");
+  });
+});
+
+describe("productHost", () => {
+  it("drops the scheme, path and a leading www", () => {
+    expect(productHost("https://www.ikea.com/gb/en/p/billy-bookcase-white-00263850/")).toBe(
+      "ikea.com"
+    );
+    expect(productHost("https://books.toscrape.com/catalogue/thing/index.html")).toBe(
+      "books.toscrape.com"
+    );
+  });
+
+  it("returns a half-typed URL unchanged rather than throwing", () => {
+    expect(productHost("not a url")).toBe("not a url");
   });
 });

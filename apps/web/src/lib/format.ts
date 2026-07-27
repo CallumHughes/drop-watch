@@ -58,6 +58,22 @@ export function formatDuration(durationMs: number | null): string {
   return durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`;
 }
 
+/** `www.` carries no information on a host label, so it is dropped. */
+const WWW_PREFIX = /^www\./;
+
+/**
+ * The bare host of a product URL, as every view labels one. Falls back to the
+ * whole string rather than throwing: a saved product's URL has always been
+ * validated, but a preview shows one the user is still typing.
+ */
+export function productHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(WWW_PREFIX, "");
+  } catch {
+    return url;
+  }
+}
+
 /** Stock label. `null` means the page never said, which is not the same as no. */
 export function formatStock(inStock: boolean | null): string {
   if (inStock === null) {

@@ -3,23 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/comp
 import Image from "next/image";
 import Link from "next/link";
 
-import { formatPrice, formatRelative, formatStock } from "@/lib/format";
+import { formatPrice, formatRelative, formatStock, productHost } from "@/lib/format";
 
 import { Sparkline } from "./sparkline";
 import { StatusBadge } from "./status-badge";
 
 const THUMBNAIL_SIZE = 56;
-
-/** `www.` carries no information on a host label, so it is dropped. */
-const WWW_PREFIX = /^www\./;
-
-export function productHost(url: string): string {
-  try {
-    return new URL(url).hostname.replace(WWW_PREFIX, "");
-  } catch {
-    return url;
-  }
-}
 
 /** Green when the target is met, muted otherwise. Returns null with no target. */
 function TargetDistance({

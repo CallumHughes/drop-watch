@@ -168,7 +168,16 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
-function conditionalHeaders(headers: Headers): { etag?: string; lastModified?: string } {
+/**
+ * Structural rather than `Headers`: this module is reachable from `apps/web`,
+ * where the global `Headers` is the DOM one and undici's is not assignable to
+ * it. Only `get` is ever used, so only `get` is asked for.
+ */
+interface ReadableHeaders {
+  get: (name: string) => string | null;
+}
+
+function conditionalHeaders(headers: ReadableHeaders): { etag?: string; lastModified?: string } {
   const result: { etag?: string; lastModified?: string } = {};
   const etag = headers.get("etag");
   if (etag) {

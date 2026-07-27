@@ -18,7 +18,7 @@ import { ORPCError } from "@orpc/server";
 import { ALERT_RULES } from "@price-tracker/core/rules";
 import { db } from "@price-tracker/db";
 import { sendCheckNow } from "@price-tracker/db/queue";
-import type { CheckRun, Product } from "@price-tracker/db/schema/products";
+import type { CheckRun, NewProduct, Product } from "@price-tracker/db/schema/products";
 import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/products";
 import { asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -52,6 +52,11 @@ const MAX_DROP_PERCENT = 99;
 
 /** Matches what `numeric(12,2)` accepts, so a bad target never reaches Postgres. */
 const PRICE_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
+
+/** Bounds on the free-text columns the add-product flow writes. */
+const MAX_URL_LENGTH = 2048;
+const MAX_TITLE_LENGTH = 500;
+const MAX_SELECTOR_LENGTH = 500;
 
 /**
  * Re-exported so `apps/web` can name these shapes without taking a dependency
@@ -207,6 +212,56 @@ function buildPatch(input: UpdateInput): Partial<Product> {
   return patch;
 }
 
+/**
+ * What the add-product flow saves. Everything past `url` is optional because
+ * the preview supplies what it found and the user overrides the rest; the same
+ * only-supplied-keys convention as {@link buildPatch} applies.
+ */
+const createInput = z
+  .object({
+    currency: z.string().length(3).nullable().optional(),
+    dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
+    /** Pinning to `selector` makes a rotted selector fail loudly. */
+    extractor: z.enum(["auto", "selector"]).default("auto"),
+    imageUrl: z.url().max(2048).nullable().optional(),
+    intervalMinutes: z
+      .number()
+      .int()
+      .min(MIN_INTERVAL_MINUTES)
+      .max(MAX_INTERVAL_MINUTES)
+      .optional(),
+    jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
+    /** BCP 47 hint for pages whose separators are ambiguous. */
+    locale: z.string().max(35).nullable().optional(),
+    rules: z.array(z.enum(ALERT_RULES)).optional(),
+    selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
+    targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),
+    title: z.string().max(MAX_TITLE_LENGTH).nullable().optional(),
+    url: z.url().max(MAX_URL_LENGTH),
+  })
+  .refine(
+    (input) => input.extractor !== "selector" || Boolean(input.selector?.trim()),
+    "A selector-mode product needs a selector"
+  );
+
+type CreateInput = z.infer<typeof createInput>;
+
+/**
+ * The insert, with `nextCheckAt` pinned to now so the minutely dispatcher picks
+ * the product up on its next tick rather than after a first full interval —
+ * adding something and watching nothing happen for three hours reads as a bug.
+ */
+function buildInsert(input: CreateInput, now: Date): NewProduct {
+  const { url, ...rest } = input;
+  const values: NewProduct = { nextCheckAt: now, url };
+  for (const [key, value] of Object.entries(rest)) {
+    if (value !== undefined) {
+      Object.assign(values, { [key]: value });
+    }
+  }
+  return values;
+}
+
 export const productsRouter = {
   /**
    * Enqueues an immediate check onto the queue the worker already consumes.
@@ -243,6 +298,30 @@ export const productsRouter = {
         .where(eq(checkRuns.productId, input.id))
         .orderBy(desc(checkRuns.startedAt))
         .limit(input.limit);
+    }),
+
+  /**
+   * Confirm-and-save, the end of the add-product flow.
+   *
+   * Returns the same {@link ProductSummary} the dashboard renders, so the new
+   * card can be seeded into the list without a round trip. It has no history
+   * yet — the worker writes the first price point when it picks the product up,
+   * which `nextCheckAt` makes happen within a minute.
+   */
+  create: protectedProcedure
+    .input(createInput)
+    .handler(async ({ input }): Promise<ProductSummary> => {
+      const [created] = await db
+        .insert(products)
+        .values(buildInsert(input, new Date()))
+        // `url` is unique. Adding something already tracked is a mistake worth
+        // naming, not a duplicate row.
+        .onConflictDoNothing({ target: products.url })
+        .returning();
+      if (!created) {
+        throw new ORPCError("CONFLICT", { message: "That URL is already being tracked." });
+      }
+      return summarise(created, [], []);
     }),
 
   detail: protectedProcedure

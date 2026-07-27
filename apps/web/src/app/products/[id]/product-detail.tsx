@@ -10,10 +10,15 @@ import Link from "next/link";
 import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
-import { productHost } from "@/components/products/product-card";
 import { StatusBadge } from "@/components/products/status-badge";
 import { TrackingSettingsForm } from "@/components/products/tracking-settings-form";
-import { formatPrice, formatRelative, formatStock, LIVE_REFETCH_MS } from "@/lib/format";
+import {
+  formatPrice,
+  formatRelative,
+  formatStock,
+  LIVE_REFETCH_MS,
+  productHost,
+} from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
 const THUMBNAIL_SIZE = 72;
