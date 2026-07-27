@@ -133,7 +133,7 @@ Depends on Epic 4; does not block Epics 5–6.
 **Done when:** a manually lowered target fires exactly one HA notification and the
 next check does not re-notify.
 
-## Epic 8 — Deployment
+## Epic 8 — Deployment ✅ (done 2026-07-27)
 
 Last; depends on everything.
 

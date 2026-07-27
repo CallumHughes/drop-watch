@@ -39,6 +39,8 @@ lerna-debug.log*
 # Turbo
 .turbo
 .nx
+# `turbo prune --docker` output, produced inside the Docker builds
+out
 
 # Better-T-Stack
 .alchemy
