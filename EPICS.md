@@ -70,7 +70,7 @@ Can run in parallel with Epic 2.
 
 **Done when:** migrations apply cleanly on a fresh DB and seed inserts products.
 
-## Epic 4 — Worker pipeline (`apps/worker`)
+## Epic 4 — Worker pipeline (`apps/worker`) ✅ (done 2026-07-27)
 
 Depends on Epics 2 + 3.
 

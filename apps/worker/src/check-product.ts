@@ -1,11 +1,12 @@
 /**
  * One check of one product: fetch → extract → record → reschedule.
  *
- * The whole point of the design here is the transaction at the bottom. The
- * price point, the check-run audit row, and the `nextCheckAt` advance are
- * written together or not at all, so a worker killed mid-check leaves the
- * product exactly as it was: still due, nothing recorded, nothing duplicated.
- * The dispatcher picks it up again on its next tick.
+ * The whole point of the design here is the transaction in `persist`. The price
+ * point, the check-run audit row, and the `nextCheckAt` advance are written
+ * together or not at all, so a worker killed mid-check leaves the product
+ * exactly as it was — still due, no half-written attempt — and the dispatcher
+ * picks it up again. Delivery is at-least-once, as it is with any queue: a
+ * crash can cost a repeated check, never a corrupt or missing one.
  *
  * Alerting is deliberately absent — that is Epic 7.
  */
