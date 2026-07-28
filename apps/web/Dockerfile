@@ -32,6 +32,23 @@ COPY --from=pruner /app/out/full/ .
 # would otherwise not pass them through to `next build`.
 ENV SKIP_ENV_VALIDATION=1
 ENV BETTER_AUTH_SECRET=build-time-placeholder-secret-not-used-at-runtime
+
+# The one runtime fact that cannot arrive at runtime. `NEXT_PUBLIC_*` is
+# inlined into the browser bundle by `next build`, and next.config.ts otherwise
+# derives this flag by asking whether RESEND_API_KEY is set — which, in here,
+# it never is: secrets are kept out of image layers on purpose (.dockerignore),
+# so the derived answer would always be `false` and the email UI would stay
+# hidden however the container is configured at runtime. Hence the build arg.
+#
+# `false` is the honest default: it is exactly what the derivation would
+# produce in this stage. Set it to `true` (compose passes it through from the
+# root `.env`) to build a mailer-enabled image. It only controls whether links
+# and the email-alerts toggle are *offered*; the routes and the mailer itself
+# are gated server-side on the real key, so a wrong value here can at worst
+# show a link to a 404 — never send mail that was not configured.
+ARG NEXT_PUBLIC_EMAIL_ENABLED=false
+ENV NEXT_PUBLIC_EMAIL_ENABLED=${NEXT_PUBLIC_EMAIL_ENABLED}
+
 RUN NODE_ENV=production pnpm exec turbo build --filter=web
 # standalone output excludes public/; ensure it exists so the runner copy never fails
 RUN mkdir -p apps/web/public

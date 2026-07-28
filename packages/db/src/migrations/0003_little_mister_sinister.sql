@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "email_alerts_enabled" boolean DEFAULT false NOT NULL;

@@ -28,6 +28,20 @@ x-app-environment: &app-environment
   # this; leaving containers on UTC while the host is not is a quiet way to
   # make "last checked" wrong by an hour for half the year.
   TZ: ${TZ:-Europe/London}
+  # Email is opt-in and RESEND_API_KEY is the switch; unset means webhook-only
+  # alerting, which is a supported configuration. Both services need all three:
+  # `web` sends Better Auth's verification and reset mail, `worker` sends the
+  # alerts, and APP_URL is how the worker — which has no BETTER_AUTH_URL of its
+  # own — knows what to link to.
+  #
+  # Listed with no value, so compose takes them from the shell or from the root
+  # `.env`, and omits them entirely when neither has them. Note the precedence:
+  # an `environment` key overrides `env_file` even when it resolves to nothing,
+  # so for containers these three belong in the root `.env` (which compose
+  # interpolates) rather than only in `apps/web/.env` (which it does not).
+  APP_URL:
+  EMAIL_FROM:
+  RESEND_API_KEY:
 
 services:
   # One-shot: applies migrations, then exits. `web` and `worker` are gated
@@ -49,6 +63,16 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      # The one setting that cannot be changed by restarting the container.
+      # `NEXT_PUBLIC_*` is inlined into the browser bundle by `next build`, and
+      # the image is built without RESEND_API_KEY, so the flag next.config.ts
+      # would otherwise derive is always `false` — leaving the email UI hidden
+      # however this file's environment is filled in. Set it to `true` in the
+      # root `.env` and rebuild (`pnpm docker:prod:up` builds) alongside the
+      # key. It only controls what is offered; the routes and the mailer are
+      # gated server-side on the key itself.
+      args:
+        NEXT_PUBLIC_EMAIL_ENABLED: ${NEXT_PUBLIC_EMAIL_ENABLED:-false}
     init: true
     ports:
       - "3001:3001"

@@ -13,6 +13,7 @@
   "dependencies": {
     "@price-tracker/core": "workspace:*",
     "@price-tracker/db": "workspace:*",
+    "@price-tracker/email": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "evlog": "^2.22.0",

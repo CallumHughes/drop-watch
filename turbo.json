@@ -4,7 +4,12 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["BETTER_AUTH_SECRET", "SKIP_ENV_VALIDATION"],
+      "env": [
+        "BETTER_AUTH_SECRET",
+        "NEXT_PUBLIC_EMAIL_ENABLED",
+        "RESEND_API_KEY",
+        "SKIP_ENV_VALIDATION"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
@@ -32,6 +37,9 @@
       "persistent": true
     },
     "db:seed": {
+      "cache": false
+    },
+    "db:verify-user": {
       "cache": false
     },
     "db:studio": {
