@@ -338,8 +338,15 @@ compose one is fine):
 
 ```bash
 pnpm db:start
-pnpm test:e2e
+pnpm test:e2e      # headless run
+pnpm test:e2e:ui   # Playwright UI mode
 ```
+
+UI mode notes: global setup recreates the throwaway database when the window
+opens, so on a fresh database run `auth.setup.ts` once before cherry-picking
+individual specs (running whole projects respects the dependency order on its
+own), and relaunch the window after a headless `pnpm test:e2e` — that run
+recreates the database underneath an open UI session.
 
 Everything else is owned by the suite. Global setup drops and recreates a throwaway
 `price-tracker-e2e` database (override with `E2E_DATABASE_URL`), pushes the schema,
@@ -420,6 +427,7 @@ Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 - `pnpm build` — build all applications
 - `pnpm test` — vitest across the workspace
 - `pnpm test:e2e` — Playwright end-to-end suite (see "End-to-end tests")
+- `pnpm test:e2e:ui` — the same suite in Playwright's interactive UI mode
 - `pnpm check-types` — TypeScript across all apps
 - `pnpm check` / `pnpm fix` — Biome via ultracite (husky runs it pre-commit)
 - `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container
