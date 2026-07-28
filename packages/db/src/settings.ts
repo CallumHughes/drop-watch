@@ -8,17 +8,24 @@
  */
 
 import type { NotifyConfig } from "@price-tracker/core/notify";
+import type { AlertTargets } from "@price-tracker/core/notify/channels";
 import { env } from "@price-tracker/env/db";
 import { eq } from "drizzle-orm";
 
 import { db } from "./index";
+import { alertRecipients } from "./recipients";
 import { type NewSettings, SETTINGS_ID, type Settings, settings } from "./schema/settings";
 
 /** The columns the settings page may change. */
 export type SettingsPatch = Partial<
   Pick<
     NewSettings,
-    "alertsEnabled" | "cooldownMinutes" | "failureThreshold" | "haUrl" | "haWebhookId"
+    | "alertsEnabled"
+    | "cooldownMinutes"
+    | "emailAlertsEnabled"
+    | "failureThreshold"
+    | "haUrl"
+    | "haWebhookId"
   >
 >;
 
@@ -85,4 +92,49 @@ export function notifyConfig(current: Settings): NotifyConfig | null {
     return null;
   }
   return { haUrl: current.haUrl, webhookId: current.haWebhookId };
+}
+
+export interface AlertTargetsInput {
+  /**
+   * `emailEnabled()` from `@price-tracker/email`, passed in rather than read.
+   *
+   * The answer depends on `RESEND_API_KEY`, and this package must not learn
+   * that variable exists — one module in the repo decides whether a mailer is
+   * configured, and it is not this one. Injecting it also keeps the dependency
+   * pointing the right way: `@price-tracker/db` knows nothing of Resend or
+   * React, exactly as `@price-tracker/core` does not.
+   */
+  emailConfigured: boolean;
+  settings: Settings;
+}
+
+/**
+ * Everything configured to receive an alert, in the shape `deliverAlert`'s
+ * callers turn into channels.
+ *
+ * The two halves are gated independently and by different things —
+ * Home Assistant by its two columns being set, email by the new toggle *and* a
+ * mailer existing *and* somebody having a verified address — but they share
+ * `alertsEnabled` as the master switch, so turning that off silences both
+ * without losing either configuration.
+ *
+ * Both halves carry {@link notifyConfig}'s distinction forward: a `null`
+ * webhook and an empty recipient list mean "we chose not to send", never "we
+ * tried and failed". That is the whole reason an unconfigured channel is left
+ * out of the channel array rather than included and failing — a tracker with
+ * no mailer would otherwise log an email failure on every single alert.
+ *
+ * The recipient query is skipped entirely when email alerting is off, which is
+ * the common case: no mailer means no round-trip to the `user` table on the
+ * back of every check.
+ */
+export async function alertTargets({
+  emailConfigured,
+  settings: current,
+}: AlertTargetsInput): Promise<AlertTargets> {
+  const emailWanted = current.alertsEnabled && current.emailAlertsEnabled && emailConfigured;
+  return {
+    recipients: emailWanted ? await alertRecipients() : [],
+    webhook: notifyConfig(current),
+  };
 }

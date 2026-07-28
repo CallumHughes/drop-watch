@@ -226,6 +226,9 @@ importers:
       '@price-tracker/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@price-tracker/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@price-tracker/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -278,6 +281,9 @@ importers:
       '@price-tracker/db':
         specifier: workspace:*
         version: link:../db
+      '@price-tracker/email':
+        specifier: workspace:*
+        version: link:../email
       '@price-tracker/env':
         specifier: workspace:*
         version: link:../env

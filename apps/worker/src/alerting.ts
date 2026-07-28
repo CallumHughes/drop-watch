@@ -15,11 +15,20 @@
  * `alert_state` is only written after a *successful* send, so a webhook that
  * was unreachable is retried on the next check instead of being silently
  * marked as delivered.
+ *
+ * An alert now goes out on more than one channel, so "a successful send" means
+ * **any channel landed** — `deliverAlert`'s `delivered`. Deduping per channel
+ * would be the wrong trade: `alert_state` is keyed by `(product, rule)`, and
+ * splitting it per channel to re-send an email nobody received would also
+ * re-send the notification that did arrive. One channel landing is enough to
+ * consider the person told.
  */
 
 import { percentChange } from "@price-tracker/core/decimal";
-import type { NotificationPayload, NotifyConfig } from "@price-tracker/core/notify";
-import { sendNotification } from "@price-tracker/core/notify";
+import type { NotificationPayload } from "@price-tracker/core/notify";
+import type { AlertChannel } from "@price-tracker/core/notify/channels";
+import { deliverAlert } from "@price-tracker/core/notify/channels";
+import { alertChannels } from "@price-tracker/core/notify/targets";
 import type {
   AlertMemory,
   AlertStateKey,
@@ -37,7 +46,8 @@ import { db } from "@price-tracker/db";
 import type { Product } from "@price-tracker/db/schema/products";
 import { alertState, checkRuns, pricePoints } from "@price-tracker/db/schema/products";
 import type { Settings } from "@price-tracker/db/schema/settings";
-import { loadSettings, notifyConfig } from "@price-tracker/db/settings";
+import { alertTargets, loadSettings } from "@price-tracker/db/settings";
+import { emailChannel, emailEnabled } from "@price-tracker/email";
 import { and, desc, eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 
@@ -143,9 +153,13 @@ function brokenPayload(
   };
 }
 
-/** Sends one notification and logs the result. Resolves to whether it landed. */
+/**
+ * Sends one notification on every configured channel and logs what each did.
+ * Resolves to whether *any* of them landed, which is what `alert_state` is
+ * gated on.
+ */
 async function deliver(
-  config: NotifyConfig,
+  channels: readonly AlertChannel[],
   payload: NotificationPayload,
   reason: string
 ): Promise<boolean> {
@@ -156,24 +170,25 @@ async function deliver(
     reason,
     rule: payload.rule,
   });
-  const result = await sendNotification(config, payload);
-  if (result.ok) {
-    log.set({ httpStatus: result.httpStatus });
+  const { delivered, results } = await deliverAlert({ channels, payload });
+  // Per channel rather than aggregated: "alert delivery failed" without saying
+  // which destination failed is a line that sends you to the code to find out.
+  log.set({ channels: results });
+  if (delivered) {
     log.info("alert sent");
   } else {
-    // Logged, never thrown: the check is already committed and a webhook is
-    // not allowed to undo it (PLAN.md §7).
-    log.set({ error: result.error, httpStatus: result.httpStatus ?? null });
+    // Logged, never thrown: the check is already committed and a notification
+    // is not allowed to undo it (PLAN.md §7).
     log.warn("alert delivery failed");
   }
   log.emit();
-  return result.ok;
+  return delivered;
 }
 
 /** Price rules: target, drop_percent, restock — evaluated, sent, remembered. */
 async function runPriceAlerts(
   product: Product,
-  config: NotifyConfig,
+  channels: readonly AlertChannel[],
   settings: Settings,
   now: Date
 ): Promise<void> {
@@ -198,7 +213,7 @@ async function runPriceAlerts(
   for (const trigger of triggers) {
     // biome-ignore lint/performance/noAwaitInLoops: a product rarely fires two rules at once, and the ones that do should arrive in rule order rather than racing.
     const sent = await deliver(
-      config,
+      channels,
       priceAlertPayload(product, trigger, latest, previous),
       trigger.reason
     );
@@ -217,7 +232,7 @@ async function runPriceAlerts(
  */
 async function runFailureAlert(
   product: Product,
-  config: NotifyConfig,
+  channels: readonly AlertChannel[],
   settings: Settings,
   context: AlertContext,
   now: Date
@@ -241,7 +256,7 @@ async function runFailureAlert(
   }
 
   const sent = await deliver(
-    config,
+    channels,
     brokenPayload(product, failures, context.outcome),
     `${failures} consecutive failed checks`
   );
@@ -258,9 +273,10 @@ async function runFailureAlert(
 export async function runAlerting(context: AlertContext): Promise<void> {
   try {
     const settings = await loadSettings();
-    const config = notifyConfig(settings);
-    if (!config) {
-      // Not an error — alerting is off, or Home Assistant has never been
+    const targets = await alertTargets({ emailConfigured: emailEnabled(), settings });
+    const channels = alertChannels(targets, emailChannel);
+    if (channels.length === 0) {
+      // Not an error — alerting is off, or no destination has ever been
       // configured. Recovery state is still cleared so a later configuration
       // does not inherit a stale "broken" flag.
       if (context.outcome.status === "ok") {
@@ -271,9 +287,9 @@ export async function runAlerting(context: AlertContext): Promise<void> {
 
     const now = new Date();
     if (context.pricePointWritten) {
-      await runPriceAlerts(context.product, config, settings, now);
+      await runPriceAlerts(context.product, channels, settings, now);
     }
-    await runFailureAlert(context.product, config, settings, context, now);
+    await runFailureAlert(context.product, channels, settings, context, now);
   } catch (error) {
     const log = createLogger({
       action: "alerting_failed",

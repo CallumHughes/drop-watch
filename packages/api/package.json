@@ -22,6 +22,7 @@
     "@price-tracker/auth": "workspace:*",
     "@price-tracker/core": "workspace:*",
     "@price-tracker/db": "workspace:*",
+    "@price-tracker/email": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
