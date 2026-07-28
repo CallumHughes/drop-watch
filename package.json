@@ -11,6 +11,8 @@
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e -F e2e",
+    "test:e2e:ui": "pnpm --filter e2e test:e2e:ui",
     "dev:web": "turbo run dev -F web",
     "dev:worker": "turbo run dev -F worker",
     "db:push": "turbo run db:push -F @price-tracker/db",

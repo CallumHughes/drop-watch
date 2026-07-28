@@ -24,6 +24,9 @@ import type { NextConfig } from "next";
 const emailFlag = process.env.NEXT_PUBLIC_EMAIL_ENABLED ?? String(emailEnabled());
 
 const nextConfig: NextConfig = {
+  // Overridable so a second dev server (the e2e suite's, on its own port) can
+  // run beside `pnpm dev` without the two fighting over one .next directory.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   env: {
     NEXT_PUBLIC_EMAIL_ENABLED: emailFlag,
   },

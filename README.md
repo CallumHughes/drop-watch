@@ -330,6 +330,42 @@ container, not only in `apps/web/.env`. Compose interpolates the root file, and 
 `environment` key in `docker-compose.yml` overrides `env_file` even when it resolves to
 nothing.
 
+## End-to-end tests
+
+`apps/e2e` is a Playwright suite covering the real loop: browser → oRPC → pg-boss →
+worker → webhook. The only prerequisite is a Postgres on `localhost:5432` (the
+compose one is fine):
+
+```bash
+pnpm db:start
+pnpm test:e2e      # headless run
+pnpm test:e2e:ui   # Playwright UI mode
+```
+
+UI mode notes: global setup recreates the throwaway database when the window
+opens, so on a fresh database run `auth.setup.ts` once before cherry-picking
+individual specs (running whole projects respects the dependency order on its
+own), and relaunch the window after a headless `pnpm test:e2e` — that run
+recreates the database underneath an open UI session.
+
+Everything else is owned by the suite. Global setup drops and recreates a throwaway
+`price-tracker-e2e` database (override with `E2E_DATABASE_URL`), pushes the schema,
+and spawns the worker against it. Playwright then starts its own web server on
+**:3101** with its own `.next-e2e` build dir — a `pnpm dev` on :3001 can keep running —
+plus a fixture server on **:4100** that plays both external roles: the retailer pages
+the app scrapes (the app's outbound HTTP is server-side undici, so browser-level
+mocking can't touch it) and the Home Assistant webhook the alerts land on.
+
+The first test (`tests/setup/auth.setup.ts`) runs against the empty database: it
+signs up the admin through the UI — covering the signup-open path — and saves the
+session as `storageState` for every other test. The suite runs fully parallel;
+isolation is by data (each test registers its own uniquely-named fixture product),
+and the specs that mutate the singleton settings row run in a serial project after
+the parallel bulk. Specs import `test`/`expect` from `tests/fixtures.ts` only, which
+injects the page objects — see `.claude/skills/playwright-e2e-conventions` for the
+house rules. The suite runs in the email-disabled configuration; email flows are
+untested for now.
+
 ## Known limitations
 
 - **Do not scale `web` past one replica.** The add-product preview caches the fetched
@@ -350,6 +386,7 @@ nothing.
 ```
 price-tracker/
 ├── apps/
+│   ├── e2e/         # Playwright end-to-end suite (fixture server, page objects, specs)
 │   ├── web/         # Next.js — UI, oRPC route handlers, Better Auth
 │   └── worker/      # pg-boss: dispatcher + check handler
 ├── packages/
@@ -389,6 +426,8 @@ Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 - `pnpm dev` / `pnpm dev:web` / `pnpm dev:worker` — development servers
 - `pnpm build` — build all applications
 - `pnpm test` — vitest across the workspace
+- `pnpm test:e2e` — Playwright end-to-end suite (see "End-to-end tests")
+- `pnpm test:e2e:ui` — the same suite in Playwright's interactive UI mode
 - `pnpm check-types` — TypeScript across all apps
 - `pnpm check` / `pnpm fix` — Biome via ultracite (husky runs it pre-commit)
 - `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container

@@ -1,0 +1,14 @@
+{
+  "extends": "@price-tracker/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "constants.ts",
+    "playwright.config.ts",
+    "global",
+    "fixture-server",
+    "tests"
+  ]
+}

@@ -13,14 +13,14 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
     "check-types": {
       "dependsOn": ["^check-types"]
     },
     "test": {
       "outputs": []
+    },
+    "test:e2e": {
+      "cache": false
     },
     "dev": {
       "cache": false,
