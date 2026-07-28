@@ -1,8 +1,9 @@
 # price-tracker
 
 A self-hosted price tracker for arbitrary online products. It checks product pages on
-a schedule, records price history, and pushes alerts to a local Home Assistant
-webhook.
+a schedule, records price history, and pushes alerts to a local Home Assistant webhook,
+to email, or to both — see [Email](#email-optional); the mailer is optional and off
+until you give it a key.
 
 See [`PLAN.md`](PLAN.md) for the design and [`EPICS.md`](EPICS.md) for the
 implementation breakdown. Scaffolded with
@@ -15,6 +16,7 @@ implementation breakdown. Scaffolded with
 - **Drizzle + PostgreSQL** — schema, migrations, `numeric(12,2)` prices
 - **pg-boss** — the queue; Postgres is the only interface between web and worker
 - **Better Auth** — one seeded admin, signup closes once that account exists
+- **Resend + React Email** — optional: transactional auth mail and a second alert channel
 - **Turborepo + pnpm**, **Biome** (via ultracite), **evlog**, **vitest**
 
 ## Getting started (development)
@@ -157,6 +159,10 @@ itself.
 | `CORS_ORIGIN` | yes (web) | `web` | Normally identical to `BETTER_AUTH_URL`. |
 | `HA_URL` | no | `web`, `worker` | **Seed value only** — see below. Base URL of Home Assistant, e.g. `http://homeassistant:8123`. |
 | `HA_WEBHOOK_ID` | no | `web`, `worker` | **Seed value only.** The webhook id is itself the secret. |
+| `RESEND_API_KEY` | no | `web`, `worker` | The mailer's on/off switch. Unset is a supported configuration: webhook-only alerting, no email auth flows. |
+| `EMAIL_FROM` | no | `web`, `worker` | `From:` address. Defaults to `onboarding@resend.dev`, which needs no verified domain but which Resend only delivers to the address that owns your Resend account. |
+| `APP_URL` | no | `web`, `worker` | Absolute base URL for links inside emails. The worker has no `BETTER_AUTH_URL` of its own; `web` falls back to that. |
+| `NEXT_PUBLIC_EMAIL_ENABLED` | no | `web` **build** | Docker only, and a *build* argument rather than runtime config — see [Email](#email-optional). |
 | `TZ` | no | all | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
 | `POSTGRES_PASSWORD` | no | dev `postgres` | Dev container only. Defaults to `password`. |
 | `NODE_ENV` | no | all | Set to `production` by compose. |
@@ -230,6 +236,100 @@ The settings page's "send test" button posts the same shape with `rule: "test"`,
 is the only way to prove the automation exists: Home Assistant answers 200 to a
 webhook with no automation behind it.
 
+## Email (optional)
+
+Email is opt-in and **`RESEND_API_KEY` is the switch**. Setting it is the statement "I
+want the mailer"; leaving it unset leaves a fully working tracker rather than a
+half-broken auth flow. Three configurations are supported, and all three are meant to
+be run:
+
+| Configuration | Set | Alerts go to | Auth |
+|---|---|---|---|
+| Webhook-only | `ha_url` + `ha_webhook_id` (settings page) | Home Assistant | Sign in immediately; no verification, no password reset |
+| Email-only | `RESEND_API_KEY`, then tick **Email alerts** | Your account's inbox | Verification required, password reset and change email available |
+| Both | both of the above | Both, independently | As above |
+
+Channels are independent. An alert fires once per configured channel, and the dedupe in
+`alert_state` is per `(product, rule)` rather than per channel, so a price that stays
+below its target does not re-notify anywhere. A channel that is not configured is not a
+channel that failed: with no mailer, nothing about the logs or the webhook path differs
+from a tracker that never had one. Email failures obey the same rule as webhook
+failures — logged, never enough to fail a check.
+
+To turn it on:
+
+```bash
+RESEND_API_KEY=re_...                    # from https://resend.com
+EMAIL_FROM=price-tracker@example.com     # optional; see the note below
+APP_URL=http://server.local:3001         # optional; links inside the mail
+```
+
+Then restart both `web` and `worker` (in Docker, rebuild — see below) and tick **Email
+alerts** on the settings page. Alert recipients are not a field you type into: they are
+the **verified** addresses on the account table, because that is what stays correct once
+products gain an owner. An unverified account receives nothing.
+
+Without `EMAIL_FROM` the sender is Resend's shared `onboarding@resend.dev`. It needs no
+verified domain, which is why it is the default — but Resend will only deliver from it
+to the address that owns your Resend account. That is enough for a single-user tracker
+and useless for anything else; verify a domain and set `EMAIL_FROM` to escape it.
+
+### What turning it on changes about sign-in
+
+With a mailer configured, Better Auth gains `requireEmailVerification`, verification
+mail on signup, password reset and change email — and `/forgot-password`,
+`/verify-email` and the change-email half of `/account` start being served. Without one,
+all of that is off: `requireEmailVerification` is *not* hardcoded `true`, because on a
+box whose signup endpoint closes after the first account it would lock every new account
+behind a mail that can never be sent.
+
+### Locked out? `pnpm db:verify-user`
+
+That is the same trap in its other form: signup closes once the first account exists, so
+an account created *before* the key was set — or one whose verification mail bounced —
+is a locked box with no second account to rescue it from. The escape hatch:
+
+```bash
+pnpm db:verify-user admin@price-tracker.local
+```
+
+Or, straight at the database:
+
+```sql
+UPDATE "user" SET email_verified = true WHERE email = 'admin@price-tracker.local';
+```
+
+`pnpm db:seed` already writes `emailVerified: true`, so a seeded admin never needs this.
+
+### Docker: `NEXT_PUBLIC_EMAIL_ENABLED` is a build argument
+
+The browser's copy of "is a mailer configured" — which is all that decides whether the
+*links* and the **Email alerts** tick box are offered — is inlined into the bundle by
+`next build`. The image is built without `RESEND_API_KEY` (secrets stay out of image
+layers), so the value it would derive is always `false`, and setting the key on the
+container at runtime cannot change it. Pass it as a build argument instead:
+
+```bash
+# in the root .env, which is the file compose interpolates
+RESEND_API_KEY=re_...
+NEXT_PUBLIC_EMAIL_ENABLED=true
+```
+
+```bash
+pnpm docker:prod:up      # builds, so the flag is baked in
+```
+
+Two consequences worth knowing. Changing it needs a **rebuild**, not a restart. And it
+is only ever about what is *offered*: the routes and the mailer itself are gated
+server-side on the real key at request time, so if the two disagree the worst case is a
+visible link to a 404 — never a form that silently does nothing, and never mail from an
+instance that was not given a key.
+
+Note also that these variables have to be in the **root `.env`** (or the shell) for a
+container, not only in `apps/web/.env`. Compose interpolates the root file, and an
+`environment` key in `docker-compose.yml` overrides `env_file` even when it resolves to
+nothing.
+
 ## Known limitations
 
 - **Do not scale `web` past one replica.** The add-product preview caches the fetched
@@ -258,7 +358,8 @@ price-tracker/
 │   ├── config/      # shared tsconfig base
 │   ├── core/        # extract/, rules/, notify/, fetch/ — pure logic
 │   ├── db/          # Drizzle schema, migrations, queue wiring, migrate image
-│   ├── env/         # zod-validated env: ./db, ./seed, ./server, ./web, ./worker
+│   ├── email/       # optional: Resend transport + React Email templates
+│   ├── env/         # zod-validated env: ./db, ./email, ./seed, ./server, ./web, ./worker
 │   └── ui/          # shared shadcn/ui primitives
 ```
 
@@ -292,6 +393,7 @@ Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 - `pnpm check` / `pnpm fix` — Biome via ultracite (husky runs it pre-commit)
 - `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container
 - `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` — Drizzle
+- `pnpm db:verify-user <email>` — mark an account verified; the lockout escape hatch
 - `pnpm --filter @price-tracker/core test-url <url>` — run the extraction chain on one URL
 - `pnpm docker:build` / `docker:up` / `docker:logs` / `docker:down` — local container stack
 - `pnpm docker:prod:build` / `docker:prod:up` / `docker:prod:logs` / `docker:prod:down` — against host Postgres
