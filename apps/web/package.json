@@ -18,6 +18,7 @@
     "@orpc/zod": "catalog:",
     "@price-tracker/api": "workspace:*",
     "@price-tracker/auth": "workspace:*",
+    "@price-tracker/email": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "@price-tracker/ui": "workspace:*",
     "@swc/helpers": "^0.5.23",

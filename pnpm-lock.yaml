@@ -135,6 +135,9 @@ importers:
       '@price-tracker/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@price-tracker/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@price-tracker/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -309,6 +312,9 @@ importers:
       '@price-tracker/db':
         specifier: workspace:*
         version: link:../db
+      '@price-tracker/email':
+        specifier: workspace:*
+        version: link:../email
       '@price-tracker/env':
         specifier: workspace:*
         version: link:../env
@@ -318,6 +324,9 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
+      evlog:
+        specifier: ^2.22.0
+        version: 2.22.3(@orpc/server@1.14.10)(express@5.2.1)(hono@4.12.32)(next@16.2.12(@babel/core@7.29.7)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0))
       zod:
         specifier: 'catalog:'
         version: 4.4.3

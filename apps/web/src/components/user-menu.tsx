@@ -51,6 +51,9 @@ export default function UserMenu() {
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
+          {/* The only way to reach /account — it is deliberately absent from
+              the header nav, which is for the tracker, not for the account. */}
+          <DropdownMenuItem render={<Link href="/account" />}>Account</DropdownMenuItem>
           <DropdownMenuItem onClick={handleSignOut} variant="destructive">
             Sign Out
           </DropdownMenuItem>

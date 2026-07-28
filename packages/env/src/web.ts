@@ -10,10 +10,11 @@ import { z } from "zod";
 // than no link, and asking the API "do you have a mail key?" would answer that
 // question for anyone who asks.
 //
-// `apps/web/next.config.ts` derives the default from `RESEND_API_KEY`, so in
-// development setting the key alone is enough. `NEXT_PUBLIC_*` is inlined at
-// build time, so a Docker image built without the key needs the value passed
-// as a build argument — see README.md.
+// `apps/web/next.config.ts` derives the default by calling `emailEnabled()`
+// itself — the same predicate, not a second reading of `RESEND_API_KEY` — so
+// in development setting the key alone is enough. `NEXT_PUBLIC_*` is inlined
+// at build time, so a Docker image built without the key needs the value
+// passed as a build argument — see README.md.
 export const env = createEnv({
   client: {
     NEXT_PUBLIC_EMAIL_ENABLED: z.stringbool().default(false),
