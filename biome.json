@@ -8,6 +8,7 @@
   "files": {
     "ignoreUnknown": false,
     "includes": [
+      "!**/.claude",
       "!**/.next",
       "!**/.next-e2e",
       "!**/test-results",
