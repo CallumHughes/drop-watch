@@ -366,6 +366,26 @@ injects the page objects — see `.claude/skills/playwright-e2e-conventions` for
 house rules. The suite runs in the email-disabled configuration; email flows are
 untested for now.
 
+## Integration tests
+
+`packages/db` has a vitest suite that runs against a real Postgres: the queue wiring
+(pg-boss policies and dedupe), `signupOpen`, the settings singleton (including the
+concurrent seeding race), and a **migrations-vs-push parity check** — production
+applies `src/migrations` while e2e uses `drizzle-kit push`, and this test proves the
+two produce identical schemas by diffing normalised `pg_dump` output. Prerequisite is
+the compose Postgres (the parity check also runs `pg_dump` inside that container):
+
+```bash
+pnpm db:start
+pnpm test:integration
+```
+
+Global setup drops and recreates a throwaway `price-tracker-integration` database
+(override with `INTEGRATION_DATABASE_URL`) and applies the real migration chain; the
+parity check uses two more throwaway databases, `price-tracker-parity-migrate` and
+`price-tracker-parity-push`, on the same server. All three are dropped afterwards.
+The suite is not part of `pnpm test`, which stays database-free.
+
 ## Known limitations
 
 - **Do not scale `web` past one replica.** The add-product preview caches the fetched

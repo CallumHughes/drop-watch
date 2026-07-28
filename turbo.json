@@ -22,6 +22,10 @@
     "test:e2e": {
       "cache": false
     },
+    "test:integration": {
+      "cache": false,
+      "passThroughEnv": ["INTEGRATION_DATABASE_URL"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
