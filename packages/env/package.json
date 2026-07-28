@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./db": "./src/db.ts",
+    "./email": "./src/email.ts",
     "./seed": "./src/seed.ts",
     "./server": "./src/server.ts",
     "./web": "./src/web.ts",
