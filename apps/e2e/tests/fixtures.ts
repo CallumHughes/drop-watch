@@ -12,20 +12,26 @@ import { test as base, expect as baseExpect } from "@playwright/test";
 import { Header } from "./components/header";
 import { AddProductPage } from "./pages/add-product.page";
 import { DashboardPage } from "./pages/dashboard.page";
+import { ForgotPasswordPage } from "./pages/forgot-password.page";
 import { LoginPage } from "./pages/login.page";
 import { ProductDetailPage } from "./pages/product-detail.page";
+import { ResetPasswordPage } from "./pages/reset-password.page";
 import { SettingsPage } from "./pages/settings.page";
+import { EmailSink } from "./support/email-sink";
 import { FixtureProduct } from "./support/fixture-product";
 import { WebhookSink } from "./support/webhook-sink";
 
 interface Fixtures {
   addProduct: AddProductPage;
   dashboard: DashboardPage;
+  emailSink: EmailSink;
   /** This test's own product page on the fixture server, already published. */
   fixtureProduct: FixtureProduct;
+  forgotPassword: ForgotPasswordPage;
   header: Header;
   loginPage: LoginPage;
   productDetail: ProductDetailPage;
+  resetPassword: ResetPasswordPage;
   settings: SettingsPage;
   webhookSink: WebhookSink;
 }
@@ -37,10 +43,16 @@ export const test = base.extend<Fixtures>({
   dashboard: async ({ page }, use) => {
     await use(new DashboardPage(page));
   },
+  emailSink: async ({ request }, use) => {
+    await use(new EmailSink(request));
+  },
   fixtureProduct: async ({ request }, use) => {
     const product = new FixtureProduct(request);
     await product.publish();
     await use(product);
+  },
+  forgotPassword: async ({ page }, use) => {
+    await use(new ForgotPasswordPage(page));
   },
   header: async ({ page }, use) => {
     await use(new Header(page));
@@ -50,6 +62,9 @@ export const test = base.extend<Fixtures>({
   },
   productDetail: async ({ page }, use) => {
     await use(new ProductDetailPage(page));
+  },
+  resetPassword: async ({ page }, use) => {
+    await use(new ResetPasswordPage(page));
   },
   settings: async ({ page }, use) => {
     await use(new SettingsPage(page));
