@@ -50,7 +50,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^24.13.3",
+    "@types/node": "catalog:",
     "husky": "latest",
     "turbo": "^2.10.2",
     "typescript": "catalog:",

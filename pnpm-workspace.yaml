@@ -17,7 +17,14 @@ catalog:
   "@orpc/server": ^1.14.12
   "@orpc/client": ^1.14.12
   "@orpc/openapi": ^1.14.12
+  "@orpc/tanstack-query": ^1.14.12
   "@orpc/zod": ^1.14.12
+  "@types/node": ^24.13.3
+  "@types/pg": ^8.20.0
+  drizzle-orm: ^0.45.2
+  evlog: ^2.22.4
+  pg: ^8.22.0
+  pg-boss: ^12.26.3
   better-auth: 1.6.25
   resend: ^6.18.0
   "@react-email/components": ^1.0.12
