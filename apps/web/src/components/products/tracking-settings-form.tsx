@@ -1,6 +1,13 @@
 "use client";
 
 import type { Product } from "@price-tracker/api/routers/products";
+import {
+  MAX_DROP_PERCENT,
+  MAX_INTERVAL_MINUTES,
+  MAX_JITTER_PERCENT,
+  MIN_DROP_PERCENT,
+  MIN_INTERVAL_MINUTES,
+} from "@price-tracker/api/schemas/products";
 import { Button } from "@price-tracker/ui/components/button";
 import { Checkbox } from "@price-tracker/ui/components/checkbox";
 import { Input } from "@price-tracker/ui/components/input";
@@ -12,17 +19,6 @@ import { toast } from "sonner";
 import { orpc } from "@/utils/orpc";
 
 type AlertRule = Product["rules"][number];
-
-/**
- * Native input bounds mirroring the `products.update` schema, so the browser
- * rejects an out-of-range value before the round trip does.
- */
-const MIN_INTERVAL_MINUTES = 5;
-/** A week, matching the router. Anything longer is a bookmark, not a tracker. */
-const MAX_INTERVAL_MINUTES = 10_080;
-const MAX_JITTER_PERCENT = 100;
-const MIN_DROP_PERCENT = 1;
-const MAX_DROP_PERCENT = 99;
 
 const RULE_OPTIONS: readonly { hint: string; label: string; value: AlertRule }[] = [
   { hint: "price at or below the target", label: "Target", value: "target" },

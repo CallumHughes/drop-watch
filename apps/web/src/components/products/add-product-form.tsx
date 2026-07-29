@@ -5,6 +5,7 @@ import type {
   PreviewExtraction,
   SelectorPreview,
 } from "@price-tracker/api/routers/preview";
+import { PRICE_PATTERN_SOURCE } from "@price-tracker/api/schemas/products";
 import { Button } from "@price-tracker/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
 import { Input } from "@price-tracker/ui/components/input";
@@ -26,9 +27,6 @@ import { SelectorPicker } from "./selector-picker";
  * way, because the page is already in memory.
  */
 const SELECTOR_DEBOUNCE_MS = 300;
-
-/** Mirrors the router's `create` schema so the browser rejects a bad target first. */
-const PRICE_PATTERN = "\\d{1,10}(\\.\\d{1,2})?";
 
 function Field({
   children,
@@ -144,7 +142,7 @@ function SavePanel({
             id={targetId}
             inputMode="decimal"
             onChange={onTargetChange}
-            pattern={PRICE_PATTERN}
+            pattern={PRICE_PATTERN_SOURCE}
             placeholder="none"
             value={targetPrice}
           />

@@ -19,7 +19,6 @@
  */
 
 import { ORPCError } from "@orpc/server";
-import { ALERT_RULES } from "@price-tracker/core/rules";
 import { db } from "@price-tracker/db";
 import { sendCheckNow } from "@price-tracker/db/queue";
 import type { CheckRun, NewProduct, Product } from "@price-tracker/db/schema/products";
@@ -29,6 +28,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import { getSenderBoss } from "../queue";
+import { productCreateInput, productUpdateInput } from "../schemas/products";
 import { type PriceSample, type ProductSummary, pulledInNextCheckAt, summarise } from "../summary";
 
 /** Points behind each dashboard sparkline. Enough shape, one small query. */
@@ -46,21 +46,6 @@ const DEFAULT_HISTORY_POINTS = 200;
 const MAX_HISTORY_POINTS = 2000;
 const DEFAULT_CHECK_RUNS = 50;
 const MAX_CHECK_RUNS = 500;
-
-const MIN_INTERVAL_MINUTES = 5;
-/** A week. Anything longer is a bookmark, not a tracker. */
-const MAX_INTERVAL_MINUTES = 10_080;
-const MAX_JITTER_PERCENT = 100;
-const MIN_DROP_PERCENT = 1;
-const MAX_DROP_PERCENT = 99;
-
-/** Matches what `numeric(12,2)` accepts, so a bad target never reaches Postgres. */
-const PRICE_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
-
-/** Bounds on the free-text columns the add-product flow writes. */
-const MAX_URL_LENGTH = 2048;
-const MAX_TITLE_LENGTH = 500;
-const MAX_SELECTOR_LENGTH = 500;
 
 /**
  * Re-exported so `apps/web` can name these shapes without taking a dependency
@@ -207,17 +192,7 @@ async function summariseOne(product: Product): Promise<ProductSummary> {
   return summarise(product, samples, runs);
 }
 
-const updateInput = z.object({
-  active: z.boolean().optional(),
-  dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
-  id: z.uuid(),
-  intervalMinutes: z.number().int().min(MIN_INTERVAL_MINUTES).max(MAX_INTERVAL_MINUTES).optional(),
-  jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
-  rules: z.array(z.enum(ALERT_RULES)).optional(),
-  targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),
-});
-
-type UpdateInput = z.infer<typeof updateInput>;
+type UpdateInput = z.infer<typeof productUpdateInput>;
 
 /**
  * Only the keys actually supplied, so `targetPrice: null` clears the target
@@ -234,39 +209,7 @@ function buildPatch(input: UpdateInput): Partial<Product> {
   return patch;
 }
 
-/**
- * What the add-product flow saves. Everything past `url` is optional because
- * the preview supplies what it found and the user overrides the rest; the same
- * only-supplied-keys convention as {@link buildPatch} applies.
- */
-const createInput = z
-  .object({
-    currency: z.string().length(3).nullable().optional(),
-    dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
-    /** Pinning to `selector` makes a rotted selector fail loudly. */
-    extractor: z.enum(["auto", "selector"]).default("auto"),
-    imageUrl: z.url().max(2048).nullable().optional(),
-    intervalMinutes: z
-      .number()
-      .int()
-      .min(MIN_INTERVAL_MINUTES)
-      .max(MAX_INTERVAL_MINUTES)
-      .optional(),
-    jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
-    /** BCP 47 hint for pages whose separators are ambiguous. */
-    locale: z.string().max(35).nullable().optional(),
-    rules: z.array(z.enum(ALERT_RULES)).optional(),
-    selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
-    targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),
-    title: z.string().max(MAX_TITLE_LENGTH).nullable().optional(),
-    url: z.url().max(MAX_URL_LENGTH),
-  })
-  .refine(
-    (input) => input.extractor !== "selector" || Boolean(input.selector?.trim()),
-    "A selector-mode product needs a selector"
-  );
-
-type CreateInput = z.infer<typeof createInput>;
+type CreateInput = z.infer<typeof productCreateInput>;
 
 /**
  * The insert, with `nextCheckAt` pinned to now so the minutely dispatcher picks
@@ -332,7 +275,7 @@ export const productsRouter = {
    * which `nextCheckAt` makes happen within a minute.
    */
   create: protectedProcedure
-    .input(createInput)
+    .input(productCreateInput)
     .handler(async ({ context, input }): Promise<ProductSummary> => {
       const [created] = await db
         .insert(products)
@@ -390,7 +333,7 @@ export const productsRouter = {
 
   /** Tracking settings: interval, jitter, alert rules, target, active. */
   update: protectedProcedure
-    .input(updateInput)
+    .input(productUpdateInput)
     .handler(async ({ context, input }): Promise<ProductSummary> => {
       const product = await loadProduct(input.id, context.session.user.id);
       const patch = buildPatch(input);
