@@ -2,12 +2,15 @@ import type { RouterClient } from "@orpc/server";
 import { signupOpen } from "@price-tracker/db/signup";
 
 import { protectedProcedure, publicProcedure } from "../index";
+import { invitesRouter } from "./invites";
 import { previewRouter } from "./preview";
 import { productsRouter } from "./products";
 import { settingsRouter } from "./settings";
 
 export const appRouter = {
   healthCheck: publicProcedure.handler(() => "OK"),
+  /** Admin-issued invites: the only way in after the bootstrap account. */
+  invites: invitesRouter,
   /** The add-product flow's read-only half: fetch once, then test selectors. */
   preview: previewRouter,
   privateData: protectedProcedure.handler(({ context }) => ({

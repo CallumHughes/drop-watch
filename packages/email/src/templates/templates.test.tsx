@@ -22,6 +22,7 @@ import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
 
 import { ChangeEmail } from "./change-email";
+import { Invite } from "./invite";
 import { PriceAlert, priceAlertSubject } from "./price-alert";
 import { ResetPassword } from "./reset-password";
 import { TrackerBroken, trackerBrokenSubject } from "./tracker-broken";
@@ -179,5 +180,18 @@ describe("auth templates", () => {
     expect(html).toContain("new@example.com");
     expect(html).not.toContain("mailto:new@example.com");
     expect(html).toContain(url);
+  });
+});
+
+describe("Invite", () => {
+  const url = "http://tracker.local/invite/abc123";
+
+  it("renders the invite link as a button and as raw text", async () => {
+    const html = await render(<Invite url={url} />);
+
+    // Twice, like the verification mail: the link is the only way to an
+    // account, so it has to survive clients that strip the button.
+    expect(html.split(url).length - 1).toBeGreaterThanOrEqual(2);
+    expect(html).toContain("48 hours");
   });
 });
