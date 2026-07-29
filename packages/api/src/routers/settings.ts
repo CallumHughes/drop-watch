@@ -29,6 +29,7 @@ import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { adminProcedure, protectedProcedure } from "../index";
+import { settingsUpdateInput } from "../schemas/settings";
 
 /**
  * Re-exported so `apps/web` can name the row without depending on
@@ -36,34 +37,8 @@ import { adminProcedure, protectedProcedure } from "../index";
  */
 export type { Settings } from "@price-tracker/db/schema/settings";
 
-/** An hour is the shortest quiet period that is still quiet. */
-const MIN_COOLDOWN_MINUTES = 60;
-/** A week. Longer than this and you have switched the rule off, not tuned it. */
-const MAX_COOLDOWN_MINUTES = 10_080;
-const MIN_FAILURE_THRESHOLD = 2;
-const MAX_FAILURE_THRESHOLD = 50;
-const MAX_WEBHOOK_ID_LENGTH = 200;
-const MAX_URL_LENGTH = 2048;
-
-/**
- * Both Home Assistant fields are nullable so the page can clear them, which is
- * how you turn alerting off without also losing the cooldown you tuned.
- */
-const updateInput = z.object({
-  alertsEnabled: z.boolean().optional(),
-  cooldownMinutes: z.number().int().min(MIN_COOLDOWN_MINUTES).max(MAX_COOLDOWN_MINUTES).optional(),
-  failureThreshold: z
-    .number()
-    .int()
-    .min(MIN_FAILURE_THRESHOLD)
-    .max(MAX_FAILURE_THRESHOLD)
-    .optional(),
-  haUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
-  haWebhookId: z.string().min(1).max(MAX_WEBHOOK_ID_LENGTH).nullable().optional(),
-});
-
 /** Only the keys actually supplied, so omitting a field leaves it alone. */
-function buildPatch(input: z.infer<typeof updateInput>): SettingsPatch {
+function buildPatch(input: z.infer<typeof settingsUpdateInput>): SettingsPatch {
   const patch: SettingsPatch = {};
   for (const [key, value] of Object.entries(input)) {
     if (value !== undefined) {
@@ -162,10 +137,12 @@ export const settingsRouter = {
     return results;
   }),
 
-  update: adminProcedure.input(updateInput).handler(async ({ input }): Promise<Settings> => {
-    const patch = buildPatch(input);
-    return Object.keys(patch).length === 0 ? await loadSettings() : await saveSettings(patch);
-  }),
+  update: adminProcedure
+    .input(settingsUpdateInput)
+    .handler(async ({ input }): Promise<Settings> => {
+      const patch = buildPatch(input);
+      return Object.keys(patch).length === 0 ? await loadSettings() : await saveSettings(patch);
+    }),
 
   /** Flips the requester's own toggle; it can touch no other row. */
   updateEmailPrefs: protectedProcedure

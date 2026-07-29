@@ -1,6 +1,12 @@
 "use client";
 
 import type { Settings } from "@price-tracker/api/routers/settings";
+import {
+  MAX_COOLDOWN_MINUTES,
+  MAX_FAILURE_THRESHOLD,
+  MIN_COOLDOWN_MINUTES,
+  MIN_FAILURE_THRESHOLD,
+} from "@price-tracker/api/schemas/settings";
 import { Button } from "@price-tracker/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
 import { Checkbox } from "@price-tracker/ui/components/checkbox";
@@ -12,12 +18,6 @@ import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
-
-/** Native bounds mirroring the `settings.update` schema. */
-const MIN_COOLDOWN_MINUTES = 60;
-const MAX_COOLDOWN_MINUTES = 10_080;
-const MIN_FAILURE_THRESHOLD = 2;
-const MAX_FAILURE_THRESHOLD = 50;
 
 function Field({
   children,
