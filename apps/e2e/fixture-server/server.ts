@@ -12,7 +12,15 @@
  * - GET  /products/:slug     the product page itself (what the app scrapes)
  * - POST /api/webhook/:id    Home Assistant webhook sink — records the payload
  * - GET  /__webhooks/:id     recorded payloads for that webhook id, as JSON
+ * - POST /emails             fake Resend API — records the mail, returns an id
+ * - GET  /__emails           every recorded mail, oldest first, as JSON
  * - GET  /__health           liveness for Playwright's webServer readiness
+ *
+ * `/emails` is the path the Resend SDK POSTs to, so pointing `RESEND_BASE_URL`
+ * here makes this server the app's mailer with no code changes: the SDK's
+ * request body (from, to, subject, html, text) is recorded verbatim and a
+ * success response is returned, exactly as the webhook sink plays Home
+ * Assistant.
  *
  * State is in-memory and per-run. Parallel tests stay isolated by using unique
  * slugs, never by clearing shared state.
@@ -25,6 +33,7 @@ import { type FixtureProductState, renderProductPage } from "./templates";
 
 const products = new Map<string, FixtureProductState>();
 const webhooks = new Map<string, unknown[]>();
+const emails: unknown[] = [];
 
 const OK = 200;
 const NO_CONTENT = 204;
@@ -94,6 +103,18 @@ async function recordWebhook(
   sendJson(response, OK, { ok: true });
 }
 
+async function recordEmail(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const body = await readBody(request);
+  try {
+    emails.push(JSON.parse(body));
+  } catch {
+    sendJson(response, BAD_REQUEST, { error: "body must be JSON" });
+    return;
+  }
+  // The shape the Resend SDK treats as a successful send.
+  sendJson(response, OK, { id: `e2e-mail-${emails.length}` });
+}
+
 async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const url = new URL(request.url ?? "/", `http://localhost:${FIXTURE_PORT}`);
   const [, root, tail] = url.pathname.split("/");
@@ -116,6 +137,14 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   }
   if (request.method === "GET" && root === "__webhooks" && tail) {
     sendJson(response, OK, webhooks.get(tail) ?? []);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/emails") {
+    await recordEmail(request, response);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/__emails") {
+    sendJson(response, OK, emails);
     return;
   }
   sendText(response, NOT_FOUND, "not found", "text/plain");

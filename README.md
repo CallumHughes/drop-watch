@@ -22,6 +22,8 @@ implementation breakdown. Scaffolded with
 ## Getting started (development)
 
 ```bash
+cp apps/web/.env.example apps/web/.env         # web app + db scripts
+cp apps/worker/.env.example apps/worker/.env   # the worker
 pnpm install
 pnpm db:start          # Postgres in Docker, port 5432
 pnpm db:migrate        # apply migrations
@@ -29,8 +31,25 @@ pnpm db:seed           # admin user + a few products
 pnpm dev               # web on http://localhost:3001, plus the worker
 ```
 
-Development configuration lives in `apps/web/.env`. Copy
-[`.env.example`](.env.example) as a starting point.
+The examples' defaults work as-is against the `pnpm db:start` Postgres — the
+only thing worth editing on day one is `SEED_ADMIN_PASSWORD` in
+`apps/web/.env`. Email stays off until you add a Resend API key; everything
+else works without one — see [Email](#email-optional).
+
+### Which `.env` goes where
+
+Each process loads its own file; there is no shared development `.env`:
+
+| File | Copy from | Read by |
+|---|---|---|
+| `apps/web/.env` | [`apps/web/.env.example`](apps/web/.env.example) | The Next.js app, and every `pnpm db:*` script (migrate, seed, studio, verify-user) — `drizzle.config.ts` and the seed script read this file explicitly. |
+| `apps/worker/.env` | [`apps/worker/.env.example`](apps/worker/.env.example) | The worker only. It resolves `.env` from its own directory, so nothing in `apps/web/.env` reaches it — at minimum it needs `DATABASE_URL`. |
+| `.env` (repo root) | [`.env.example`](.env.example) | **Docker deployments only** — the file compose interpolates and the containers read. Not used by `pnpm dev`. |
+
+The other workspaces need no file of their own: `packages/db` borrows
+`apps/web/.env` as above, and `apps/e2e` defines its entire environment
+explicitly in `apps/e2e/constants.ts` (a throwaway database, overridable with
+`E2E_DATABASE_URL`).
 
 ## Database setup
 
@@ -147,9 +166,11 @@ production override against that instance instead.
 ## Environment variables
 
 Read through the zod schemas in `packages/env` — never `process.env` directly.
-Compose reads `apps/web/.env` first and then the root `.env`, so the root file wins
-in a deployment; `docker-compose.yml` sets `DATABASE_URL`, `NODE_ENV` and `TZ`
-itself.
+Where to put them is covered in
+[Which `.env` goes where](#which-env-goes-where): per-app files in
+development, the root `.env` for Docker. Compose reads `apps/web/.env` first
+and then the root `.env`, so the root file wins in a deployment;
+`docker-compose.yml` sets `DATABASE_URL`, `NODE_ENV` and `TZ` itself.
 
 | Variable | Required | Used by | Notes |
 |---|---|---|---|
@@ -264,7 +285,10 @@ EMAIL_FROM=price-tracker@example.com     # optional; see the note below
 APP_URL=http://server.local:3001         # optional; links inside the mail
 ```
 
-Then restart both `web` and `worker` (in Docker, rebuild — see below) and tick **Email
+In development these go in **both** `apps/web/.env` and `apps/worker/.env` —
+auth mail is sent by the web app, alert mail by the worker, and each process
+only reads its own file. In Docker they go in the root `.env` once, which
+reaches both containers. Then restart both `web` and `worker` (in Docker, rebuild — see below) and tick **Email
 alerts** on the settings page. Alert recipients are not a field you type into: they are
 the **verified** addresses on the account table, because that is what stays correct once
 products gain an owner. An unverified account receives nothing.
@@ -365,6 +389,26 @@ the parallel bulk. Specs import `test`/`expect` from `tests/fixtures.ts` only, w
 injects the page objects — see `.claude/skills/playwright-e2e-conventions` for the
 house rules. The suite runs in the email-disabled configuration; email flows are
 untested for now.
+
+## Integration tests
+
+`packages/db` has a vitest suite that runs against a real Postgres: the queue wiring
+(pg-boss policies and dedupe), `signupOpen`, the settings singleton (including the
+concurrent seeding race), and a **migrations-vs-push parity check** — production
+applies `src/migrations` while e2e uses `drizzle-kit push`, and this test proves the
+two produce identical schemas by diffing normalised `pg_dump` output. Prerequisite is
+the compose Postgres (the parity check also runs `pg_dump` inside that container):
+
+```bash
+pnpm db:start
+pnpm test:integration
+```
+
+Global setup drops and recreates a throwaway `price-tracker-integration` database
+(override with `INTEGRATION_DATABASE_URL`) and applies the real migration chain; the
+parity check uses two more throwaway databases, `price-tracker-parity-migrate` and
+`price-tracker-parity-push`, on the same server. All three are dropped afterwards.
+The suite is not part of `pnpm test`, which stays database-free.
 
 ## Known limitations
 

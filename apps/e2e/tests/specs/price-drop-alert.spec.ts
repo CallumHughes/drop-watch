@@ -1,3 +1,4 @@
+import { ADMIN_EMAIL } from "../../constants";
 import { expect, test } from "../fixtures";
 import type { AlertPayload } from "../support/webhook-sink";
 
@@ -6,12 +7,14 @@ const ALERT_TIMEOUT_MS = 20_000;
 
 /**
  * The highest-value path in the app, end to end: track → observe a price →
- * the price drops → the next check fires a webhook alert into the (fixture)
- * Home Assistant. The sink is shared, so everything is filtered by this
- * test's own product URL.
+ * the price drops → the next check fans one alert out to both configured
+ * channels — a webhook into the (fixture) Home Assistant and a mail through
+ * the (fixture) Resend API. Both sinks are shared, so everything is filtered
+ * by this test's own product URL or title.
  */
-test("a price drop fires a webhook alert with the right numbers", async ({
+test("a price drop alerts both channels with the right numbers", async ({
   addProduct,
+  emailSink,
   fixtureProduct,
   productDetail,
   webhookSink,
@@ -55,5 +58,21 @@ test("a price drop fires a webhook alert with the right numbers", async ({
     expect(alert?.price).toBe("50.00");
     expect(alert?.previousPrice).toBe("100.00");
     expect(alert?.title).toBe(fixtureProduct.title);
+  });
+
+  await test.step("the same alert was emailed to the admin", async () => {
+    // Every price-drop mail in the run lands in the one sink, so this test's
+    // is the one naming its own product in the subject.
+    const subjectPattern = new RegExp(`^Price drop .*${fixtureProduct.title}`);
+    const dropMail = async () => (await emailSink.messagesWithSubject(subjectPattern)).at(0);
+
+    await expect
+      .poll(async () => (await dropMail()) !== undefined, { timeout: ALERT_TIMEOUT_MS })
+      .toBe(true);
+
+    const mail = await dropMail();
+    expect(mail?.to).toContain(ADMIN_EMAIL);
+    expect(mail?.subject).toContain("£50.00");
+    expect(mail?.text).toContain("£100.00");
   });
 });

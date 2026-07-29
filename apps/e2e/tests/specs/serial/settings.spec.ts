@@ -1,4 +1,7 @@
+import { ADMIN_EMAIL } from "../../../constants";
 import { expect, test } from "../../fixtures";
+
+const TEST_MAIL_SUBJECT_PATTERN = /^Test alert from /;
 
 /**
  * These tests write the singleton settings row — the one piece of state every
@@ -22,16 +25,26 @@ test("noise controls persist across a reload", async ({ page, settings }) => {
   });
 });
 
-test("a test send reports delivery and reaches the sink", async ({ settings, webhookSink }) => {
+test("a test send reports delivery on both channels and reaches the sinks", async ({
+  emailSink,
+  settings,
+  webhookSink,
+}) => {
   await settings.goto();
   await settings.sendTestButton.click();
 
-  await test.step("the UI reports the Home Assistant channel delivered", async () => {
+  await test.step("the UI reports both channels delivered", async () => {
     await expect(settings.haTestResult).toContainText("delivered");
+    await expect(settings.emailTestResult).toContainText("delivered");
   });
 
-  await test.step("the sink actually received a test payload", async () => {
+  await test.step("the webhook sink actually received a test payload", async () => {
     const payloads = await webhookSink.payloads();
     expect(payloads.some((payload) => payload.rule === "test")).toBe(true);
+  });
+
+  await test.step("the email sink actually received the test mail", async () => {
+    const mails = await emailSink.messagesWithSubject(TEST_MAIL_SUBJECT_PATTERN);
+    expect(mails.some((mail) => mail.to.includes(ADMIN_EMAIL))).toBe(true);
   });
 });

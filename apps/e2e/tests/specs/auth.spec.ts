@@ -1,7 +1,7 @@
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../../constants";
 import { expect, test } from "../fixtures";
 
-const HTTP_NOT_FOUND = 404;
+const HTTP_OK = 200;
 const INVALID_CREDENTIALS_PATTERN = /invalid email or password/i;
 
 /**
@@ -59,12 +59,12 @@ test.describe("authentication", () => {
     });
   });
 
-  test("email-only routes 404 while no mailer is configured", async ({ loginPage, page }) => {
+  test("email-only routes exist while a mailer is configured", async ({ loginPage, page }) => {
     await loginPage.goto();
     await expect(loginPage.signInHeading).toBeVisible();
-    await expect(loginPage.forgotPasswordLink).toBeHidden();
+    await expect(loginPage.forgotPasswordLink).toBeVisible();
 
     const response = await page.goto("/forgot-password");
-    expect(response?.status()).toBe(HTTP_NOT_FOUND);
+    expect(response?.status()).toBe(HTTP_OK);
   });
 });
