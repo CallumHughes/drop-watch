@@ -1,6 +1,10 @@
 {
   "name": "price-tracker",
   "private": true,
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=11"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -38,19 +42,14 @@
     "fix": "ultracite fix",
     "prepare": "husky"
   },
-  "dependencies": {
-    "@price-tracker/env": "workspace:*",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
-  },
   "devDependencies": {
-    "@biomejs/biome": "2.5.2",
+    "@biomejs/biome": "2.5.6",
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^22.13.14",
+    "@types/node": "catalog:",
     "husky": "latest",
     "turbo": "^2.10.2",
     "typescript": "catalog:",
-    "ultracite": "7.9.3"
+    "ultracite": "7.9.4"
   },
   "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72"
 }

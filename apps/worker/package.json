@@ -15,14 +15,14 @@
     "@price-tracker/db": "workspace:*",
     "@price-tracker/email": "workspace:*",
     "@price-tracker/env": "workspace:*",
-    "drizzle-orm": "^0.45.2",
-    "evlog": "^2.22.0",
-    "pg-boss": "^12.26.3",
+    "drizzle-orm": "catalog:",
+    "evlog": "catalog:",
+    "pg-boss": "catalog:",
     "tsx": "catalog:"
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^22.13.14",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

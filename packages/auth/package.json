@@ -16,7 +16,7 @@
     "@price-tracker/env": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
-    "evlog": "^2.22.0",
+    "evlog": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

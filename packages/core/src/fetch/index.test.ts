@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { fetchPage, hostnameKey, isRetryableStatus, retryDelayMs } from "./index";
+import { domainQueueCount, fetchPage, hostnameKey, isRetryableStatus, retryDelayMs } from "./index";
 
 describe("hostnameKey", () => {
   it("lowercases the hostname", () => {
@@ -65,8 +65,26 @@ describe("retryDelayMs", () => {
     expect(retryDelayMs(0, "9999")).toBe(30_000);
   });
 
-  it("ignores a non-numeric Retry-After", () => {
-    expect(retryDelayMs(0, "Wed, 21 Oct 2026 07:28:00 GMT")).toBeGreaterThanOrEqual(1000);
+  it("honours an HTTP-date Retry-After", () => {
+    const retryAt = new Date(Date.now() + 5000).toUTCString();
+    const delay = retryDelayMs(0, retryAt);
+    expect(delay).toBeGreaterThan(3000);
+    expect(delay).toBeLessThanOrEqual(5000);
+  });
+
+  it("caps a far-future HTTP-date Retry-After", () => {
+    const retryAt = new Date(Date.now() + 120_000).toUTCString();
+    expect(retryDelayMs(0, retryAt)).toBe(30_000);
+  });
+
+  it("treats a past HTTP-date Retry-After as retry now", () => {
+    expect(retryDelayMs(0, new Date(Date.now() - 60_000).toUTCString())).toBe(0);
+  });
+
+  it("falls back to exponential backoff for an unparsable Retry-After", () => {
+    const delay = retryDelayMs(0, "soonish");
+    expect(delay).toBeGreaterThanOrEqual(1000);
+    expect(delay).toBeLessThanOrEqual(1250);
   });
 });
 
@@ -90,6 +108,21 @@ describe("fetchPage", () => {
       res.writeHead(429, { "retry-after": "0" });
       res.end("slow down");
     },
+    // res.write (rather than a single res.end) forces chunked transfer
+    // encoding, so these responses carry no Content-Length header.
+    "/chunked": (res) => {
+      res.writeHead(200);
+      res.write("<html>");
+      res.write("chunked");
+      res.end("</html>");
+    },
+    "/chunked-big": (res) => {
+      res.writeHead(200);
+      for (let i = 0; i < 40; i += 1) {
+        res.write("x".repeat(1000));
+      }
+      res.end();
+    },
     "/conditional": (res, req) => {
       if (req.headers["if-none-match"] === '"abc123"') {
         res.writeHead(304, { etag: '"abc123"' });
@@ -112,6 +145,12 @@ describe("fetchPage", () => {
     "/missing": (res) => {
       res.writeHead(404);
       res.end("nope");
+    },
+    "/multibyte": (res) => {
+      // 10 characters, 30 UTF-8 bytes, sent without a Content-Length header.
+      res.writeHead(200);
+      res.write("€".repeat(10));
+      res.end();
     },
     "/ok": (res) => {
       res.writeHead(200, {
@@ -252,6 +291,40 @@ describe("fetchPage", () => {
     }
   });
 
+  it("streams a chunked body with no Content-Length", async () => {
+    const result = await fetchPage(`${origin}/chunked`);
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.body).toBe("<html>chunked</html>");
+    }
+  });
+
+  it("aborts a chunked body once it passes maxBytes", async () => {
+    const result = await fetchPage(`${origin}/chunked-big`, { maxBytes: 2500 });
+    expect(result.status).toBe("http_error");
+    if (result.status === "http_error") {
+      expect(result.httpStatus).toBe(200);
+      expect(result.error).toContain("too large");
+    }
+  });
+
+  it("counts bytes, not UTF-16 code units, against maxBytes", async () => {
+    // 10 code units but 30 bytes: a code-unit cap would let this through.
+    const result = await fetchPage(`${origin}/multibyte`, { maxBytes: 15 });
+    expect(result.status).toBe("http_error");
+    if (result.status === "http_error") {
+      expect(result.error).toContain("too large");
+    }
+  });
+
+  it("decodes a multibyte body that fits maxBytes exactly", async () => {
+    const result = await fetchPage(`${origin}/multibyte`, { maxBytes: 30 });
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.body).toBe("€".repeat(10));
+    }
+  });
+
   it("runs at most one request per domain at a time", async () => {
     inFlight = 0;
     maxConcurrent = 0;
@@ -261,6 +334,17 @@ describe("fetchPage", () => {
       fetchPage(`${origin}/serial`),
     ]);
     expect(maxConcurrent).toBe(1);
+  });
+
+  it("evicts the domain queue once no work remains", async () => {
+    const first = fetchPage(`${origin}/serial`);
+    const second = fetchPage(`${origin}/serial`);
+    expect(domainQueueCount()).toBe(1);
+    await first;
+    // The second request is still queued or in flight, so the queue survives.
+    expect(domainQueueCount()).toBe(1);
+    await second;
+    expect(domainQueueCount()).toBe(0);
   });
 
   it("returns network_error for an unparseable URL instead of throwing", async () => {

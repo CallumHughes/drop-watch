@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^22.13.14",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "typescript": "catalog:",

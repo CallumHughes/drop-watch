@@ -34,7 +34,7 @@ function listen(
   handler: (body: string, path: string) => { body?: string; status: number }
 ): Promise<{ origin: string; received: { body: string; path: string }[] }> {
   const received: { body: string; path: string }[] = [];
-  server = createServer((req, res) => {
+  const srv = createServer((req, res) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
@@ -45,9 +45,10 @@ function listen(
       res.writeHead(status).end(responseBody);
     });
   });
+  server = srv;
   return new Promise((resolve) => {
-    server?.listen(0, "127.0.0.1", () => {
-      const { port } = server?.address() as AddressInfo;
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address() as AddressInfo;
       resolve({ origin: `http://127.0.0.1:${port}`, received });
     });
   });
@@ -79,9 +80,8 @@ describe("sendNotification", () => {
     const result = await sendNotification({ haUrl: origin, webhookId: "price_tracker" }, payload);
 
     expect(result).toEqual({ httpStatus: 200, ok: true });
-    expect(received).toHaveLength(1);
-    expect(received[0]?.path).toBe("/api/webhook/price_tracker");
-    expect(JSON.parse(received[0]?.body ?? "")).toEqual(payload);
+    expect(received.map((request) => request.path)).toEqual(["/api/webhook/price_tracker"]);
+    expect(received.map((request) => JSON.parse(request.body))).toEqual([payload]);
   });
 
   it("reports a non-2xx response as a failure without throwing", async () => {

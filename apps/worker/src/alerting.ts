@@ -123,7 +123,7 @@ function priceAlertPayload(
     imageUrl: product.imageUrl,
     inStock: latest.inStock,
     pctChange: previous ? percentChange(previous.price, latest.price) : null,
-    previousPrice: previous?.price ?? null,
+    previousPrice: previous ? previous.price : null,
     price: latest.price,
     productId: product.id,
     rule: trigger.rule,
