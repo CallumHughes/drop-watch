@@ -113,13 +113,20 @@ export function isRetryableStatus(httpStatus: number): boolean {
 }
 
 /**
- * Exponential backoff with jitter, honouring a sane `Retry-After`. Jitter keeps
- * a batch of products on one domain from retrying in lockstep.
+ * Exponential backoff with jitter, honouring a sane `Retry-After` in either of
+ * its RFC 9110 forms (delay-seconds or an HTTP-date). Jitter keeps a batch of
+ * products on one domain from retrying in lockstep.
  */
 export function retryDelayMs(attempt: number, retryAfterHeader?: string | null): number {
-  const retryAfterSeconds = Number(retryAfterHeader);
-  if (retryAfterHeader && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
-    return Math.min(retryAfterSeconds * MS_PER_SECOND, MAX_RETRY_AFTER_MS);
+  if (retryAfterHeader) {
+    const retryAfterSeconds = Number(retryAfterHeader);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+      return Math.min(retryAfterSeconds * MS_PER_SECOND, MAX_RETRY_AFTER_MS);
+    }
+    const retryAtMs = Date.parse(retryAfterHeader);
+    if (!Number.isNaN(retryAtMs)) {
+      return Math.min(Math.max(0, retryAtMs - Date.now()), MAX_RETRY_AFTER_MS);
+    }
   }
   const exponential = Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS);
   return Math.round(exponential * (1 + Math.random() * BACKOFF_JITTER));
@@ -206,6 +213,39 @@ function tooLarge(byteCount: number, httpStatus: number, durationMs: number): At
   };
 }
 
+type CappedBody = { body: string; ok: true } | { byteCount: number; ok: false };
+
+/**
+ * Streams the body, bailing out as soon as the cumulative byte count passes
+ * `maxBytes`. A body with no Content-Length never gets fully buffered into
+ * memory, and the cap counts bytes rather than UTF-16 code units.
+ */
+async function readBodyWithCap(
+  stream: AsyncIterable<Uint8Array> | null,
+  maxBytes: number
+): Promise<CappedBody> {
+  if (!stream) {
+    return { body: "", ok: true };
+  }
+  const chunks: Uint8Array[] = [];
+  let byteCount = 0;
+  for await (const chunk of stream) {
+    byteCount += chunk.byteLength;
+    if (byteCount > maxBytes) {
+      // Returning mid-iteration cancels the stream, aborting the download.
+      return { byteCount, ok: false };
+    }
+    chunks.push(chunk);
+  }
+  const merged = new Uint8Array(byteCount);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { body: new TextDecoder().decode(merged), ok: true };
+}
+
 async function attemptFetch(
   url: string,
   options: FetchPageOptions,
@@ -262,14 +302,14 @@ async function attemptFetch(
       return tooLarge(declaredLength, response.status, elapsed());
     }
 
-    const body = await response.text();
-    if (body.length > maxBytes) {
-      return tooLarge(body.length, response.status, elapsed());
+    const read = await readBodyWithCap(response.body, maxBytes);
+    if (!read.ok) {
+      return tooLarge(read.byteCount, response.status, elapsed());
     }
 
     return {
       result: {
-        body,
+        body: read.body,
         durationMs: elapsed(),
         httpStatus: response.status,
         status: "ok",
@@ -320,19 +360,38 @@ async function fetchWithRetries(url: string, options: FetchPageOptions): Promise
  * Fetches a product page, queued behind any other in-flight request to the same
  * domain. Never throws — every failure mode comes back as a result variant.
  */
-export function fetchPage(url: string, options: FetchPageOptions = {}): Promise<FetchPageResult> {
+export async function fetchPage(
+  url: string,
+  options: FetchPageOptions = {}
+): Promise<FetchPageResult> {
   let key: string;
   try {
     key = hostnameKey(url);
   } catch {
-    return Promise.resolve({
+    return {
       durationMs: 0,
       error: `invalid URL: ${url}`,
       status: "network_error",
-    });
+    };
   }
 
-  return queueFor(key).add(() => fetchWithRetries(url, options));
+  const queue = queueFor(key);
+  try {
+    return await queue.add(() => fetchWithRetries(url, options));
+  } finally {
+    // Evict the queue once the domain is idle so the map cannot grow without
+    // bound. A request queued between completion and this check keeps the
+    // queue busy (size/pending non-zero), so it is never dropped mid-use; the
+    // identity check guards against deleting a successor queue for the key.
+    if (queue.size === 0 && queue.pending === 0 && queues.get(key) === queue) {
+      queues.delete(key);
+    }
+  }
+}
+
+/** Number of per-domain queues currently tracked. Exposed for tests. */
+export function domainQueueCount(): number {
+  return queues.size;
 }
 
 /** Requests queued or in flight for a domain. */
