@@ -12,6 +12,11 @@
  * Exactly one row, pinned to id 1 and held there by a check constraint. A
  * key/value table would have been more flexible and less typed; there is one
  * instance, so flexibility buys nothing here.
+ *
+ * Email alerting is *not* here: whether alerts are mailed is a per-account
+ * choice, `user.email_alerts_enabled` in `./auth`. This table keeps only the
+ * knobs shared by the whole instance (master switch, cooldown, failure
+ * threshold, Home Assistant webhook).
  */
 
 import { sql } from "drizzle-orm";
@@ -33,18 +38,6 @@ export const settings = pgTable(
     alertsEnabled: boolean("alerts_enabled").default(true).notNull(),
     /** Per `(productId, rule)` quiet period after an alert fires. */
     cooldownMinutes: integer("cooldown_minutes").default(DEFAULT_COOLDOWN_MINUTES).notNull(),
-    /**
-     * Whether alerts are also emailed to the verified account addresses.
-     *
-     * Its own column rather than "email is configured", because those are
-     * different questions: `RESEND_API_KEY` says a mailer *exists*, this says
-     * you want alerts through it. Default `false` so an install that gains a
-     * key does not silently start mailing people — and so applying this
-     * migration to a running tracker changes nothing until somebody ticks the
-     * box. `alertsEnabled` still overrules it; Home Assistant is gated by its
-     * own two columns being set, this channel by this one.
-     */
-    emailAlertsEnabled: boolean("email_alerts_enabled").default(false).notNull(),
     /** Consecutive failures before the "tracker broken" alert fires. */
     failureThreshold: integer("failure_threshold").default(DEFAULT_FAILURE_THRESHOLD).notNull(),
     /** Base URL of Home Assistant. Null until configured — nothing is sent. */

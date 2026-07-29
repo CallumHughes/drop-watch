@@ -29,14 +29,21 @@ export async function resetSettings(): Promise<void> {
 
 export interface TestUser {
   email: string;
+  emailAlertsEnabled?: boolean;
   emailVerified?: boolean;
   name?: string;
+  role?: string;
 }
 
+/** Returns the generated id so tests can hand it to owner-scoped code. */
 export async function insertUser({
   email,
+  emailAlertsEnabled = false,
   emailVerified = false,
   name = "Test User",
-}: TestUser): Promise<void> {
-  await db.insert(user).values({ email, emailVerified, id: crypto.randomUUID(), name });
+  role,
+}: TestUser): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.insert(user).values({ email, emailAlertsEnabled, emailVerified, id, name, role });
+  return id;
 }

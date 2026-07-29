@@ -48,6 +48,7 @@ function product(overrides: Partial<Product> = {}): Product {
     title: "Bulbasaur",
     updatedAt: minutesAgo(10_000),
     url: "https://example.test/p",
+    userId: "user-1",
     ...overrides,
   };
 }

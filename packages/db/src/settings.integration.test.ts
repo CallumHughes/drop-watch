@@ -21,7 +21,6 @@ describe("loadSettings", () => {
     expect(loaded).toMatchObject({
       alertsEnabled: true,
       cooldownMinutes: 720,
-      emailAlertsEnabled: false,
       failureThreshold: 5,
       haUrl: null,
       haWebhookId: null,
@@ -86,56 +85,110 @@ describe("alertTargets", () => {
     await truncateUsers();
   });
 
-  it("emails verified accounts when the channel is on and a mailer exists", async () => {
-    await insertUser({ email: "verified@example.com", emailVerified: true });
-    await insertUser({ email: "unverified@example.com", emailVerified: false });
-    const current = await saveSettings({ emailAlertsEnabled: true });
-
-    const targets = await alertTargets({ emailConfigured: true, settings: current });
-    expect(targets.recipients).toEqual(["verified@example.com"]);
-  });
-
-  it("sends no email without a configured mailer, even with verified accounts", async () => {
-    await insertUser({ email: "verified@example.com", emailVerified: true });
-    const current = await saveSettings({ emailAlertsEnabled: true });
-
-    const targets = await alertTargets({ emailConfigured: false, settings: current });
-    expect(targets.recipients).toEqual([]);
-  });
-
-  it("sends no email when the toggle is off", async () => {
-    await insertUser({ email: "verified@example.com", emailVerified: true });
+  it("emails only the owner, even with other verified accounts present", async () => {
+    const ownerId = await insertUser({
+      email: "owner@example.com",
+      emailAlertsEnabled: true,
+      emailVerified: true,
+    });
+    await insertUser({ email: "bystander@example.com", emailVerified: true });
     const current = await loadSettings();
 
-    const targets = await alertTargets({ emailConfigured: true, settings: current });
+    const targets = await alertTargets({ emailConfigured: true, ownerId, settings: current });
+    expect(targets.recipients).toEqual(["owner@example.com"]);
+  });
+
+  it("sends no email when the owner's toggle is off", async () => {
+    const ownerId = await insertUser({ email: "owner@example.com", emailVerified: true });
+    const current = await loadSettings();
+
+    const targets = await alertTargets({ emailConfigured: true, ownerId, settings: current });
     expect(targets.recipients).toEqual([]);
   });
 
-  it("builds the webhook half from the two HA columns", async () => {
-    const current = await saveSettings({
-      haUrl: "http://ha.local:8123",
-      haWebhookId: "hook",
+  it("sends no email while the owner's address is unverified", async () => {
+    const ownerId = await insertUser({
+      email: "owner@example.com",
+      emailAlertsEnabled: true,
+      emailVerified: false,
     });
+    const current = await loadSettings();
 
-    const targets = await alertTargets({ emailConfigured: false, settings: current });
-    expect(targets.webhook).toEqual({ haUrl: "http://ha.local:8123", webhookId: "hook" });
+    const targets = await alertTargets({ emailConfigured: true, ownerId, settings: current });
+    expect(targets.recipients).toEqual([]);
   });
 
-  it("leaves the webhook null while HA is only half-configured", async () => {
-    const current = await saveSettings({ haUrl: "http://ha.local:8123" });
-    expect(notifyConfig(current)).toBeNull();
+  it("sends no email without a configured mailer, even with a willing owner", async () => {
+    const ownerId = await insertUser({
+      email: "owner@example.com",
+      emailAlertsEnabled: true,
+      emailVerified: true,
+    });
+    const current = await loadSettings();
+
+    const targets = await alertTargets({ emailConfigured: false, ownerId, settings: current });
+    expect(targets.recipients).toEqual([]);
   });
 
   it("silences both channels when the master switch is off", async () => {
-    await insertUser({ email: "verified@example.com", emailVerified: true });
+    const ownerId = await insertUser({
+      email: "owner@example.com",
+      emailAlertsEnabled: true,
+      emailVerified: true,
+      role: "admin",
+    });
     const current = await saveSettings({
       alertsEnabled: false,
-      emailAlertsEnabled: true,
       haUrl: "http://ha.local:8123",
       haWebhookId: "hook",
     });
 
-    const targets = await alertTargets({ emailConfigured: true, settings: current });
+    const targets = await alertTargets({ emailConfigured: true, ownerId, settings: current });
+    expect(targets).toEqual({ recipients: [], webhook: null });
+  });
+
+  it("builds the webhook half for an admin owner from the two HA columns", async () => {
+    const ownerId = await insertUser({ email: "admin@example.com", role: "admin" });
+    const current = await saveSettings({
+      haUrl: "http://ha.local:8123",
+      haWebhookId: "hook",
+    });
+
+    const targets = await alertTargets({ emailConfigured: false, ownerId, settings: current });
+    expect(targets.webhook).toEqual({ haUrl: "http://ha.local:8123", webhookId: "hook" });
+  });
+
+  it("leaves the webhook null for a plain owner even with HA configured", async () => {
+    const ownerId = await insertUser({ email: "plain@example.com", role: "user" });
+    const current = await saveSettings({
+      haUrl: "http://ha.local:8123",
+      haWebhookId: "hook",
+    });
+
+    const targets = await alertTargets({ emailConfigured: false, ownerId, settings: current });
+    expect(targets.webhook).toBeNull();
+  });
+
+  it("leaves the webhook null while HA is only half-configured, admin or not", async () => {
+    const ownerId = await insertUser({ email: "admin@example.com", role: "admin" });
+    const current = await saveSettings({ haUrl: "http://ha.local:8123" });
+    expect(notifyConfig(current)).toBeNull();
+
+    const targets = await alertTargets({ emailConfigured: false, ownerId, settings: current });
+    expect(targets.webhook).toBeNull();
+  });
+
+  it("goes quiet on an unknown owner (deletion racing an in-flight check)", async () => {
+    const current = await saveSettings({
+      haUrl: "http://ha.local:8123",
+      haWebhookId: "hook",
+    });
+
+    const targets = await alertTargets({
+      emailConfigured: true,
+      ownerId: crypto.randomUUID(),
+      settings: current,
+    });
     expect(targets).toEqual({ recipients: [], webhook: null });
   });
 });

@@ -1,17 +1,21 @@
 /**
- * Instance settings: where alerts go, how noisy they may be, and a button that
- * proves the whole path works before you wait three hours to find out it
- * doesn't.
+ * Settings, split by who they belong to. The shared plumbing — the master
+ * switch, cooldown, failure threshold, Home Assistant webhook — is one row
+ * that steers alerting for the whole instance, so it is admin-only. Whether
+ * your alerts are emailed to you is nobody's business but yours, so the
+ * email toggle lives on the `user` row and every signed-in account gets its
+ * own pair of procedures for it.
  *
- * The row is the single source of truth for both apps — the worker reads it on
- * every check — so a webhook changed here takes effect immediately with nothing
- * to restart (PLAN.md §1: Postgres is the interface).
+ * The settings row is still the single source of truth for both apps — the
+ * worker reads it on every check — so a webhook changed here takes effect
+ * immediately with nothing to restart (PLAN.md §1: Postgres is the interface).
  */
 
 import type { ChannelResult } from "@price-tracker/core/notify/channels";
 import { deliverAlert } from "@price-tracker/core/notify/channels";
 import { alertChannels } from "@price-tracker/core/notify/targets";
 import { db } from "@price-tracker/db";
+import { user } from "@price-tracker/db/schema/auth";
 import { products } from "@price-tracker/db/schema/products";
 import type { Settings } from "@price-tracker/db/schema/settings";
 import {
@@ -21,10 +25,10 @@ import {
   saveSettings,
 } from "@price-tracker/db/settings";
 import { emailChannel, emailEnabled } from "@price-tracker/email";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { protectedProcedure } from "../index";
+import { adminProcedure, protectedProcedure } from "../index";
 
 /**
  * Re-exported so `apps/web` can name the row without depending on
@@ -48,12 +52,6 @@ const MAX_URL_LENGTH = 2048;
 const updateInput = z.object({
   alertsEnabled: z.boolean().optional(),
   cooldownMinutes: z.number().int().min(MIN_COOLDOWN_MINUTES).max(MAX_COOLDOWN_MINUTES).optional(),
-  /**
-   * The email channel's switch. No address comes with it, deliberately:
-   * recipients are the verified account addresses, so there is nothing here
-   * for the page to submit and nothing to keep in sync.
-   */
-  emailAlertsEnabled: z.boolean().optional(),
   failureThreshold: z
     .number()
     .int()
@@ -76,6 +74,15 @@ function buildPatch(input: z.infer<typeof updateInput>): SettingsPatch {
 }
 
 /**
+ * The requester's slice of alerting config: whether alerts for their products
+ * are emailed to them. A shape rather than a bare boolean so growing it later
+ * (digest frequency, quiet hours) is additive.
+ */
+export interface EmailPrefs {
+  emailAlertsEnabled: boolean;
+}
+
+/**
  * What the "send test" button reports back, one row per *attempted* channel.
  *
  * It is `ChannelResult` unchanged rather than a parallel type, because the
@@ -86,22 +93,42 @@ function buildPatch(input: z.infer<typeof updateInput>): SettingsPatch {
 export type TestResult = ChannelResult;
 
 export const settingsRouter = {
-  get: protectedProcedure.handler((): Promise<Settings> => loadSettings()),
+  /** The signed-in account's own email-alert toggle, nobody else's. */
+  emailPrefs: protectedProcedure.handler(async ({ context }): Promise<EmailPrefs> => {
+    const [row] = await db
+      .select({ emailAlertsEnabled: user.emailAlertsEnabled })
+      .from(user)
+      .where(eq(user.id, context.session.user.id))
+      .limit(1);
+    if (!row) {
+      throw new Error("session user row disappeared");
+    }
+    return row;
+  }),
+
+  get: adminProcedure.handler((): Promise<Settings> => loadSettings()),
 
   /**
-   * Fires a notification shaped exactly like a real alert, on every configured
-   * channel at once, against a real tracked product where there is one. Home
-   * Assistant answers 200 to a webhook with no automation behind it, so a green
-   * webhook row proves the URL and the webhook id are right — not that your
-   * phone will buzz.
+   * Fires a notification shaped exactly like a real alert, resolved for the
+   * requester: a non-admin's test exercises exactly the channels their real
+   * alerts would use (email only — the webhook is the admin's channel), while
+   * the admin's exercises both. The sample product is the requester's own
+   * oldest one, so the mail shows something they actually track. Home
+   * Assistant answers 200 to a webhook with no automation behind it, so a
+   * green webhook row proves the URL and the webhook id are right — not that
+   * your phone will buzz.
    *
    * An **empty array is not a failure**: it means nothing is configured to
-   * receive alerts, which is a state to describe rather than an error to
-   * report. The page renders it as such.
+   * receive alerts for this account, which is a state to describe rather than
+   * an error to report. The page renders it as such.
    */
-  sendTest: protectedProcedure.handler(async (): Promise<TestResult[]> => {
+  sendTest: protectedProcedure.handler(async ({ context }): Promise<TestResult[]> => {
     const current = await loadSettings();
-    const targets = await alertTargets({ emailConfigured: emailEnabled(), settings: current });
+    const targets = await alertTargets({
+      emailConfigured: emailEnabled(),
+      ownerId: context.session.user.id,
+      settings: current,
+    });
     // The same assembly the worker uses, so a test send attempts exactly the
     // channels a real alert would — including attempting none.
     const channels = alertChannels(targets, emailChannel);
@@ -109,7 +136,12 @@ export const settingsRouter = {
       return [];
     }
 
-    const [sample] = await db.select().from(products).orderBy(asc(products.createdAt)).limit(1);
+    const [sample] = await db
+      .select()
+      .from(products)
+      .where(eq(products.userId, context.session.user.id))
+      .orderBy(asc(products.createdAt))
+      .limit(1);
     const { results } = await deliverAlert({
       channels,
       payload: {
@@ -130,8 +162,23 @@ export const settingsRouter = {
     return results;
   }),
 
-  update: protectedProcedure.input(updateInput).handler(async ({ input }): Promise<Settings> => {
+  update: adminProcedure.input(updateInput).handler(async ({ input }): Promise<Settings> => {
     const patch = buildPatch(input);
     return Object.keys(patch).length === 0 ? await loadSettings() : await saveSettings(patch);
   }),
+
+  /** Flips the requester's own toggle; it can touch no other row. */
+  updateEmailPrefs: protectedProcedure
+    .input(z.object({ emailAlertsEnabled: z.boolean() }))
+    .handler(async ({ context, input }): Promise<EmailPrefs> => {
+      const [updated] = await db
+        .update(user)
+        .set({ emailAlertsEnabled: input.emailAlertsEnabled })
+        .where(eq(user.id, context.session.user.id))
+        .returning({ emailAlertsEnabled: user.emailAlertsEnabled });
+      if (!updated) {
+        throw new Error("session user row disappeared during update");
+      }
+      return updated;
+    }),
 };

@@ -1,6 +1,8 @@
 import { relations } from "drizzle-orm";
 import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+import { products } from "./products";
+
 export const user = pgTable("user", {
   // banExpires/banned/banReason/role are the Better Auth admin plugin's
   // columns; the plugin reads and writes them through the adapter.
@@ -9,6 +11,13 @@ export const user = pgTable("user", {
   banReason: text("ban_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   email: text("email").notNull().unique(),
+  /**
+   * Per-user alert channel switch; alerts for this user's products are
+   * emailed only while this is on. Replaces the old instance-wide
+   * settings.email_alerts_enabled. Default false: a new account is not
+   * mailed until they opt in.
+   */
+  emailAlertsEnabled: boolean("email_alerts_enabled").default(false).notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   id: text("id").primaryKey(),
   image: text("image"),
@@ -107,6 +116,7 @@ export const invitation = pgTable(
 export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   invitations: many(invitation),
+  products: many(products),
   sessions: many(session),
 }));
 

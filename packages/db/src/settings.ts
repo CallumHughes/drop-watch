@@ -13,19 +13,14 @@ import { env } from "@price-tracker/env/db";
 import { eq } from "drizzle-orm";
 
 import { db } from "./index";
-import { alertRecipients } from "./recipients";
+import { productOwner } from "./recipients";
 import { type NewSettings, SETTINGS_ID, type Settings, settings } from "./schema/settings";
 
-/** The columns the settings page may change. */
+/** The columns the (admin-only) settings page may change. */
 export type SettingsPatch = Partial<
   Pick<
     NewSettings,
-    | "alertsEnabled"
-    | "cooldownMinutes"
-    | "emailAlertsEnabled"
-    | "failureThreshold"
-    | "haUrl"
-    | "haWebhookId"
+    "alertsEnabled" | "cooldownMinutes" | "failureThreshold" | "haUrl" | "haWebhookId"
   >
 >;
 
@@ -105,36 +100,39 @@ export interface AlertTargetsInput {
    * React, exactly as `@price-tracker/core` does not.
    */
   emailConfigured: boolean;
+  /** The product owner's `user.id` — alerts are the owner's, nobody else's. */
+  ownerId: string;
   settings: Settings;
 }
 
 /**
- * Everything configured to receive an alert, in the shape `deliverAlert`'s
- * callers turn into channels.
+ * Everything configured to receive an alert for one owner's product, in the
+ * shape `deliverAlert`'s callers turn into channels.
  *
- * The two halves are gated independently and by different things —
- * Home Assistant by its two columns being set, email by the new toggle *and* a
- * mailer existing *and* somebody having a verified address — but they share
- * `alertsEnabled` as the master switch, so turning that off silences both
- * without losing either configuration.
+ * The two halves are gated independently and by different things — email by
+ * the owner's own toggle *and* a mailer existing *and* the owner's address
+ * being verified; the webhook by the owner being an admin and the two HA
+ * columns being set — but they share `alertsEnabled` as the master switch, so
+ * turning that off silences both without losing either configuration.
  *
  * Both halves carry {@link notifyConfig}'s distinction forward: a `null`
  * webhook and an empty recipient list mean "we chose not to send", never "we
  * tried and failed". That is the whole reason an unconfigured channel is left
  * out of the channel array rather than included and failing — a tracker with
  * no mailer would otherwise log an email failure on every single alert.
- *
- * The recipient query is skipped entirely when email alerting is off, which is
- * the common case: no mailer means no round-trip to the `user` table on the
- * back of every check.
  */
 export async function alertTargets({
   emailConfigured,
+  ownerId,
   settings: current,
 }: AlertTargetsInput): Promise<AlertTargets> {
-  const emailWanted = current.alertsEnabled && current.emailAlertsEnabled && emailConfigured;
+  const owner = await productOwner(ownerId);
+  const emailWanted =
+    current.alertsEnabled && emailConfigured && owner?.emailAlertsEnabled && owner.emailVerified;
   return {
-    recipients: emailWanted ? await alertRecipients() : [],
-    webhook: notifyConfig(current),
+    recipients: emailWanted && owner ? [owner.email] : [],
+    // The webhook is the admin's channel: it fires only for products the
+    // admin owns. Checked per send, so plural admins each get their own.
+    webhook: owner?.role === "admin" ? notifyConfig(current) : null,
   };
 }

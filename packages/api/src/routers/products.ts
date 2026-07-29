@@ -2,6 +2,10 @@
  * Everything the dashboard and the product detail page read, plus the two
  * things they write: tracking settings and "check now".
  *
+ * Every read and write is scoped to the signed-in owner — products are private
+ * per account, and an id that belongs to someone else answers NOT_FOUND, never
+ * FORBIDDEN, so "not yours" is indistinguishable from "doesn't exist".
+ *
  * Two shapes matter here. `summary` is what a product card needs — latest
  * price, a short sparkline, distance from target, and whether recent checks
  * have been failing — assembled for every product in three queries rather than
@@ -20,7 +24,7 @@ import { db } from "@price-tracker/db";
 import { sendCheckNow } from "@price-tracker/db/queue";
 import type { CheckRun, NewProduct, Product } from "@price-tracker/db/schema/products";
 import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/products";
-import { asc, desc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
@@ -67,8 +71,17 @@ export type { CheckStatus, PriceSample, ProductSummary } from "../summary";
 
 const productIdInput = z.object({ id: z.uuid() });
 
-async function loadProduct(id: string): Promise<Product> {
-  const [product] = await db.select().from(products).where(eq(products.id, id)).limit(1);
+/**
+ * A product *belonging to the requester*, or NOT_FOUND. Deliberately the same
+ * NOT_FOUND whether the id does not exist or exists under another account — a
+ * FORBIDDEN would confirm the id is real and leak what other users track.
+ */
+async function loadProduct(id: string, ownerId: string): Promise<Product> {
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, id), eq(products.userId, ownerId)))
+    .limit(1);
   if (!product) {
     throw new ORPCError("NOT_FOUND", { message: "Product not found" });
   }
@@ -76,13 +89,15 @@ async function loadProduct(id: string): Promise<Product> {
 }
 
 /**
- * The most recent `limit` price points for every product at once.
+ * The most recent `limit` price points for every product *of one owner* at
+ * once.
  *
  * A window function rather than a query per product: the dashboard is a list,
  * and `price_points(product_id, observed_at DESC)` serves the partition
- * directly.
+ * directly. The join to `products` exists purely to filter by owner — without
+ * it, other accounts' sparkline data would be computed and shipped.
  */
-async function recentSamples(limit: number): Promise<Map<string, PriceSample[]>> {
+async function recentSamples(limit: number, ownerId: string): Promise<Map<string, PriceSample[]>> {
   const ranked = db.$with("ranked_price_points").as(
     db
       .select({
@@ -96,6 +111,8 @@ async function recentSamples(limit: number): Promise<Map<string, PriceSample[]>>
         ),
       })
       .from(pricePoints)
+      .innerJoin(products, eq(pricePoints.productId, products.id))
+      .where(eq(products.userId, ownerId))
   );
 
   const rows = await db
@@ -119,8 +136,11 @@ async function recentSamples(limit: number): Promise<Map<string, PriceSample[]>>
   return byProduct;
 }
 
-/** The most recent `limit` check runs per product, newest first. */
-async function recentRuns(limit: number): Promise<Map<string, CheckRun[]>> {
+/**
+ * The most recent `limit` check runs per product of one owner, newest first.
+ * Owner-filtered for the same reason as {@link recentSamples}.
+ */
+async function recentRuns(limit: number, ownerId: string): Promise<Map<string, CheckRun[]>> {
   const ranked = db.$with("ranked_check_runs").as(
     db
       .select({
@@ -137,6 +157,8 @@ async function recentRuns(limit: number): Promise<Map<string, CheckRun[]>> {
         status: checkRuns.status,
       })
       .from(checkRuns)
+      .innerJoin(products, eq(checkRuns.productId, products.id))
+      .where(eq(products.userId, ownerId))
   );
 
   const rows = await db
@@ -251,9 +273,9 @@ type CreateInput = z.infer<typeof createInput>;
  * the product up on its next tick rather than after a first full interval —
  * adding something and watching nothing happen for three hours reads as a bug.
  */
-function buildInsert(input: CreateInput, now: Date): NewProduct {
+function buildInsert(input: CreateInput, ownerId: string, now: Date): NewProduct {
   const { url, ...rest } = input;
-  const values: NewProduct = { nextCheckAt: now, url };
+  const values: NewProduct = { nextCheckAt: now, url, userId: ownerId };
   for (const [key, value] of Object.entries(rest)) {
     if (value !== undefined) {
       Object.assign(values, { [key]: value });
@@ -272,9 +294,10 @@ export const productsRouter = {
     .input(productIdInput)
     .handler(
       async ({
+        context,
         input,
       }): Promise<{ jobId: string | null; status: "already_checking" | "queued" }> => {
-        const product = await loadProduct(input.id);
+        const product = await loadProduct(input.id, context.session.user.id);
         const boss = await getSenderBoss();
         const jobId = await sendCheckNow(boss, product.id);
         return jobId ? { jobId, status: "queued" } : { jobId: null, status: "already_checking" };
@@ -290,8 +313,8 @@ export const productsRouter = {
         limit: z.number().int().min(1).max(MAX_CHECK_RUNS).default(DEFAULT_CHECK_RUNS),
       })
     )
-    .handler(async ({ input }): Promise<CheckRun[]> => {
-      await loadProduct(input.id);
+    .handler(async ({ context, input }): Promise<CheckRun[]> => {
+      await loadProduct(input.id, context.session.user.id);
       return await db
         .select()
         .from(checkRuns)
@@ -310,13 +333,14 @@ export const productsRouter = {
    */
   create: protectedProcedure
     .input(createInput)
-    .handler(async ({ input }): Promise<ProductSummary> => {
+    .handler(async ({ context, input }): Promise<ProductSummary> => {
       const [created] = await db
         .insert(products)
-        .values(buildInsert(input, new Date()))
-        // `url` is unique. Adding something already tracked is a mistake worth
-        // naming, not a duplicate row.
-        .onConflictDoNothing({ target: products.url })
+        .values(buildInsert(input, context.session.user.id, new Date()))
+        // `(userId, url)` is unique. Adding something *you* already track is a
+        // mistake worth naming, not a duplicate row — another account tracking
+        // the same URL is none of your business and conflicts with nothing.
+        .onConflictDoNothing({ target: [products.userId, products.url] })
         .returning();
       if (!created) {
         throw new ORPCError("CONFLICT", { message: "That URL is already being tracked." });
@@ -326,7 +350,10 @@ export const productsRouter = {
 
   detail: protectedProcedure
     .input(productIdInput)
-    .handler(({ input }): Promise<ProductSummary> => loadProduct(input.id).then(summariseOne)),
+    .handler(
+      ({ context, input }): Promise<ProductSummary> =>
+        loadProduct(input.id, context.session.user.id).then(summariseOne)
+    ),
 
   /**
    * Price history oldest-first, so the chart can render it without reversing.
@@ -339,17 +366,22 @@ export const productsRouter = {
         limit: z.number().int().min(1).max(MAX_HISTORY_POINTS).default(DEFAULT_HISTORY_POINTS),
       })
     )
-    .handler(async ({ input }): Promise<PriceSample[]> => {
-      await loadProduct(input.id);
+    .handler(async ({ context, input }): Promise<PriceSample[]> => {
+      await loadProduct(input.id, context.session.user.id);
       return await loadSamples(input.id, input.limit);
     }),
 
-  /** The dashboard: one summary per tracked product. */
-  list: protectedProcedure.handler(async (): Promise<ProductSummary[]> => {
+  /** The dashboard: one summary per product the requester tracks. */
+  list: protectedProcedure.handler(async ({ context }): Promise<ProductSummary[]> => {
+    const ownerId = context.session.user.id;
     const [rows, samples, runs] = await Promise.all([
-      db.select().from(products).orderBy(asc(products.title), asc(products.url)),
-      recentSamples(SPARKLINE_POINTS),
-      recentRuns(FAILURE_WINDOW),
+      db
+        .select()
+        .from(products)
+        .where(eq(products.userId, ownerId))
+        .orderBy(asc(products.title), asc(products.url)),
+      recentSamples(SPARKLINE_POINTS, ownerId),
+      recentRuns(FAILURE_WINDOW, ownerId),
     ]);
     return rows.map((product) =>
       summarise(product, samples.get(product.id) ?? [], runs.get(product.id) ?? [])
@@ -359,8 +391,8 @@ export const productsRouter = {
   /** Tracking settings: interval, jitter, alert rules, target, active. */
   update: protectedProcedure
     .input(updateInput)
-    .handler(async ({ input }): Promise<ProductSummary> => {
-      const product = await loadProduct(input.id);
+    .handler(async ({ context, input }): Promise<ProductSummary> => {
+      const product = await loadProduct(input.id, context.session.user.id);
       const patch = buildPatch(input);
       const nextCheckAt = pulledInNextCheckAt(product, input.intervalMinutes, new Date());
       if (nextCheckAt) {

@@ -62,9 +62,14 @@ test("bootstrap: sign up, verify by email, point alerts at the sinks", async ({
   });
 
   await test.step("configure both alert channels: sink webhook and email", async () => {
+    // Two saves because the channels live in different rows now: the webhook
+    // and master switch in the singleton settings row (admin form), the email
+    // toggle on the admin's own user row (email-prefs form, default off).
     await settings.goto();
-    await settings.configureAlerts(FIXTURE_URL, SINK_WEBHOOK_ID);
+    await settings.configureWebhook(FIXTURE_URL, SINK_WEBHOOK_ID);
     await expect(settings.savedToast).toBeVisible();
+    await settings.enableEmailAlerts();
+    await expect(settings.emailPrefsSavedToast).toBeVisible();
   });
 
   await page.context().storageState({ path: ADMIN_STORAGE_STATE });

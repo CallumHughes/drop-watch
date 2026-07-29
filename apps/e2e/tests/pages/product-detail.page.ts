@@ -10,10 +10,17 @@ export class ProductDetailPage {
   readonly restockRuleCheckbox: Locator;
   readonly saveSettingsButton: Locator;
   readonly settingsSavedToast: Locator;
+  /**
+   * What the page shows for an id that does not resolve — which since
+   * per-user scoping includes ids that exist but belong to someone else
+   * (deliberately indistinguishable from "gone").
+   */
+  readonly notFoundMessage: Locator;
   readonly page: Page;
 
   constructor(page: Page) {
     this.page = page;
+    this.notFoundMessage = page.getByText("This product could not be loaded.");
     this.checkNowButton = page.getByRole("button", { name: "Check now" });
     this.targetPriceInput = page.getByLabel("Target price");
     this.dropPercentInput = page.getByLabel("Drop alert threshold");
