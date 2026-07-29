@@ -20,8 +20,10 @@ import { type NewProduct, products } from "./schema/products";
  * Stable, scraping-friendly product pages. The first three carry schema.org
  * JSON-LD; books.toscrape.com carries none, so it exercises the configured
  * selector path. All four were verified live against the Epic 2 extractor.
+ * Ownerless here — every seed product is stamped with the admin's id at
+ * insert time, since products are per-user.
  */
-const SEED_PRODUCTS: NewProduct[] = [
+const SEED_PRODUCTS: Omit<NewProduct, "userId">[] = [
   {
     currency: "GBP",
     dropPercent: 10,
@@ -61,11 +63,12 @@ const SEED_PRODUCTS: NewProduct[] = [
   },
 ];
 
-async function seedAdmin(db: ReturnType<typeof createDb>): Promise<string> {
+/** Returns the admin's user id — the products seeded below belong to it. */
+async function seedAdmin(db: ReturnType<typeof createDb>): Promise<{ id: string; note: string }> {
   const email = env.SEED_ADMIN_EMAIL.toLowerCase();
   const [found] = await db.select({ id: user.id }).from(user).where(eq(user.email, email));
   if (found) {
-    return `admin ${email} already exists (${found.id})`;
+    return { id: found.id, note: `admin ${email} already exists (${found.id})` };
   }
 
   const id = randomUUID();
@@ -92,15 +95,16 @@ async function seedAdmin(db: ReturnType<typeof createDb>): Promise<string> {
     userId: id,
   });
 
-  return `admin ${email} created (${id})`;
+  return { id, note: `admin ${email} created (${id})` };
 }
 
-async function seedProducts(db: ReturnType<typeof createDb>): Promise<string> {
+async function seedProducts(db: ReturnType<typeof createDb>, adminId: string): Promise<string> {
   const inserted = await db
     .insert(products)
-    .values(SEED_PRODUCTS)
-    // `url` is unique; re-seeding must not disturb an already-tracked product.
-    .onConflictDoNothing({ target: products.url })
+    .values(SEED_PRODUCTS.map((product) => ({ ...product, userId: adminId })))
+    // `(userId, url)` is unique; re-seeding must not disturb a product the
+    // admin already tracks.
+    .onConflictDoNothing({ target: [products.userId, products.url] })
     .returning({ id: products.id, url: products.url });
 
   const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(products);
@@ -109,8 +113,9 @@ async function seedProducts(db: ReturnType<typeof createDb>): Promise<string> {
 
 async function main() {
   const db = createDb();
-  process.stdout.write(`${await seedAdmin(db)}\n`);
-  process.stdout.write(`${await seedProducts(db)}\n`);
+  const admin = await seedAdmin(db);
+  process.stdout.write(`${admin.note}\n`);
+  process.stdout.write(`${await seedProducts(db, admin.id)}\n`);
   await db.$client.end();
 }
 

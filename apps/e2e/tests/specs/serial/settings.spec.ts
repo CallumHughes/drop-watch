@@ -2,6 +2,7 @@ import { ADMIN_EMAIL } from "../../../constants";
 import { expect, test } from "../../fixtures";
 
 const TEST_MAIL_SUBJECT_PATTERN = /^Test alert from /;
+const HTTP_FORBIDDEN = 403;
 
 /**
  * These tests write the singleton settings row — the one piece of state every
@@ -47,4 +48,39 @@ test("a test send reports delivery on both channels and reaches the sinks", asyn
     const mails = await emailSink.messagesWithSubject(TEST_MAIL_SUBJECT_PATTERN);
     expect(mails.some((mail) => mail.to.includes(ADMIN_EMAIL))).toBe(true);
   });
+});
+
+test("a plain user's settings page offers only the email preference", async ({ secondUser }) => {
+  await secondUser.settings.goto();
+
+  await test.step("their own slice is there: toggle and test send", async () => {
+    await expect(secondUser.settings.emailAlertsCheckbox).toBeVisible();
+    await expect(secondUser.settings.sendTestButton).toBeVisible();
+  });
+
+  await test.step("none of the instance-wide plumbing is", async () => {
+    await expect(secondUser.settings.cooldownInput).toBeHidden();
+    await expect(secondUser.settings.failureThresholdInput).toBeHidden();
+    await expect(secondUser.settings.haUrlInput).toBeHidden();
+    await expect(secondUser.settings.webhookIdInput).toBeHidden();
+    await expect(secondUser.settings.sendAlertsCheckbox).toBeHidden();
+  });
+});
+
+test("the admin-only settings procedures refuse a plain user at the API", async ({
+  secondUser,
+}) => {
+  // The page above merely doesn't render the form; this is the enforcement.
+  // Straight to the oRPC endpoint with the second user's own cookies, the
+  // way a curious user with devtools would go. Bodies are the RPC wire shape:
+  // the input under a `json` key.
+  const update = await secondUser.page.request.post("/api/rpc/settings/update", {
+    data: { json: { cooldownMinutes: 90 } },
+  });
+  expect(update.status()).toBe(HTTP_FORBIDDEN);
+
+  const get = await secondUser.page.request.post("/api/rpc/settings/get", {
+    data: { json: {} },
+  });
+  expect(get.status()).toBe(HTTP_FORBIDDEN);
 });

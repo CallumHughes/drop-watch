@@ -21,8 +21,11 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
+
+import { user } from "./auth";
 
 /** `auto` runs the full fallback chain; `selector` forces the configured CSS selector. */
 export const extractorMode = pgEnum("extractor_mode", ["auto", "selector"]);
@@ -98,11 +101,24 @@ export const products = pgTable(
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
-    url: text("url").notNull().unique(),
+    url: text("url").notNull(),
+    /**
+     * The owning account. Cascade, not restrict: the Better Auth admin plugin
+     * can remove users, and a removed user's products (and their price points,
+     * check runs and alert state, which cascade off `productId`) go with them.
+     * Uniqueness is per `(userId, url)` — two users tracking the same URL is
+     * two rows and two fetches, accepted as the cost of privacy.
+     */
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => [
     // The dispatcher runs this exact predicate every minute.
     index("products_active_next_check_at_idx").on(table.active, table.nextCheckAt),
+    // Leading user_id also serves every owner-scoped list query, so no
+    // separate plain index on userId is needed.
+    unique("products_user_id_url_unique").on(table.userId, table.url),
   ]
 );
 
@@ -176,9 +192,13 @@ export const alertState = pgTable(
   (table) => [primaryKey({ columns: [table.productId, table.rule] })]
 );
 
-export const productsRelations = relations(products, ({ many }) => ({
+export const productsRelations = relations(products, ({ many, one }) => ({
   alertStates: many(alertState),
   checkRuns: many(checkRuns),
+  owner: one(user, {
+    fields: [products.userId],
+    references: [user.id],
+  }),
   pricePoints: many(pricePoints),
 }));
 

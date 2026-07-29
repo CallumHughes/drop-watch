@@ -1,24 +1,18 @@
 /**
- * Who an alert email goes to.
+ * Who an alert email goes to: the product's owner.
  *
- * There is deliberately no "alert email address" field in `settings`. Alerts go
- * to the people who hold accounts on this tracker, resolved from the `user`
- * table at send time, because a typed-in address is a second copy of a fact the
- * database already knows — one that goes stale the moment somebody changes
- * their address, and one nobody ever remembers to update. The settings page
- * says so in as many words instead of offering a box to type into.
+ * There is deliberately no "alert email address" field anywhere. Alerts go to
+ * the account that owns the product, resolved from the `user` table at send
+ * time, because a typed-in address is a second copy of a fact the database
+ * already knows — one that goes stale the moment somebody changes their
+ * address, and one nobody ever remembers to update.
  *
  * Only *verified* addresses qualify. `emailVerified` is the only evidence the
  * tracker has that an address belongs to the person who claimed it, and mailing
  * an unverified one is how a typo in a sign-up form turns into a stranger
- * receiving price alerts for products they have never heard of.
- *
- * Today that is every account, because a product has no owner: the tracker is
- * single-user and `products` carries no `userId`. The intent is to open signup
- * later, at which point "who gets this alert" becomes a question about one
- * product rather than about the instance — so the answer is already a list
- * rather than an address, and already resolved per send rather than cached.
- * Adding the product to the call then changes this file and nothing else.
+ * receiving price alerts for products they have never heard of. The
+ * verification gate itself lives in `alertTargets` (`./settings`), which turns
+ * this row into a recipient list; this module only answers "who owns it".
  */
 
 import { eq } from "drizzle-orm";
@@ -26,19 +20,29 @@ import { eq } from "drizzle-orm";
 import { db } from "./index";
 import { user } from "./schema/auth";
 
+/** The alert-routing view of an account: address, consent, and role. */
+export interface ProductOwner {
+  email: string;
+  emailAlertsEnabled: boolean;
+  emailVerified: boolean;
+  role: string | null;
+}
+
 /**
- * Every verified account address, for the email alert channel.
- *
- * Returns an empty list rather than throwing when nobody qualifies — an
- * install whose only account has never verified its address has *no email
- * channel*, which is a quiet, legitimate state and not a failure. Callers turn
- * an empty list into "do not build the channel"; see `alertTargets` in
- * `./settings`.
+ * The account a product belongs to, or `null` when the row is gone (deletion
+ * racing an in-flight check). A `null` is a quiet, legitimate state — the
+ * caller turns it into "no channel", not an error.
  */
-export async function alertRecipients(): Promise<string[]> {
-  const rows = await db
-    .select({ email: user.email })
+export async function productOwner(userId: string): Promise<ProductOwner | null> {
+  const [row] = await db
+    .select({
+      email: user.email,
+      emailAlertsEnabled: user.emailAlertsEnabled,
+      emailVerified: user.emailVerified,
+      role: user.role,
+    })
     .from(user)
-    .where(eq(user.emailVerified, true));
-  return rows.map((row) => row.email);
+    .where(eq(user.id, userId))
+    .limit(1);
+  return row ?? null;
 }

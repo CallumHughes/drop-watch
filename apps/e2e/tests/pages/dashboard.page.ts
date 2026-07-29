@@ -2,10 +2,13 @@ import type { Locator, Page } from "@playwright/test";
 
 /** /dashboard — the product card grid. */
 export class DashboardPage {
+  /** The empty state an account with no products of its own sees. */
+  readonly emptyState: Locator;
   readonly page: Page;
 
   constructor(page: Page) {
     this.page = page;
+    this.emptyState = page.getByText("Nothing tracked yet");
   }
 
   async goto(): Promise<void> {

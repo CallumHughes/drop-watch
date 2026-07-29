@@ -38,6 +38,28 @@ interface Visitor {
   page: Page;
 }
 
+/**
+ * A second, non-admin account signed in on a context of its own, alongside the
+ * test's admin `page`. For everything per-user scoping is about: two accounts
+ * looking at the same instance at once.
+ *
+ * Each test gets a brand-new account (invited by the admin, signed up through
+ * the invite link), so nothing a test does to it — products, the email
+ * toggle — can be seen by any other test. Invited accounts arrive already
+ * email-verified, so `email` is immediately alertable.
+ */
+interface SecondUser {
+  addProduct: AddProductPage;
+  dashboard: DashboardPage;
+  email: string;
+  header: Header;
+  page: Page;
+  productDetail: ProductDetailPage;
+  settings: SettingsPage;
+}
+
+const SECOND_USER_PASSWORD = "second-user-password-1";
+
 interface Fixtures {
   addProduct: AddProductPage;
   dashboard: DashboardPage;
@@ -51,6 +73,12 @@ interface Fixtures {
   loginPage: LoginPage;
   productDetail: ProductDetailPage;
   resetPassword: ResetPasswordPage;
+  /**
+   * A second published fixture page, for tests whose scenario needs a product
+   * per account — same isolation model as `fixtureProduct`, distinct URL.
+   */
+  secondFixtureProduct: FixtureProduct;
+  secondUser: SecondUser;
   settings: SettingsPage;
   visitor: Visitor;
   webhookSink: WebhookSink;
@@ -91,6 +119,44 @@ export const test = base.extend<Fixtures>({
   },
   resetPassword: async ({ page }, use) => {
     await use(new ResetPasswordPage(page));
+  },
+  secondFixtureProduct: async ({ request }, use) => {
+    const product = new FixtureProduct(request);
+    await product.publish();
+    await use(product);
+  },
+  secondUser: async ({ browser, invites }, use, testInfo) => {
+    // Unique per test: the parallel index separates workers, the timestamp
+    // separates successive tests on one worker — no two second users ever
+    // share an address, so mails and invite rows never cross tests.
+    const email = `user-${testInfo.parallelIndex}-${Date.now()}@e2e.local`;
+
+    // The invite is minted on the admin's own page; only the signup happens
+    // in the fresh context, because /invite/[token] bounces signed-in
+    // visitors and the whole point is to become someone else.
+    await invites.goto();
+    const inviteUrl = await invites.createInvite(email);
+
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: { cookies: [], origins: [] },
+    });
+    const page = await context.newPage();
+    const invitePage = new InvitePage(page);
+    await invitePage.goto(inviteUrl);
+    await invitePage.signUp(`E2E User ${testInfo.parallelIndex}`, SECOND_USER_PASSWORD);
+    await page.waitForURL("**/dashboard");
+
+    await use({
+      addProduct: new AddProductPage(page),
+      dashboard: new DashboardPage(page),
+      email,
+      header: new Header(page),
+      page,
+      productDetail: new ProductDetailPage(page),
+      settings: new SettingsPage(page),
+    });
+    await context.close();
   },
   settings: async ({ page }, use) => {
     await use(new SettingsPage(page));

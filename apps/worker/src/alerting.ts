@@ -273,7 +273,11 @@ async function runFailureAlert(
 export async function runAlerting(context: AlertContext): Promise<void> {
   try {
     const settings = await loadSettings();
-    const targets = await alertTargets({ emailConfigured: emailEnabled(), settings });
+    const targets = await alertTargets({
+      emailConfigured: emailEnabled(),
+      ownerId: context.product.userId,
+      settings,
+    });
     const channels = alertChannels(targets, emailChannel);
     if (channels.length === 0) {
       // Not an error — alerting is off, or no destination has ever been
