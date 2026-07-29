@@ -100,16 +100,6 @@ catalogs:
 importers:
 
   .:
-    dependencies:
-      '@price-tracker/env':
-        specifier: workspace:*
-        version: link:packages/env
-      dotenv:
-        specifier: 'catalog:'
-        version: 17.4.2
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.6

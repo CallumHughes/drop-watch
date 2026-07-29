@@ -42,11 +42,6 @@
     "fix": "ultracite fix",
     "prepare": "husky"
   },
-  "dependencies": {
-    "@price-tracker/env": "workspace:*",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@price-tracker/config": "workspace:*",
