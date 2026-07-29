@@ -16,7 +16,7 @@
     "@price-tracker/email": "workspace:*",
     "@price-tracker/env": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "evlog": "^2.22.0",
+    "evlog": "^2.22.4",
     "pg-boss": "^12.26.3",
     "tsx": "catalog:"
   },

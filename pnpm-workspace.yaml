@@ -14,11 +14,11 @@ catalog:
   react: ^19.2.7
   react-dom: ^19.2.7
   sonner: ^2.0.7
-  "@orpc/server": ^1.14.6
-  "@orpc/client": ^1.14.6
-  "@orpc/openapi": ^1.14.6
-  "@orpc/zod": ^1.14.6
-  better-auth: 1.6.23
+  "@orpc/server": ^1.14.12
+  "@orpc/client": ^1.14.12
+  "@orpc/openapi": ^1.14.12
+  "@orpc/zod": ^1.14.12
+  better-auth: 1.6.25
   resend: ^6.18.0
   "@react-email/components": ^1.0.12
   "@react-email/render": ^2.1.0
