@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^22.13.14",
+    "@types/node": "^24.13.3",
     "typescript": "catalog:"
   }
 }

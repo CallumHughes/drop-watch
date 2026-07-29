@@ -41,7 +41,7 @@
     "@price-tracker/config": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
     "@tanstack/react-query-devtools": "^5.101.2",
-    "@types/node": "^22.13.14",
+    "@types/node": "^24.13.3",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "tailwindcss": "catalog:",

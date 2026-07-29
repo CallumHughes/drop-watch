@@ -1,6 +1,10 @@
 {
   "name": "price-tracker",
   "private": true,
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=11"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -46,7 +50,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
     "@price-tracker/config": "workspace:*",
-    "@types/node": "^22.13.14",
+    "@types/node": "^24.13.3",
     "husky": "latest",
     "turbo": "^2.10.2",
     "typescript": "catalog:",
