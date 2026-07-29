@@ -1,4 +1,5 @@
 import { createDb } from "@price-tracker/db";
+import { findPendingInvite, markInviteAccepted } from "@price-tracker/db/invites";
 // biome-ignore lint/performance/noNamespaceImport: drizzle adapter requires the full schema object.
 import * as schema from "@price-tracker/db/schema/auth";
 import { signupOpen } from "@price-tracker/db/signup";
@@ -14,33 +15,60 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins/admin";
 import { createLogger } from "evlog";
 
 /** The endpoint the guard below closes. */
 const SIGN_UP_PATH = "/sign-up/email";
 
 /**
- * Signup is open exactly until the first account exists.
+ * The invite token riding in a sign-up body, if a plausible one is there.
  *
- * This tracker is single-user (PLAN.md §8): one seeded admin, and no way for
- * anyone reaching the LAN to add themselves afterwards. A live check rather
- * than the static `emailAndPassword.disableSignUp` flag, so a fresh install
- * that has not been seeded can still be bootstrapped from the login page — and
- * so the door shuts the moment it has been.
+ * Better Auth's sign-up schema passes unknown body keys through to hooks (and
+ * drops them again before the insert), which is the sanctioned way to smuggle
+ * extra context into a signup. The body is untrusted input, so this checks
+ * shape rather than assuming it.
+ */
+function inviteTokenFrom(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) {
+    return null;
+  }
+  const token = (body as Record<string, unknown>).inviteToken;
+  return typeof token === "string" && token.length > 0 ? token : null;
+}
+
+/**
+ * Signup is open for exactly one bootstrap account, then invite-only.
+ *
+ * A fresh install that has not been seeded can still create its first account
+ * from the login page — that account becomes the admin (see the database hook
+ * below). From then on the only way in is an invite the admin issued: the
+ * body must carry a token that resolves to a pending, unexpired invite, *and*
+ * the email being registered must be the one the invite was addressed to —
+ * an invite is permission for one known inbox, not a transferable ticket.
  *
  * Enforced here rather than only in the UI because hiding a form is not
  * security; the endpoint is what is actually exposed.
  */
-const closeSignupAfterFirstUser = createAuthMiddleware(async (ctx) => {
+const guardSignup = createAuthMiddleware(async (ctx) => {
   if (ctx.path !== SIGN_UP_PATH) {
     return;
   }
-  if (!(await signupOpen())) {
-    throw new APIError("FORBIDDEN", {
-      code: "SIGN_UP_DISABLED",
-      message: "Signup is disabled. This tracker already has an account.",
-    });
+  if (await signupOpen()) {
+    return;
   }
+  const token = inviteTokenFrom(ctx.body);
+  if (token) {
+    const invite = await findPendingInvite(token);
+    const { email } = ctx.body as { email?: unknown };
+    if (invite && typeof email === "string" && email.toLowerCase() === invite.email) {
+      return;
+    }
+  }
+  throw new APIError("FORBIDDEN", {
+    code: "SIGN_UP_DISABLED",
+    message: "Signup is invite-only. Ask the admin for an invitation.",
+  });
 });
 
 /**
@@ -86,7 +114,18 @@ async function deliver(kind: string, send: () => Promise<SendEmailResult>): Prom
  * address and this is the only mail sent. Addressing `user.email` rather than
  * anything remembered from the request is what makes both paths correct.
  */
-function sendVerification({ url, user }: { url: string; user: { email: string } }): Promise<void> {
+function sendVerification({
+  url,
+  user,
+}: {
+  url: string;
+  user: { email: string; emailVerified: boolean };
+}): Promise<void> {
+  // The sign-up route sends this unconditionally under `sendOnSignUp`, but an
+  // invited account is born verified — nothing to confirm, so send nothing.
+  if (user.emailVerified) {
+    return Promise.resolve();
+  }
   return deliver("verify_email", () => sendVerificationEmail({ to: user.email, url }));
 }
 
@@ -146,6 +185,47 @@ export function createAuth() {
 
       schema,
     }),
+    databaseHooks: {
+      user: {
+        create: {
+          /**
+           * Burn the invite only once the user row actually exists — a signup
+           * that dies halfway must leave the link usable for another attempt.
+           */
+          after: async (_created, ctx) => {
+            if (ctx?.path !== SIGN_UP_PATH) {
+              return;
+            }
+            const token = inviteTokenFrom(ctx.body);
+            if (token) {
+              await markInviteAccepted(token);
+            }
+          },
+          /**
+           * What kind of user a signup produces. The bootstrap account — the
+           * one created while the user table is still empty — is the admin;
+           * the admin plugin's own before-hook runs first (plugin database
+           * hooks precede config ones), so this `role` override wins over its
+           * default. An invited account instead arrives already verified: a
+           * valid token proves the admin addressed that inbox, which is the
+           * user's accepted standard of proof, and its role falls through to
+           * the plugin's default "user".
+           */
+          before: async (userData, ctx) => {
+            if (ctx?.path !== SIGN_UP_PATH) {
+              return;
+            }
+            if (await signupOpen()) {
+              return { data: { ...userData, role: "admin" } };
+            }
+            const token = inviteTokenFrom(ctx.body);
+            if (token && (await findPendingInvite(token))) {
+              return { data: { ...userData, emailVerified: true } };
+            }
+          },
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: mailer,
@@ -159,9 +239,9 @@ export function createAuth() {
       sendVerificationEmail: mailer ? sendVerification : undefined,
     },
     hooks: {
-      before: closeSignupAfterFirstUser,
+      before: guardSignup,
     },
-    plugins: [nextCookies()],
+    plugins: [admin(), nextCookies()],
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [env.CORS_ORIGIN],
     user: {

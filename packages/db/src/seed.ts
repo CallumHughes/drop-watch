@@ -76,6 +76,7 @@ async function seedAdmin(db: ReturnType<typeof createDb>): Promise<string> {
     emailVerified: true,
     id,
     name: env.SEED_ADMIN_NAME,
+    role: "admin",
     updatedAt: now,
   });
 

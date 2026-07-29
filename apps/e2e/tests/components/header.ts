@@ -20,8 +20,22 @@ export class Header {
     this.signInLink = page.getByRole("link", { name: "Sign In" });
   }
 
+  /** An item inside the (open) user dropdown. */
+  menuItem(name: string): Locator {
+    return this.page.getByRole("menuitem", { exact: true, name });
+  }
+
+  /**
+   * The dropdown trigger for an arbitrary signed-in user — `userMenuButton`
+   * assumes the shared admin session, which specs driving their own accounts
+   * cannot.
+   */
+  userMenuFor(name: string): Locator {
+    return this.page.getByRole("button", { exact: true, name });
+  }
+
   async signOut(): Promise<void> {
     await this.userMenuButton.click();
-    await this.page.getByRole("menuitem", { name: "Sign Out" }).click();
+    await this.menuItem("Sign Out").click();
   }
 }

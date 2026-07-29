@@ -26,6 +26,7 @@ import type { AlertChannel, ChannelSendResult } from "@price-tracker/core/notify
 
 import { appUrl, type SendEmailResult, sendEmail } from "./client";
 import { CHANGE_EMAIL_SUBJECT, ChangeEmail } from "./templates/change-email";
+import { INVITE_SUBJECT, Invite } from "./templates/invite";
 import { PriceAlert, priceAlertSubject } from "./templates/price-alert";
 import { RESET_PASSWORD_SUBJECT, ResetPassword } from "./templates/reset-password";
 import { TrackerBroken, trackerBrokenSubject } from "./templates/tracker-broken";
@@ -77,6 +78,14 @@ export function sendVerificationEmail({ to, url }: AuthEmailInput): Promise<Send
 /** Password reset — the only way back into a box whose signup has closed. */
 export function sendPasswordResetEmail({ to, url }: AuthEmailInput): Promise<SendEmailResult> {
   return sendEmail({ react: <ResetPassword url={url} />, subject: RESET_PASSWORD_SUBJECT, to });
+}
+
+/**
+ * An admin's invitation. The `url` carries the raw invite token, so this mail
+ * is the token's one delivery — the sender keeps only its hash.
+ */
+export function sendInviteEmail({ to, url }: AuthEmailInput): Promise<SendEmailResult> {
+  return sendEmail({ react: <Invite url={url} />, subject: INVITE_SUBJECT, to });
 }
 
 /**

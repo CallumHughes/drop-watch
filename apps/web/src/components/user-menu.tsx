@@ -54,6 +54,12 @@ export default function UserMenu() {
           {/* The only way to reach /account — it is deliberately absent from
               the header nav, which is for the tracker, not for the account. */}
           <DropdownMenuItem render={<Link href="/account" />}>Account</DropdownMenuItem>
+          {/* Same convention for /invites, plus admin-only: hiding it is
+              presentation — the page and every invites procedure re-check the
+              role server-side. */}
+          {session.user.role === "admin" ? (
+            <DropdownMenuItem render={<Link href="/invites" />}>Invites</DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onClick={handleSignOut} variant="destructive">
             Sign Out
           </DropdownMenuItem>
