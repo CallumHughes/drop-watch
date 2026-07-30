@@ -135,9 +135,6 @@ changed in the UI takes effect on the next check without restarting anything.
   nothing prunes it yet.
 - **Prices render in `en-GB` formatting.** The currency follows the shop; the
   number and date formatting does not yet follow you.
-- **The `worker` and `migrate` images are large** (~1.5 GB against the web
-  image's ~410 MB), because pnpm's auto-installed peer dependencies pull Next.js
-  into both even though neither process loads it.
 
 There is also no cross-retailer comparison and no all-time-low or average
 statistics; a product is one URL and the history is the history.

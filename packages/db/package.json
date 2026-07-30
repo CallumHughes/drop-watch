@@ -10,6 +10,7 @@
     }
   },
   "scripts": {
+    "build": "rolldown -c",
     "check-types": "tsc --noEmit",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
@@ -34,6 +35,7 @@
     "@drop-watch/config": "workspace:*",
     "@types/pg": "catalog:",
     "drizzle-kit": "^0.31.10",
+    "rolldown": "^1.2.1",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

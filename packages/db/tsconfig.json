@@ -7,5 +7,11 @@
     "outDir": "dist",
     "strictNullChecks": true
   },
-  "include": ["src", "test", "drizzle.config.ts", "vitest.config.ts"]
+  "include": [
+    "src",
+    "test",
+    "drizzle.config.ts",
+    "rolldown.config.ts",
+    "vitest.config.ts"
+  ]
 }

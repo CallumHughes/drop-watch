@@ -17,8 +17,8 @@ services:
 
   migrate:
     # The host's Postgres is outside compose's view, so there is no
-    # `service_healthy` condition to wait on. The entrypoint retries the
-    # connection instead (packages/db/docker-entrypoint.sh), which is also what
+    # `service_healthy` condition to wait on. The job retries the connection
+    # itself instead (packages/db/src/migrate.ts), which is also what
     # makes the stack come back cleanly after a host reboot, when the
     # containers routinely start before Postgres has finished.
     depends_on: !reset null
