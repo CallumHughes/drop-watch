@@ -24,30 +24,25 @@
  * consider the person told.
  */
 
-import { percentChange } from "@price-tracker/core/decimal";
-import type { NotificationPayload } from "@price-tracker/core/notify";
-import type { AlertChannel } from "@price-tracker/core/notify/channels";
-import { deliverAlert } from "@price-tracker/core/notify/channels";
-import { alertChannels } from "@price-tracker/core/notify/targets";
-import type {
-  AlertMemory,
-  AlertStateKey,
-  Observation,
-  RuleTrigger,
-} from "@price-tracker/core/rules";
+import { percentChange } from "@drop-watch/core/decimal";
+import type { NotificationPayload } from "@drop-watch/core/notify";
+import type { AlertChannel } from "@drop-watch/core/notify/channels";
+import { deliverAlert } from "@drop-watch/core/notify/channels";
+import { alertChannels } from "@drop-watch/core/notify/targets";
+import type { AlertMemory, AlertStateKey, Observation, RuleTrigger } from "@drop-watch/core/rules";
 import {
   cooldownMs,
   countLeadingFailures,
   evaluateAlerts,
   shouldReportBroken,
-  TRACKER_BROKEN,
-} from "@price-tracker/core/rules";
-import { db } from "@price-tracker/db";
-import type { Product } from "@price-tracker/db/schema/products";
-import { alertState, checkRuns, pricePoints } from "@price-tracker/db/schema/products";
-import type { Settings } from "@price-tracker/db/schema/settings";
-import { alertTargets, loadSettings } from "@price-tracker/db/settings";
-import { emailChannel, emailEnabled } from "@price-tracker/email";
+  WATCH_BROKEN,
+} from "@drop-watch/core/rules";
+import { db } from "@drop-watch/db";
+import type { Product } from "@drop-watch/db/schema/products";
+import { alertState, checkRuns, pricePoints } from "@drop-watch/db/schema/products";
+import type { Settings } from "@drop-watch/db/schema/settings";
+import { alertTargets, loadSettings } from "@drop-watch/db/settings";
+import { emailChannel, emailEnabled } from "@drop-watch/email";
 import { and, desc, eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 
@@ -147,7 +142,7 @@ function brokenPayload(
     previousPrice: null,
     price: null,
     productId: product.id,
-    rule: TRACKER_BROKEN,
+    rule: WATCH_BROKEN,
     title: product.title,
     url: product.url,
   };
@@ -224,10 +219,10 @@ async function runPriceAlerts(
 }
 
 /**
- * The "this tracker is broken" alarm.
+ * The "this watch is broken" alarm.
  *
  * One notification when the failure streak reaches the threshold, then silence
- * until a check succeeds — recovery is the `tracker_broken` row being deleted,
+ * until a check succeeds — recovery is the `watch_broken` row being deleted,
  * which happens on every successful check whether or not one was ever sent.
  */
 async function runFailureAlert(
@@ -238,7 +233,7 @@ async function runFailureAlert(
   now: Date
 ): Promise<void> {
   if (context.outcome.status === "ok") {
-    await forgetAlert(product.id, TRACKER_BROKEN);
+    await forgetAlert(product.id, WATCH_BROKEN);
     return;
   }
 
@@ -251,7 +246,7 @@ async function runFailureAlert(
 
   const failures = countLeadingFailures(runs);
   const memory = await loadMemory(product.id);
-  if (!shouldReportBroken(failures, memory.has(TRACKER_BROKEN), settings.failureThreshold)) {
+  if (!shouldReportBroken(failures, memory.has(WATCH_BROKEN), settings.failureThreshold)) {
     return;
   }
 
@@ -261,7 +256,7 @@ async function runFailureAlert(
     `${failures} consecutive failed checks`
   );
   if (sent) {
-    await rememberAlert(product.id, TRACKER_BROKEN, null, now);
+    await rememberAlert(product.id, WATCH_BROKEN, null, now);
   }
 }
 
@@ -284,7 +279,7 @@ export async function runAlerting(context: AlertContext): Promise<void> {
       // configured. Recovery state is still cleared so a later configuration
       // does not inherit a stale "broken" flag.
       if (context.outcome.status === "ok") {
-        await forgetAlert(context.product.id, TRACKER_BROKEN);
+        await forgetAlert(context.product.id, WATCH_BROKEN);
       }
       return;
     }

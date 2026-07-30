@@ -3,7 +3,7 @@
  *
  * Email is opt-in and `RESEND_API_KEY` is the switch: setting it is the
  * statement "I want the mailer", and leaving it unset must leave a self-hoster
- * with a fully working, webhook-only tracker rather than a half-broken auth
+ * with a fully working, webhook-only install rather than a half-broken auth
  * flow. That decision only holds if the capability is decided in exactly one
  * place, so {@link emailEnabled} is it — no other module in the repo reads the
  * variable, and every branch that behaves differently with a mailer (Better
@@ -12,16 +12,16 @@
  * from the environment.
  *
  * {@link sendEmail} never throws. That is the same contract
- * `sendNotification` in `@price-tracker/core/notify` keeps, for the same
+ * `sendNotification` in `@drop-watch/core/notify` keeps, for the same
  * reason: a mail that could not be sent is a thing to log, never a thing that
  * fails the check, the sign-up or the request that triggered it. With no key
  * it short-circuits to `{ ok: false, error: EMAIL_NOT_CONFIGURED }`, which
  * callers can tell apart from a real failure exactly as `notifyConfig` in
- * `@price-tracker/db/settings` already separates "chose not to send" from
+ * `@drop-watch/db/settings` already separates "chose not to send" from
  * "tried and failed".
  */
 
-import { env } from "@price-tracker/env/email";
+import { env } from "@drop-watch/env/email";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { Resend } from "resend";
@@ -29,7 +29,7 @@ import { Resend } from "resend";
 /**
  * Resend's shared sender, which needs no verified domain but which Resend will
  * only deliver to the address that owns the account. That is enough for a
- * single-user tracker and useless for anything else, so `EMAIL_FROM` exists.
+ * single-user install and useless for anything else, so `EMAIL_FROM` exists.
  */
 const DEFAULT_FROM = "onboarding@resend.dev";
 
@@ -90,7 +90,7 @@ export function appUrl(): string | null {
 
 /**
  * Constructed on first use rather than at import time, so that importing this
- * module — which `@price-tracker/auth` does unconditionally — costs nothing on
+ * module — which `@drop-watch/auth` does unconditionally — costs nothing on
  * an install with no key, and so the process starts even when the key is
  * garbage. The instance is a thin HTTP wrapper and is safe to share.
  */

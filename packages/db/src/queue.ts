@@ -2,7 +2,7 @@
  * pg-boss wiring: queue names, queue configuration, and the two ways to get a
  * boss instance.
  *
- * This lives in `@price-tracker/db` rather than in `apps/worker` because
+ * This lives in `@drop-watch/db` rather than in `apps/worker` because
  * Postgres is the only interface between the web app and the worker (PLAN.md
  * §1) — the "check now" button in `apps/web` enqueues onto the same queue the
  * worker consumes, and neither side can import from the other's app.
@@ -13,7 +13,7 @@
  * double-fire the minutely dispatcher.
  */
 
-import { env } from "@price-tracker/env/db";
+import { env } from "@drop-watch/env/db";
 import { PgBoss, type Queue, type SendOptions } from "pg-boss";
 
 /** Re-exported so callers can type a boss without depending on pg-boss directly. */
@@ -89,7 +89,7 @@ export const ENQUEUE_DUE_CHECKS_CRON = "* * * * *";
  */
 export function createWorkerBoss(): PgBoss {
   return new PgBoss({
-    application_name: "price-tracker-worker",
+    application_name: "drop-watch-worker",
     connectionString: env.DATABASE_URL,
     migrate: true,
     schedule: true,
@@ -107,7 +107,7 @@ const SENDER_POOL_SIZE = 2;
  */
 export function createSenderBoss(): PgBoss {
   return new PgBoss({
-    application_name: "price-tracker-sender",
+    application_name: "drop-watch-sender",
     connectionString: env.DATABASE_URL,
     max: SENDER_POOL_SIZE,
     migrate: false,

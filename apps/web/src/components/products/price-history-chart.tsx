@@ -1,6 +1,6 @@
 "use client";
 
-import type { PriceSample } from "@price-tracker/api/routers/products";
+import type { PriceSample } from "@drop-watch/api/routers/products";
 import { useCallback } from "react";
 import {
   CartesianGrid,

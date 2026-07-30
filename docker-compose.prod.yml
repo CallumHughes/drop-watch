@@ -23,7 +23,7 @@ services:
     # containers routinely start before Postgres has finished.
     depends_on: !reset null
     environment:
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://drop_watch:password@host.docker.internal:5432/drop_watch}
     # A no-op on Docker Desktop, which already resolves the name; required on
     # Linux, where host.docker.internal otherwise does not exist (PLAN.md §3).
     extra_hosts:
@@ -31,12 +31,12 @@ services:
 
   web:
     environment:
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://drop_watch:password@host.docker.internal:5432/drop_watch}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   worker:
     environment:
-      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://price_tracker:password@host.docker.internal:5432/price_tracker}
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://drop_watch:password@host.docker.internal:5432/drop_watch}
     extra_hosts:
       - "host.docker.internal:host-gateway"

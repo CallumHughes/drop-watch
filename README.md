@@ -1,6 +1,6 @@
-# price-tracker
+# DropWatch
 
-A self-hosted price tracker for arbitrary online products. It checks product pages on
+DropWatch is a self-hosted price tracker for arbitrary online products. It checks product pages on
 a schedule, records price history, and pushes alerts to a local Home Assistant webhook,
 to email, or to both — see [Email](#email-optional); the mailer is optional and off
 until you give it a key.
@@ -56,7 +56,7 @@ explicitly in `apps/e2e/constants.ts` (a throwaway database, overridable with
 ### Development
 
 `pnpm db:start` brings up the `postgres` service from `docker-compose.yml` with a
-`price-tracker` database. Nothing else is needed.
+`drop-watch` database. Nothing else is needed.
 
 ### Production
 
@@ -65,9 +65,9 @@ container (PLAN.md §3). Give the tracker its own database and role rather than 
 schema inside another service's database:
 
 ```sql
-CREATE ROLE price_tracker WITH LOGIN PASSWORD 'choose-something-long';
-CREATE DATABASE price_tracker OWNER price_tracker;
-GRANT ALL PRIVILEGES ON DATABASE price_tracker TO price_tracker;
+CREATE ROLE drop_watch WITH LOGIN PASSWORD 'choose-something-long';
+CREATE DATABASE drop_watch OWNER drop_watch;
+GRANT ALL PRIVILEGES ON DATABASE drop_watch TO drop_watch;
 ```
 
 Owning the database matters: the role has to be able to **create schemas**. Drizzle
@@ -78,8 +78,8 @@ If the role does not own the database, grant the schema rights explicitly (Postg
 15+ no longer gives `PUBLIC` create rights on `public`):
 
 ```sql
-GRANT CREATE ON DATABASE price_tracker TO price_tracker;
-GRANT ALL ON SCHEMA public TO price_tracker;
+GRANT CREATE ON DATABASE drop_watch TO drop_watch;
+GRANT ALL ON SCHEMA public TO drop_watch;
 ```
 
 ### Letting the containers reach the host
@@ -100,8 +100,8 @@ the address is usually somewhere in `172.16.0.0/12` rather than the `172.17.0.0/
 default bridge:
 
 ```conf
-# TYPE  DATABASE       USER           ADDRESS          METHOD
-host    price_tracker  price_tracker  172.16.0.0/12    scram-sha-256
+# TYPE  DATABASE    USER        ADDRESS          METHOD
+host    drop_watch  drop_watch  172.16.0.0/12    scram-sha-256
 ```
 
 Reload afterwards (`SELECT pg_reload_conf();`, or `systemctl reload postgresql`).
@@ -174,7 +174,7 @@ and then the root `.env`, so the root file wins in a deployment;
 
 | Variable | Required | Used by | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | yes | everything | Set by compose. In production, `postgresql://price_tracker:...@host.docker.internal:5432/price_tracker`. |
+| `DATABASE_URL` | yes | everything | Set by compose. In production, `postgresql://drop_watch:...@host.docker.internal:5432/drop_watch`. |
 | `BETTER_AUTH_SECRET` | yes (web) | `web` | ≥32 chars. `openssl rand -base64 32`. |
 | `BETTER_AUTH_URL` | yes (web) | `web` | The URL the browser uses, e.g. `http://server.local:3001`. Defaults to `http://localhost:3001`. |
 | `CORS_ORIGIN` | yes (web) | `web` | Normally identical to `BETTER_AUTH_URL`. |
@@ -214,7 +214,7 @@ Delivery failures are logged and never fail a check.
 - alias: Price drop alert
   trigger:
     - platform: webhook
-      webhook_id: price_tracker
+      webhook_id: drop_watch
       local_only: true
   action:
     - service: notify.mobile_app_yourphone
@@ -234,22 +234,22 @@ address `trigger.json.previousPrice` without guarding first:
 | `title`, `imageUrl`, `currency` | `null` until a check has extracted them. |
 | `price`, `previousPrice`, `pctChange` | Decimal **strings**, never floats. `pctChange` is signed, one decimal place. |
 | `inStock` | `null` when the page did not say. |
-| `rule` | `target`, `drop_percent`, `restock`, `tracker_broken`, or `test`. |
-| `consecutiveFailures` | Length of the failure streak on `tracker_broken`; `null` otherwise. |
-| `error` | Failure detail on `tracker_broken`; `null` otherwise. |
+| `rule` | `target`, `drop_percent`, `restock`, `watch_broken`, or `test`. |
+| `consecutiveFailures` | Length of the failure streak on `watch_broken`; `null` otherwise. |
+| `error` | Failure detail on `watch_broken`; `null` otherwise. |
 
-`tracker_broken` fires once after N consecutive failed checks (default 5) and stays
+`watch_broken` fires once after N consecutive failed checks (default 5) and stays
 quiet until the product recovers — selectors rot silently, and this is how you find
 out. Branch on it if you want a different notification:
 
 ```yaml
   action:
     - choose:
-        - conditions: "{{ trigger.json.rule == 'tracker_broken' }}"
+        - conditions: "{{ trigger.json.rule == 'watch_broken' }}"
           sequence:
             - service: notify.mobile_app_yourphone
               data:
-                title: "Tracker broken: {{ trigger.json.title }}"
+                title: "Watch broken: {{ trigger.json.title }}"
                 message: "{{ trigger.json.consecutiveFailures }} failed checks — {{ trigger.json.error }}"
 ```
 
@@ -281,7 +281,7 @@ To turn it on:
 
 ```bash
 RESEND_API_KEY=re_...                    # from https://resend.com
-EMAIL_FROM=price-tracker@example.com     # optional; see the note below
+EMAIL_FROM=drop-watch@example.com        # optional; see the note below
 APP_URL=http://server.local:3001         # optional; links inside the mail
 ```
 
@@ -314,13 +314,13 @@ an account created *before* the key was set — or one whose verification mail b
 is a locked box with no second account to rescue it from. The escape hatch:
 
 ```bash
-pnpm db:verify-user admin@price-tracker.local
+pnpm db:verify-user admin@drop-watch.local
 ```
 
 Or, straight at the database:
 
 ```sql
-UPDATE "user" SET email_verified = true WHERE email = 'admin@price-tracker.local';
+UPDATE "user" SET email_verified = true WHERE email = 'admin@drop-watch.local';
 ```
 
 `pnpm db:seed` already writes `emailVerified: true`, so a seeded admin never needs this.
@@ -373,7 +373,7 @@ own), and relaunch the window after a headless `pnpm test:e2e` — that run
 recreates the database underneath an open UI session.
 
 Everything else is owned by the suite. Global setup drops and recreates a throwaway
-`price-tracker-e2e` database (override with `E2E_DATABASE_URL`), pushes the schema,
+`drop-watch-e2e` database (override with `E2E_DATABASE_URL`), pushes the schema,
 and spawns the worker against it. Playwright then starts its own web server on
 **:3101** with its own `.next-e2e` build dir — a `pnpm dev` on :3001 can keep running —
 plus a fixture server on **:4100** that plays both external roles: the retailer pages
@@ -404,10 +404,10 @@ pnpm db:start
 pnpm test:integration
 ```
 
-Global setup drops and recreates a throwaway `price-tracker-integration` database
+Global setup drops and recreates a throwaway `drop-watch-integration` database
 (override with `INTEGRATION_DATABASE_URL`) and applies the real migration chain; the
-parity check uses two more throwaway databases, `price-tracker-parity-migrate` and
-`price-tracker-parity-push`, on the same server. All three are dropped afterwards.
+parity check uses two more throwaway databases, `drop-watch-parity-migrate` and
+`drop-watch-parity-push`, on the same server. All three are dropped afterwards.
 The suite is not part of `pnpm test`, which stays database-free.
 
 ## Known limitations
@@ -428,7 +428,7 @@ The suite is not part of `pnpm test`, which stays database-free.
 ## Project structure
 
 ```
-price-tracker/
+drop-watch/
 ├── apps/
 │   ├── e2e/         # Playwright end-to-end suite (fixture server, page objects, specs)
 │   ├── web/         # Next.js — UI, oRPC route handlers, Better Auth
@@ -460,7 +460,7 @@ npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
 ```
 
 ```tsx
-import { Button } from "@price-tracker/ui/components/button";
+import { Button } from "@drop-watch/ui/components/button";
 ```
 
 Run the shadcn CLI from `apps/web` instead for app-specific blocks.
@@ -477,6 +477,6 @@ Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 - `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container
 - `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` — Drizzle
 - `pnpm db:verify-user <email>` — mark an account verified; the lockout escape hatch
-- `pnpm --filter @price-tracker/core test-url <url>` — run the extraction chain on one URL
+- `pnpm --filter @drop-watch/core test-url <url>` — run the extraction chain on one URL
 - `pnpm docker:build` / `docker:up` / `docker:logs` / `docker:down` — local container stack
 - `pnpm docker:prod:build` / `docker:prod:up` / `docker:prod:logs` / `docker:prod:down` — against host Postgres

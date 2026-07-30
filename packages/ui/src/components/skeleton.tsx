@@ -1,4 +1,4 @@
-import { cn } from "@price-tracker/ui/lib/utils";
+import { cn } from "@drop-watch/ui/lib/utils";
 
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (

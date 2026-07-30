@@ -1,5 +1,5 @@
-import { auth } from "@price-tracker/auth";
-import { emailEnabled } from "@price-tracker/email";
+import { auth } from "@drop-watch/auth";
+import { emailEnabled } from "@drop-watch/email";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";

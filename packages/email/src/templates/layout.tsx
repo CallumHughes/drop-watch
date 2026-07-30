@@ -40,8 +40,8 @@ import {
 } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
 
-/** The product's name as it appears in headings and footers. */
-export const APP_NAME = "Price Tracker";
+/** The product's name as it appears in headings, subjects and footers. */
+export const APP_NAME = "DropWatch";
 
 const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -174,7 +174,7 @@ export function EmailLayout({ children, heading, preview }: EmailLayoutProps) {
           <Section>{children}</Section>
           <Hr style={hrStyle} />
           <Text style={mutedStyle}>
-            Sent by {APP_NAME}, the self-hosted price tracker running on your own machine.
+            Sent by {APP_NAME}, the self-hosted price watcher running on your own machine.
           </Text>
         </Container>
       </Body>

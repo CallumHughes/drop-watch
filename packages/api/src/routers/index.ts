@@ -1,5 +1,5 @@
+import { signupOpen } from "@drop-watch/db/signup";
 import type { RouterClient } from "@orpc/server";
-import { signupOpen } from "@price-tracker/db/signup";
 
 import { protectedProcedure, publicProcedure } from "../index";
 import { invitesRouter } from "./invites";

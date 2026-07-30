@@ -163,10 +163,10 @@ describe("deliverAlert", () => {
 
 describe("webhookChannel", () => {
   it("reports the endpoint it will POST to as its target", () => {
-    const channel = webhookChannel({ haUrl: "http://ha.local:8123", webhookId: "price_tracker" });
+    const channel = webhookChannel({ haUrl: "http://ha.local:8123", webhookId: "drop_watch" });
 
     expect(channel.name).toBe("webhook");
-    expect(channel.target).toBe("http://ha.local:8123/api/webhook/price_tracker");
+    expect(channel.target).toBe("http://ha.local:8123/api/webhook/drop_watch");
   });
 
   it("stays a channel when the configured URL is unusable", () => {

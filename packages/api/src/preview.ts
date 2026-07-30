@@ -14,7 +14,7 @@ import type {
   ExtractorStrategy,
   SelectorMatch,
   SelectorTest,
-} from "@price-tracker/core/extract";
+} from "@drop-watch/core/extract";
 
 /** One fetched page, held only long enough to pick a selector against it. */
 export interface PreviewEntry {

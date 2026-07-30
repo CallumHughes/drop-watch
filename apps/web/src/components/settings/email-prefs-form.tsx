@@ -1,12 +1,12 @@
 "use client";
 
-import type { TestResult } from "@price-tracker/api/routers/settings";
-import { env } from "@price-tracker/env/web";
-import { Button } from "@price-tracker/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
-import { Checkbox } from "@price-tracker/ui/components/checkbox";
-import { Label } from "@price-tracker/ui/components/label";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+import type { TestResult } from "@drop-watch/api/routers/settings";
+import { env } from "@drop-watch/env/web";
+import { Button } from "@drop-watch/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
+import { Checkbox } from "@drop-watch/ui/components/checkbox";
+import { Label } from "@drop-watch/ui/components/label";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send } from "lucide-react";
 import { type FormEvent, useCallback, useState } from "react";

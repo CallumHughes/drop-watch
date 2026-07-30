@@ -11,20 +11,20 @@
  * immediately with nothing to restart (PLAN.md §1: Postgres is the interface).
  */
 
-import type { ChannelResult } from "@price-tracker/core/notify/channels";
-import { deliverAlert } from "@price-tracker/core/notify/channels";
-import { alertChannels } from "@price-tracker/core/notify/targets";
-import { db } from "@price-tracker/db";
-import { user } from "@price-tracker/db/schema/auth";
-import { products } from "@price-tracker/db/schema/products";
-import type { Settings } from "@price-tracker/db/schema/settings";
+import type { ChannelResult } from "@drop-watch/core/notify/channels";
+import { deliverAlert } from "@drop-watch/core/notify/channels";
+import { alertChannels } from "@drop-watch/core/notify/targets";
+import { db } from "@drop-watch/db";
+import { user } from "@drop-watch/db/schema/auth";
+import { products } from "@drop-watch/db/schema/products";
+import type { Settings } from "@drop-watch/db/schema/settings";
 import {
   alertTargets,
   loadSettings,
   type SettingsPatch,
   saveSettings,
-} from "@price-tracker/db/settings";
-import { emailChannel, emailEnabled } from "@price-tracker/email";
+} from "@drop-watch/db/settings";
+import { emailChannel, emailEnabled } from "@drop-watch/email";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -33,9 +33,9 @@ import { settingsUpdateInput } from "../schemas/settings";
 
 /**
  * Re-exported so `apps/web` can name the row without depending on
- * `@price-tracker/db` — the UI reads the API, not the database.
+ * `@drop-watch/db` — the UI reads the API, not the database.
  */
-export type { Settings } from "@price-tracker/db/schema/settings";
+export type { Settings } from "@drop-watch/db/schema/settings";
 
 /** Only the keys actually supplied, so omitting a field leaves it alone. */
 function buildPatch(input: z.infer<typeof settingsUpdateInput>): SettingsPatch {
@@ -130,7 +130,7 @@ export const settingsRouter = {
         price: "55.44",
         productId: sample?.id ?? "00000000-0000-0000-0000-000000000000",
         rule: "test",
-        title: sample?.title ?? "Price tracker test",
+        title: sample?.title ?? "DropWatch test",
         url: sample?.url ?? "https://example.com/",
       },
     });

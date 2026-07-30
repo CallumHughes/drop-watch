@@ -1,4 +1,4 @@
-import { auth } from "@price-tracker/auth";
+import { auth } from "@drop-watch/auth";
 import type { NextRequest } from "next/server";
 
 export async function createContext(req: NextRequest) {

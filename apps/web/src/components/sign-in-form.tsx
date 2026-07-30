@@ -1,8 +1,8 @@
-import { env } from "@price-tracker/env/web";
-import { Button } from "@price-tracker/ui/components/button";
-import { Card, CardContent, CardHeader } from "@price-tracker/ui/components/card";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@price-tracker/ui/components/field";
-import { Input } from "@price-tracker/ui/components/input";
+import { env } from "@drop-watch/env/web";
+import { Button } from "@drop-watch/ui/components/button";
+import { Card, CardContent, CardHeader } from "@drop-watch/ui/components/card";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@drop-watch/ui/components/field";
+import { Input } from "@drop-watch/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

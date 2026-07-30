@@ -14,9 +14,9 @@
  * stays true.
  */
 
-import { percentChange, subtract } from "@price-tracker/core/decimal";
-import { countLeadingFailures } from "@price-tracker/core/rules";
-import type { CheckRun, Product } from "@price-tracker/db/schema/products";
+import { percentChange, subtract } from "@drop-watch/core/decimal";
+import { countLeadingFailures } from "@drop-watch/core/rules";
+import type { CheckRun, Product } from "@drop-watch/db/schema/products";
 
 /** One observation. `price` is a decimal string; `inStock` is null when unknown. */
 export interface PriceSample {

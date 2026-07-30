@@ -9,7 +9,7 @@
 #
 # (or `pnpm docker:prod:up`, which is the same thing). See README.md.
 
-name: price-tracker
+name: drop-watch
 
 # `apps/web/.env` is the file the rest of the repo already uses in development.
 # The root `.env` is what a deployment writes, and comes second so it wins when
@@ -22,7 +22,7 @@ x-env-files: &env-files
     required: false
 
 x-app-environment: &app-environment
-  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/price-tracker
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/drop-watch
   NODE_ENV: production
   # Every timestamp the worker schedules and the UI renders is derived from
   # this; leaving containers on UTC while the host is not is a quiet way to
@@ -117,21 +117,27 @@ services:
   # docker-compose.prod.yml.
   postgres:
     image: postgres:18
-    container_name: price-tracker-postgres
+    container_name: drop-watch-postgres
     environment:
-      POSTGRES_DB: price-tracker
+      POSTGRES_DB: drop-watch
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     ports:
       - "5432:5432"
     volumes:
-      - price-tracker_postgres_data:/var/lib/postgresql
+      - drop-watch_postgres_data:/var/lib/postgresql
+    # -d names the target database, not just the server: on a fresh volume
+    # `pg_isready` answers on the init-time socket before `POSTGRES_DB` has been
+    # created, so checking the server alone reports ready too early and whatever
+    # runs next (db:push) fails against a database that does not exist yet.
+    # Paired with `--wait` in the db:start script, which is what actually blocks.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d drop-watch"]
+      start_period: 30s
+      interval: 2s
       timeout: 5s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
 volumes:
-  price-tracker_postgres_data:
+  drop-watch_postgres_data:

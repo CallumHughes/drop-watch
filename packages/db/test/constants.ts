@@ -10,10 +10,10 @@
 
 export const INTEGRATION_DATABASE_URL =
   process.env.INTEGRATION_DATABASE_URL ??
-  "postgresql://postgres:password@localhost:5432/price-tracker-integration";
+  "postgresql://postgres:password@localhost:5432/drop-watch-integration";
 
-export const PARITY_MIGRATE_DB = "price-tracker-parity-migrate";
-export const PARITY_PUSH_DB = "price-tracker-parity-push";
+export const PARITY_MIGRATE_DB = "drop-watch-parity-migrate";
+export const PARITY_PUSH_DB = "drop-watch-parity-push";
 
 export function databaseName(connectionString: string): string {
   return decodeURIComponent(new URL(connectionString).pathname.slice(1));

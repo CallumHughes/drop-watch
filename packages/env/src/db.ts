@@ -10,7 +10,7 @@ import { z } from "zod";
 // they are *seed values*, not runtime config: the `settings` table is created
 // from them on first boot and edited in the UI thereafter (EPICS.md, Epic 7).
 // Both `apps/web` and `apps/worker` reach the webhook config through
-// `@price-tracker/db/settings`, so one definition serves both.
+// `@drop-watch/db/settings`, so one definition serves both.
 export const env = createEnv({
   emptyStringAsUndefined: true,
   runtimeEnv: process.env,

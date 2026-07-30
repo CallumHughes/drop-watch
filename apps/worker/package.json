@@ -1,5 +1,5 @@
 {
-  "name": "worker",
+  "name": "@drop-watch/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,17 +11,17 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@price-tracker/core": "workspace:*",
-    "@price-tracker/db": "workspace:*",
-    "@price-tracker/email": "workspace:*",
-    "@price-tracker/env": "workspace:*",
+    "@drop-watch/core": "workspace:*",
+    "@drop-watch/db": "workspace:*",
+    "@drop-watch/email": "workspace:*",
+    "@drop-watch/env": "workspace:*",
     "drizzle-orm": "catalog:",
     "evlog": "catalog:",
     "pg-boss": "catalog:",
     "tsx": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
-import { cn } from "@price-tracker/ui/lib/utils";
+import { Button } from "@drop-watch/ui/components/button";
+import { cn } from "@drop-watch/ui/lib/utils";
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,

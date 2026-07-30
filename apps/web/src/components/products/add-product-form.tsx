@@ -4,11 +4,11 @@ import type {
   PagePreview,
   PreviewExtraction,
   SelectorPreview,
-} from "@price-tracker/api/routers/preview";
-import { PRICE_PATTERN_SOURCE } from "@price-tracker/api/schemas/products";
-import { Button } from "@price-tracker/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
-import { Input } from "@price-tracker/ui/components/input";
+} from "@drop-watch/api/routers/preview";
+import { PRICE_PATTERN_SOURCE } from "@drop-watch/api/schemas/products";
+import { Button } from "@drop-watch/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
+import { Input } from "@drop-watch/ui/components/input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent } from "react";

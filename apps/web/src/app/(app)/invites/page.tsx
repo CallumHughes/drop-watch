@@ -1,4 +1,4 @@
-import { auth } from "@price-tracker/auth";
+import { auth } from "@drop-watch/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 

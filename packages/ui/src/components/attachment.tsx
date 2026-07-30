@@ -1,7 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { Button } from "@price-tracker/ui/components/button";
-import { cn } from "@price-tracker/ui/lib/utils";
+import { Button } from "@drop-watch/ui/components/button";
+import { cn } from "@drop-watch/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 

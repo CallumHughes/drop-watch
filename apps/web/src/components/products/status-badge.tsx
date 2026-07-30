@@ -1,5 +1,5 @@
-import type { CheckStatus } from "@price-tracker/api/routers/products";
-import { cn } from "@price-tracker/ui/lib/utils";
+import type { CheckStatus } from "@drop-watch/api/routers/products";
+import { cn } from "@drop-watch/ui/lib/utils";
 
 /** Human wording for the `check_run_status` enum. */
 const STATUS_LABELS: Record<CheckStatus, string> = {

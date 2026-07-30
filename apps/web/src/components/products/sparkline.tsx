@@ -1,4 +1,4 @@
-import type { PriceSample } from "@price-tracker/api/routers/products";
+import type { PriceSample } from "@drop-watch/api/routers/products";
 
 /** Drawn in an abstract 100×32 box and stretched to whatever the card gives it. */
 const VIEW_WIDTH = 100;

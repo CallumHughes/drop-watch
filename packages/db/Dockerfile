@@ -6,7 +6,7 @@
 # `service_completed_successfully` on this one, so a bad migration stops the
 # deployment instead of half-starting it.
 #
-# Pruned to `@price-tracker/db`, which carries the migration SQL, the drizzle
+# Pruned to `@drop-watch/db`, which carries the migration SQL, the drizzle
 # config and drizzle-kit itself. The install is not `--prod`: drizzle-kit is a
 # dev dependency.
 
@@ -17,7 +17,7 @@ WORKDIR /app
 FROM base AS pruner
 RUN npm install --global turbo@2.10.7
 COPY . .
-RUN turbo prune @price-tracker/db --docker
+RUN turbo prune @drop-watch/db --docker
 
 FROM base AS runner
 COPY --from=pruner /app/out/json/ .

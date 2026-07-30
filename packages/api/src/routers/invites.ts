@@ -2,8 +2,8 @@
  * Admin-issued invites — the only door into this tracker once the bootstrap
  * account exists.
  *
- * The API half is deliberately thin: `@price-tracker/db/invites` owns tokens,
- * hashing and expiry, and the signup hook in `@price-tracker/auth` is the
+ * The API half is deliberately thin: `@drop-watch/db/invites` owns tokens,
+ * hashing and expiry, and the signup hook in `@drop-watch/auth` is the
  * enforcement point. Everything here exists for the admin page (create, list,
  * revoke) and for the invite landing page (check) — none of it is what keeps a
  * stranger out.
@@ -14,9 +14,9 @@ import {
   findPendingInvite,
   listPendingInvites,
   revokeInvite,
-} from "@price-tracker/db/invites";
-import { emailEnabled, sendInviteEmail } from "@price-tracker/email";
-import { env } from "@price-tracker/env/server";
+} from "@drop-watch/db/invites";
+import { emailEnabled, sendInviteEmail } from "@drop-watch/email";
+import { env } from "@drop-watch/env/server";
 import { z } from "zod";
 
 import { adminProcedure, publicProcedure } from "../index";

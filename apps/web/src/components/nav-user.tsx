@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@price-tracker/ui/components/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@drop-watch/ui/components/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +9,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@price-tracker/ui/components/dropdown-menu";
+} from "@drop-watch/ui/components/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@price-tracker/ui/components/sidebar";
+} from "@drop-watch/ui/components/sidebar";
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

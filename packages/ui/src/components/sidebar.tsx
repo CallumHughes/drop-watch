@@ -5,24 +5,24 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { useIsMobile } from "@price-tracker/ui/hooks/use-mobile"
-import { cn } from "@price-tracker/ui/lib/utils"
-import { Button } from "@price-tracker/ui/components/button"
-import { Input } from "@price-tracker/ui/components/input"
-import { Separator } from "@price-tracker/ui/components/separator"
+import { useIsMobile } from "@drop-watch/ui/hooks/use-mobile"
+import { cn } from "@drop-watch/ui/lib/utils"
+import { Button } from "@drop-watch/ui/components/button"
+import { Input } from "@drop-watch/ui/components/input"
+import { Separator } from "@drop-watch/ui/components/separator"
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@price-tracker/ui/components/sheet"
-import { Skeleton } from "@price-tracker/ui/components/skeleton"
+} from "@drop-watch/ui/components/sheet"
+import { Skeleton } from "@drop-watch/ui/components/skeleton"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@price-tracker/ui/components/tooltip"
+} from "@drop-watch/ui/components/tooltip"
 import { PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"

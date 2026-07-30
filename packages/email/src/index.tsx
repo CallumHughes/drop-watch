@@ -3,14 +3,14 @@
  * seam that turns "send an alert" into an alert channel.
  *
  * Everything above this line is a template or a transport; everything that
- * calls it — Better Auth's callbacks in `@price-tracker/auth`, the worker's
+ * calls it — Better Auth's callbacks in `@drop-watch/auth`, the worker's
  * fan-out in `apps/worker/src/alerting.ts` — should be able to say what it
  * wants in one line and get back a result it never has to catch. So each
  * function here pairs a template with its subject and hands the pair to
  * {@link sendEmail}, and none of them throws.
  *
  * {@link emailChannel} is the other half of that: it wraps `sendAlertEmail` in
- * the `AlertChannel` shape `@price-tracker/core/notify/channels` defines, which
+ * the `AlertChannel` shape `@drop-watch/core/notify/channels` defines, which
  * is how the email transport reaches `deliverAlert` without `core` ever
  * importing Resend or React. Build the channel only when there is somebody to
  * send to — an unconfigured channel is *absent from the array*, never a channel
@@ -21,16 +21,16 @@
 /** @jsxRuntime automatic — see ./templates/layout.tsx for why this is here. */
 /** @jsxImportSource react */
 
-import type { NotificationPayload } from "@price-tracker/core/notify";
-import type { AlertChannel, ChannelSendResult } from "@price-tracker/core/notify/channels";
+import type { NotificationPayload } from "@drop-watch/core/notify";
+import type { AlertChannel, ChannelSendResult } from "@drop-watch/core/notify/channels";
 
 import { appUrl, type SendEmailResult, sendEmail } from "./client";
 import { CHANGE_EMAIL_SUBJECT, ChangeEmail } from "./templates/change-email";
 import { INVITE_SUBJECT, Invite } from "./templates/invite";
 import { PriceAlert, priceAlertSubject } from "./templates/price-alert";
 import { RESET_PASSWORD_SUBJECT, ResetPassword } from "./templates/reset-password";
-import { TrackerBroken, trackerBrokenSubject } from "./templates/tracker-broken";
 import { VERIFY_EMAIL_SUBJECT, VerifyEmail } from "./templates/verify-email";
+import { WatchBroken, watchBrokenSubject } from "./templates/watch-broken";
 
 // `emailEnabled` is the switch every caller has to read, so it is surfaced on
 // the entry point rather than leaving consumers to know it lives in `./client`:
@@ -53,11 +53,11 @@ export interface ChangeEmailInput extends AuthEmailInput {
 }
 
 /**
- * Absolute link to a product's page in the tracker, or `null` when `APP_URL`
+ * Absolute link to a product page in DropWatch, or `null` when `APP_URL`
  * is unset. `null` rather than a relative path on purpose: the templates fall
  * back to the shop's own URL, which is at least clickable from an inbox.
  */
-function trackerLink(productId: string): string | null {
+function watchLink(productId: string): string | null {
   const base = appUrl();
   if (base === null) {
     return null;
@@ -107,26 +107,26 @@ export function sendChangeEmailVerification({
 
 /**
  * One alert to every account address, in a single send — recipients are the
- * people who share the tracker, so there is nothing to hide between them and
+ * people who share the account, so there is nothing to hide between them and
  * one mail is cheaper than n.
  *
- * The payload's `rule` picks the template: `tracker_broken` says the opposite
+ * The payload's `rule` picks the template: `watch_broken` says the opposite
  * thing from a price alert and gets its own.
  */
 export function sendAlertEmail(
   recipients: readonly string[],
   payload: NotificationPayload
 ): Promise<SendEmailResult> {
-  const trackerUrl = trackerLink(payload.productId);
-  if (payload.rule === "tracker_broken") {
+  const watchUrl = watchLink(payload.productId);
+  if (payload.rule === "watch_broken") {
     return sendEmail({
-      react: <TrackerBroken payload={payload} trackerUrl={trackerUrl} />,
-      subject: trackerBrokenSubject(payload),
+      react: <WatchBroken payload={payload} watchUrl={watchUrl} />,
+      subject: watchBrokenSubject(payload),
       to: recipients,
     });
   }
   return sendEmail({
-    react: <PriceAlert payload={payload} trackerUrl={trackerUrl} />,
+    react: <PriceAlert payload={payload} watchUrl={watchUrl} />,
     subject: priceAlertSubject(payload),
     to: recipients,
   });

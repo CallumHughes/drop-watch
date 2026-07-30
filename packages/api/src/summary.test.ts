@@ -1,4 +1,4 @@
-import type { CheckRun, Product } from "@price-tracker/db/schema/products";
+import type { CheckRun, Product } from "@drop-watch/db/schema/products";
 import { describe, expect, it } from "vitest";
 
 import { type PriceSample, pulledInNextCheckAt, summarise } from "./summary";
@@ -53,7 +53,7 @@ function product(overrides: Partial<Product> = {}): Product {
   };
 }
 
-// The streak count itself is covered in `@price-tracker/core/rules`, where it
+// The streak count itself is covered in `@drop-watch/core/rules`, where it
 // lives; what belongs here is that a summary surfaces it.
 
 describe("summarise", () => {

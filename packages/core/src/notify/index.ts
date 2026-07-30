@@ -22,9 +22,9 @@ const HTTP_BAD_REQUEST = 400;
 
 /**
  * What a notification is about. The three alert rules, the synthetic
- * "this tracker is broken" alarm, and `test` from the settings page's button.
+ * "this watch is broken" alarm, and `test` from the settings page's button.
  */
-export type NotificationKind = AlertRule | "test" | "tracker_broken";
+export type NotificationKind = AlertRule | "test" | "watch_broken";
 
 /**
  * The webhook body.
@@ -35,13 +35,13 @@ export type NotificationKind = AlertRule | "test" | "tracker_broken";
  * way from `numeric(12,2)` — a price is never a float on this wire either.
  *
  * `consecutiveFailures` and `error` are the two additions to the plan's shape,
- * carrying the detail a `tracker_broken` notification is useless without.
+ * carrying the detail a `watch_broken` notification is useless without.
  */
 export interface NotificationPayload {
-  /** Length of the failure streak on a `tracker_broken` alert; else null. */
+  /** Length of the failure streak on a `watch_broken` alert; else null. */
   consecutiveFailures: number | null;
   currency: string | null;
-  /** Failure detail on a `tracker_broken` alert; else null. */
+  /** Failure detail on a `watch_broken` alert; else null. */
   error: string | null;
   imageUrl: string | null;
   inStock: boolean | null;

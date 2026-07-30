@@ -1,4 +1,4 @@
-import { auth } from "@price-tracker/auth";
+import { auth } from "@drop-watch/auth";
 import { type BetterAuthInstance, createAuthMiddleware } from "evlog/better-auth";
 
 import { useLogger } from "@/lib/evlog";

@@ -1,5 +1,5 @@
-import type { ProductSummary } from "@price-tracker/api/routers/products";
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
+import type { ProductSummary } from "@drop-watch/api/routers/products";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import Image from "next/image";
 import Link from "next/link";
 

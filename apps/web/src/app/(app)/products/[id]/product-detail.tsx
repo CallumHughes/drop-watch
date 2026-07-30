@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import Image from "next/image";
@@ -10,7 +10,7 @@ import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { StatusBadge } from "@/components/products/status-badge";
-import { TrackingSettingsForm } from "@/components/products/tracking-settings-form";
+import { WatchSettingsForm } from "@/components/products/watch-settings-form";
 import {
   formatPrice,
   formatRelative,
@@ -137,10 +137,10 @@ export default function ProductDetail({ productId }: { productId: string }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Tracking settings</CardTitle>
+            <CardTitle>Watch settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <TrackingSettingsForm key={product.updatedAt.toISOString()} product={product} />
+            <WatchSettingsForm key={product.updatedAt.toISOString()} product={product} />
           </CardContent>
         </Card>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@price-tracker/ui/lib/utils";
+import { cn } from "@drop-watch/ui/lib/utils";
 import type * as React from "react";
 
 function Label({ className, ...props }: React.ComponentProps<"label">) {

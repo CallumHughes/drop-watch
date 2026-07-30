@@ -6,7 +6,7 @@
  * "Once" is the whole design. `page` is the only procedure here that reaches
  * out to the internet; `testSelector` and `source` are pure reads of the cached
  * body, which is what makes the picker safe to drive from every keystroke
- * (PLAN.md §8). The chain itself is `@price-tracker/core/extract` — the same
+ * (PLAN.md §8). The chain itself is `@drop-watch/core/extract` — the same
  * module `apps/worker` calls — so the preview cannot drift from what a
  * scheduled check will later record.
  *
@@ -14,11 +14,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-
+import { extract, testSelector } from "@drop-watch/core/extract";
+import type { FetchPageResult } from "@drop-watch/core/fetch";
+import { fetchPage } from "@drop-watch/core/fetch";
 import { ORPCError } from "@orpc/server";
-import { extract, testSelector } from "@price-tracker/core/extract";
-import type { FetchPageResult } from "@price-tracker/core/fetch";
-import { fetchPage } from "@price-tracker/core/fetch";
 import { createLogger } from "evlog";
 import { z } from "zod";
 
@@ -34,9 +33,9 @@ import {
 
 /**
  * Re-exported so `apps/web` can name these shapes without depending on
- * `@price-tracker/core` — the UI reads the API, not the extraction engine.
+ * `@drop-watch/core` — the UI reads the API, not the extraction engine.
  */
-export type { SelectorMatch } from "@price-tracker/core/extract";
+export type { SelectorMatch } from "@drop-watch/core/extract";
 export type { PagePreview, PreviewExtraction, SelectorPreview } from "../preview";
 
 /**
@@ -64,15 +63,15 @@ const MAX_SELECTOR_LENGTH = 500;
  * database pool is: a Next.js hot reload re-evaluates this module, and a fresh
  * cache would silently invalidate every preview the user had open.
  */
-const globalForPreviews = globalThis as { __priceTrackerPreviews?: PreviewCache };
+const globalForPreviews = globalThis as { __dropWatchPreviews?: PreviewCache };
 
 function previewCache(): PreviewCache {
-  const existing = globalForPreviews.__priceTrackerPreviews;
+  const existing = globalForPreviews.__dropWatchPreviews;
   if (existing) {
     return existing;
   }
   const cache = new PreviewCache({ maxEntries: MAX_PREVIEWS, ttlMs: PREVIEW_TTL_MS });
-  globalForPreviews.__priceTrackerPreviews = cache;
+  globalForPreviews.__dropWatchPreviews = cache;
   return cache;
 }
 

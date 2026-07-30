@@ -17,7 +17,7 @@
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
 /** @jsxImportSource react */
 
-import type { NotificationKind, NotificationPayload } from "@price-tracker/core/notify";
+import type { NotificationKind, NotificationPayload } from "@drop-watch/core/notify";
 import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
 
@@ -72,9 +72,9 @@ function alertCopy(payload: NotificationPayload): AlertCopy {
  *
  * A record keyed by {@link NotificationKind} rather than a `switch`, because
  * the record is exhaustive by construction: adding a rule to
- * `@price-tracker/core/rules` fails to compile here until someone writes the
+ * `@drop-watch/core/rules` fails to compile here until someone writes the
  * words a person will read, instead of silently falling through to a generic
- * "Alert:" line. `tracker_broken` has its own template and never reaches these
+ * "Alert:" line. `watch_broken` has its own template and never reaches these
  * — the entries exist only so the type is total.
  */
 const HEADINGS: Record<NotificationKind, (copy: AlertCopy) => string> = {
@@ -82,7 +82,7 @@ const HEADINGS: Record<NotificationKind, (copy: AlertCopy) => string> = {
   restock: ({ label }) => `${label} is back in stock`,
   target: ({ label }) => `${label} has hit your target price`,
   test: () => `Test alert from ${APP_NAME}`,
-  tracker_broken: ({ label }) => `Alert for ${label}`,
+  watch_broken: ({ label }) => `Alert for ${label}`,
 };
 
 /**
@@ -101,7 +101,7 @@ const SUBJECTS: Record<NotificationKind, (copy: AlertCopy) => string> = {
   target: ({ label, price }) =>
     price === null ? `Target hit: ${label}` : `Target hit: ${label} at ${price}`,
   test: () => `Test alert from ${APP_NAME}`,
-  tracker_broken: ({ label }) => `Alert: ${label}`,
+  watch_broken: ({ label }) => `Alert: ${label}`,
 };
 
 /** The one-line reason this mail exists, used as both heading and preview. */
@@ -117,15 +117,15 @@ export function priceAlertSubject(payload: NotificationPayload): string {
 export interface PriceAlertProps {
   payload: NotificationPayload;
   /**
-   * Absolute link to the product's page in the tracker, or `null` when
+   * Absolute link to the product page in DropWatch, or `null` when
    * `APP_URL` is unset. Omitted rather than rendered relative: a dead link in
    * a mail client cannot be fixed by the reader, and the shop link below still
    * makes the mail useful.
    */
-  trackerUrl: string | null;
+  watchUrl: string | null;
 }
 
-export function PriceAlert({ payload, trackerUrl }: PriceAlertProps) {
+export function PriceAlert({ payload, watchUrl }: PriceAlertProps) {
   const heading = priceAlertHeading(payload);
   const price = payload.price === null ? null : formatPrice(payload.price, payload.currency);
   const previousPrice =
@@ -151,8 +151,8 @@ export function PriceAlert({ payload, trackerUrl }: PriceAlertProps) {
         .
       </Text>
       <Text style={actionStyle}>
-        <Link href={trackerUrl ?? payload.url} style={buttonStyle}>
-          {trackerUrl === null ? "Open the product page" : "Open in Price Tracker"}
+        <Link href={watchUrl ?? payload.url} style={buttonStyle}>
+          {watchUrl === null ? "Open the product page" : "Open in DropWatch"}
         </Link>
       </Text>
       <Text style={mutedStyle}>

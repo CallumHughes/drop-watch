@@ -18,11 +18,11 @@
  * `../summary`; this module only queries.
  */
 
+import { db } from "@drop-watch/db";
+import { sendCheckNow } from "@drop-watch/db/queue";
+import type { CheckRun, NewProduct, Product } from "@drop-watch/db/schema/products";
+import { checkRuns, pricePoints, products } from "@drop-watch/db/schema/products";
 import { ORPCError } from "@orpc/server";
-import { db } from "@price-tracker/db";
-import { sendCheckNow } from "@price-tracker/db/queue";
-import type { CheckRun, NewProduct, Product } from "@price-tracker/db/schema/products";
-import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/products";
 import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -49,9 +49,9 @@ const MAX_CHECK_RUNS = 500;
 
 /**
  * Re-exported so `apps/web` can name these shapes without taking a dependency
- * on `@price-tracker/db` — the UI reads the API, not the database.
+ * on `@drop-watch/db` — the UI reads the API, not the database.
  */
-export type { CheckRun, Product } from "@price-tracker/db/schema/products";
+export type { CheckRun, Product } from "@drop-watch/db/schema/products";
 export type { CheckStatus, PriceSample, ProductSummary } from "../summary";
 
 const productIdInput = z.object({ id: z.uuid() });

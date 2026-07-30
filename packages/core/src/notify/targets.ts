@@ -6,11 +6,11 @@
  * that fails.** `deliverAlert` reports every channel it is handed, so a channel
  * built for a destination nobody configured turns into a failure row — in the
  * worker's log on the back of every single alert, and in the settings page's
- * test results. A tracker with no mailer must behave exactly as it did before
+ * test results. An install with no mailer must behave exactly as it did before
  * email existed, and that property lives here.
  *
  * The email channel is *injected* for the same reason `channels.ts` injects
- * `send`: `@price-tracker/core` must not learn about Resend or React. It is a
+ * `send`: `@drop-watch/core` must not learn about Resend or React. It is a
  * separate module from `channels.ts` only because that file is the transport
  * seam and this is the policy on top of it.
  *
@@ -34,7 +34,7 @@ export type EmailChannelFactory = (recipients: readonly string[]) => AlertChanne
  * is the target itself: a `null` webhook and an empty recipient list both mean
  * "nothing was set up here". Whoever resolved the targets has already applied
  * the master switch, the toggles and the "is a mailer even installed" question
- * — see `alertTargets` in `@price-tracker/db/settings` — so there is nothing
+ * — see `alertTargets` in `@drop-watch/db/settings` — so there is nothing
  * left to second-guess.
  *
  * An empty result is a legitimate, quiet outcome: nothing is configured, so

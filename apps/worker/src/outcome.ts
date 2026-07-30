@@ -6,12 +6,12 @@
  * this mapping is the part that is easy to get subtly wrong (a 304 is a
  * success; a dead hostname is not an HTTP error) and the part Epic 7's
  * consecutive-failure alarm depends on. The table it implements is documented
- * on the `check_run_status` enum in `@price-tracker/db/schema/products`.
+ * on the `check_run_status` enum in `@drop-watch/db/schema/products`.
  */
 
-import type { ExtractionResult } from "@price-tracker/core/extract";
-import type { FetchPageResult } from "@price-tracker/core/fetch";
-import type { checkRunStatus, ExtractorUsed } from "@price-tracker/db/schema/products";
+import type { ExtractionResult } from "@drop-watch/core/extract";
+import type { FetchPageResult } from "@drop-watch/core/fetch";
+import type { checkRunStatus, ExtractorUsed } from "@drop-watch/db/schema/products";
 
 export type CheckRunStatus = (typeof checkRunStatus.enumValues)[number];
 

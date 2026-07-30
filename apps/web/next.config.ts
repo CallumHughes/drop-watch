@@ -1,12 +1,12 @@
-import "@price-tracker/env/web";
-import { emailEnabled } from "@price-tracker/email/client";
+import "@drop-watch/env/web";
+import { emailEnabled } from "@drop-watch/email/client";
 import type { NextConfig } from "next";
 
 /**
  * The browser's copy of one server-side fact: whether a mailer is configured.
  *
  * Derived here, at build time, from the same `emailEnabled()` the server gates
- * on — never from `RESEND_API_KEY` directly, which only `@price-tracker/email`
+ * on — never from `RESEND_API_KEY` directly, which only `@drop-watch/email`
  * may read, and never from an API call, which would answer "does this box have
  * a mail key?" for anyone who asks. All the flag buys is that the *links* to
  * the email-only pages can disappear; the routes themselves are gated
@@ -16,7 +16,7 @@ import type { NextConfig } from "next";
  * built without the runtime's environment: there the value has to arrive as a
  * build argument. Locally, setting the key alone is enough.
  *
- * Imported from `@price-tracker/email/client` rather than the package entry
+ * Imported from `@drop-watch/email/client` rather than the package entry
  * point, which is the only place in the app that does so: the entry point is a
  * `.tsx` file, and Next's config loader — unlike the app's own compiler —
  * cannot parse JSX. `emailEnabled` is the same function either way.

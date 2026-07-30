@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
+import { Button } from "@drop-watch/ui/components/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { useCallback } from "react";

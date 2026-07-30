@@ -53,7 +53,7 @@ async function recreateDatabase(): Promise<void> {
 
 function pushSchema(): void {
   // Explicit env wins over every dotenv file the tooling loads on its own.
-  execSync("pnpm --filter @price-tracker/db db:push", {
+  execSync("pnpm --filter @drop-watch/db db:push", {
     cwd: REPO_ROOT,
     env: { ...process.env, DATABASE_URL: E2E_DATABASE_URL },
     stdio: ["ignore", "ignore", "inherit"],

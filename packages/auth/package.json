@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/auth",
+  "name": "@drop-watch/auth",
   "type": "module",
   "exports": {
     ".": {
@@ -11,16 +11,16 @@
   },
   "scripts": {},
   "dependencies": {
-    "@price-tracker/db": "workspace:*",
-    "@price-tracker/email": "workspace:*",
-    "@price-tracker/env": "workspace:*",
+    "@drop-watch/db": "workspace:*",
+    "@drop-watch/email": "workspace:*",
+    "@drop-watch/env": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "evlog": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "typescript": "catalog:"
   }
 }

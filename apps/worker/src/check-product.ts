@@ -12,13 +12,13 @@
  * deliberately unable to fail the check — see `./alerting`.
  */
 
-import type { ExtractionResult, ExtractorStrategy } from "@price-tracker/core/extract";
-import { extract, STRATEGY_ORDER } from "@price-tracker/core/extract";
-import type { FetchPageResult } from "@price-tracker/core/fetch";
-import { fetchPage } from "@price-tracker/core/fetch";
-import { db } from "@price-tracker/db";
-import type { NewCheckRun, NewPricePoint, Product } from "@price-tracker/db/schema/products";
-import { checkRuns, pricePoints, products } from "@price-tracker/db/schema/products";
+import type { ExtractionResult, ExtractorStrategy } from "@drop-watch/core/extract";
+import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
+import type { FetchPageResult } from "@drop-watch/core/fetch";
+import { fetchPage } from "@drop-watch/core/fetch";
+import { db } from "@drop-watch/db";
+import type { NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
+import { checkRuns, pricePoints, products } from "@drop-watch/db/schema/products";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";

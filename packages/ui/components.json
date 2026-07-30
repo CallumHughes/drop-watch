@@ -12,11 +12,11 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@price-tracker/ui/components",
-    "utils": "@price-tracker/ui/lib/utils",
-    "hooks": "@price-tracker/ui/hooks",
-    "lib": "@price-tracker/ui/lib",
-    "ui": "@price-tracker/ui/components"
+    "components": "@drop-watch/ui/components",
+    "utils": "@drop-watch/ui/lib/utils",
+    "hooks": "@drop-watch/ui/hooks",
+    "lib": "@drop-watch/ui/lib",
+    "ui": "@drop-watch/ui/components"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

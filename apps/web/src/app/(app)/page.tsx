@@ -1,5 +1,5 @@
-import { auth } from "@price-tracker/auth";
-import { buttonVariants } from "@price-tracker/ui/components/button";
+import { auth } from "@drop-watch/auth";
+import { buttonVariants } from "@drop-watch/ui/components/button";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";

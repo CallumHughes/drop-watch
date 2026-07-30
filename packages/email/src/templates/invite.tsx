@@ -1,11 +1,11 @@
 /**
- * An admin's invitation to join the tracker.
+ * An admin's invitation to join DropWatch.
  *
  * Signup is invite-only, so this link is the recipient's only way to an
  * account — hence the raw URL {@link CallToAction} prints under the button for
  * the clients that mangle the anchor, and hence the copy naming the 48-hour
  * expiry: a stale link should read as "ask for a fresh one", not as a broken
- * tracker.
+ * app.
  */
 
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
@@ -29,7 +29,7 @@ export function Invite({ url }: InviteProps) {
       preview={`You have been invited to create an account on ${APP_NAME}`}
     >
       <Text style={paragraphStyle}>
-        You have been invited to create an account on {APP_NAME}, the self-hosted price tracker.
+        You have been invited to create an account on {APP_NAME}, the self-hosted price watcher.
         Follow the link below to choose a name and password.
       </Text>
       <CallToAction label="Accept invitation" url={url} />

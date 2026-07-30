@@ -7,8 +7,8 @@ import { z } from "zod";
 // supported configuration — so a self-hoster must be able to boot, migrate,
 // sign in and run checks with none of these set.
 //
-// Imported by `@price-tracker/email` itself rather than by its consumers, the
-// same trick `@price-tracker/db/settings` uses with `@price-tracker/env/db`:
+// Imported by `@drop-watch/email` itself rather than by its consumers, the
+// same trick `@drop-watch/db/settings` uses with `@drop-watch/env/db`:
 // both `apps/web` and `apps/worker` pick the schema up transitively, and
 // neither has to remember to.
 export const env = createEnv({
