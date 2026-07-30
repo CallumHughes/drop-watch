@@ -12,6 +12,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # turbo's default in CI is to group a task's output and print it once the
+  # task exits, which holds the whole log back until the run is over.
+  TURBO_LOG_ORDER: stream
+
 jobs:
   lint:
     name: Lint
