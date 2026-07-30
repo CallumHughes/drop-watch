@@ -40,6 +40,7 @@ has to be in the **root** `.env` or the shell. Compose does not interpolate from
 | `RESEND_API_KEY` | no | `web`, `worker` | The mailer's on/off switch. Unset is a supported configuration: webhook-only alerting, no email auth flows. |
 | `EMAIL_FROM` | no | `web`, `worker` | `From:` address. Defaults to `onboarding@resend.dev`, which needs no verified domain but which Resend only delivers to the address that owns your Resend account. |
 | `APP_URL` | no | `web`, `worker` | Absolute base URL for links inside emails. The worker has no `BETTER_AUTH_URL` of its own; `web` falls back to that. |
+| `AUTH_RATE_LIMIT_ENABLED` | no | `web` | Overrides Better Auth's default of on in production, off in development. Limits are per client address, so set `false` only where every request already shares one — a test run, say. |
 | `NEXT_PUBLIC_EMAIL_ENABLED` | no | `web` **build** | Docker only, and a *build* argument rather than runtime config — see [Notifications](notifications.md#docker-next_public_email_enabled-is-a-build-argument). |
 | `TZ` | no | all | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
 | `POSTGRES_PASSWORD` | no | dev `postgres` | Dev container only. Defaults to `password`. |
