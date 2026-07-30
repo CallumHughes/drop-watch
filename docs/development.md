@@ -31,7 +31,7 @@ pnpm --filter @drop-watch/core test-url <url> [--selector <css>] [--locale <tag>
 ```
 
 Runs the real extraction chain against a live page and prints what each strategy
-found. The fastest way to tell whether a site is trackable at all.
+found. Useful for checking whether a site is trackable before adding it.
 
 The chain lives in `packages/core/extract` and is imported by both apps: the
 worker runs it on every scheduled check, and the web app runs the identical code

@@ -1,63 +1,58 @@
 # DropWatch
 
-Self-hosted price tracking. Paste a product URL, and DropWatch checks the page on
-a schedule you choose, keeps every price it sees, and tells you when something
-actually moves — a target hit, a real drop, or a restock. It runs on your own
-box, against your own Postgres, and talks to nothing you did not configure.
+DropWatch keeps an eye on product pages and tells you if the price drops. You
+give it a URL, it checks the page on a schedule and records what it finds.
+Self-hosted: your machine, your Postgres.
 
-Alerts go to a Home Assistant webhook, to email, or to both. Neither is required
-to start.
+It is early software with a deliberately narrow scope — one URL per product, no
+shopping around across retailers. It copes with shops that publish structured
+data, which is most of them, and gives up politely on the ones that do not.
 
-## Features
+Alerts go to a Home Assistant webhook or to email. Neither is required.
 
-**Track almost any store.** Paste a URL and DropWatch works out where the price
-is: JSON-LD first, then microdata/RDFa, then OpenGraph, then a CSS selector you
-pick yourself. No per-site adapters to write or maintain, and nothing to update
-when a shop redesigns — the structured data most stores already publish is
-usually enough.
+## What it does
 
-**Pick the price yourself when a page is awkward.** When the automatic chain
-comes up empty, the add-product flow gives you a live selector picker: type a
-selector and see the match count and sample elements immediately, with the raw
-page source a click away. It all runs against a single cached fetch, so
-experimenting costs the shop nothing.
+**Reading the price.** It tries JSON-LD, then microdata/RDFa, then OpenGraph,
+then a CSS selector if you supply one. Most shops publish at least one of the
+first three, so usually there is nothing to configure. There are no per-site
+adapters, which means nothing to update when a shop redesigns — and also means a
+shop can quietly break a watch.
 
-**Keep the price history.** Every successful check records a point, not just the
-changes. Cards carry a sparkline; the detail page draws the full series with your
-target price as a reference line, so "is this actually cheap?" is a glance rather
-than a guess.
+**Picking a selector.** When none of that finds anything, the add-product page
+lets you type a CSS selector and shows the match count and a few matched
+elements as you type, with the page source to hand. It works off a single cached
+fetch, so trying selectors does not hammer the shop.
 
-**Watch stock, not just price.** Availability is read from the same structured
-data and normalised across the usual spellings, so "in stock", "preorder" and
-"sold out" mean the same thing whatever the shop calls them. A back-in-stock
-alert falls out of that.
+**History.** Every successful check writes a price point, not only the ones that
+changed. Product cards get a sparkline, and the detail page draws the series with
+your target marked on it. No averages or all-time lows.
 
-**Alerts that fire once, not every check.** Arm any combination of three rules
-per product: a target price, a percentage drop, or a restock. Each fires once and
-then goes quiet for a cooldown, so a price that sits below your target does not
-notify you every three hours. A cheaper price is always news and reopens it.
+**Stock.** Availability comes from the same structured data, normalised to in,
+out, or unknown. Mainly this exists so the restock rule has something to go on.
 
-**Know when a watch breaks.** Selectors rot silently — a shop changes its markup
-and a tracker just stops seeing prices, forever, without complaining. DropWatch
-counts consecutive failures and sends a `watch_broken` alert when a product stops
-working, then stays quiet until it recovers.
+**Alerts.** Three rules per product, in any combination: target price, percentage
+drop, restock. Each fires once and then keeps quiet for a cooldown, on the theory
+that being told the same thing every three hours is how a notifier gets muted. A
+lower price reopens it.
 
-**Check on your schedule.** Interval is per product, from 5 minutes to a week,
-with jitter so twenty products added the same evening do not stampede the same
-shop on the same minute. Pause anything you are done with, or hit **Check now**
-when you cannot wait.
+**Broken watches.** Selectors rot. A shop changes its markup, the tracker stops
+finding a price, and left alone it would sit there indefinitely saying nothing.
+After a few consecutive failures it sends a `watch_broken` alert, then shuts up
+until the product recovers.
 
-**Share it with the household.** The first account created becomes the admin;
-after that sign-up closes and new people join by invite — single-use links that
-expire in 48 hours. Everyone's products, targets and email preferences are their
-own.
+**Scheduling.** Interval is per product, five minutes to a week, with some jitter
+so a batch of products added in one sitting does not hit the same shop on the
+same minute. Products can be paused, or checked on demand.
 
-**Host it yourself.** Docker Compose, a Postgres, and nothing else. No accounts
-to create, no API keys required, no telemetry. Email and Home Assistant are both
-opt-in.
+**More than one person.** The first account created is the admin. After that
+sign-up closes and people join by invite — single-use links, good for 48 hours.
+Products and alert preferences belong to whoever added them.
 
-**Typed API.** Everything the UI does goes through oRPC, with an OpenAPI document
-and a browsable reference at `/api/rpc/api-reference`.
+**Running it.** Docker Compose and a Postgres. Nothing phones home, and neither
+email nor Home Assistant is needed to get started.
+
+**API.** The UI talks to the backend over oRPC. There is an OpenAPI document and
+a reference page at `/api/rpc/api-reference` if you want to script against it.
 
 ## Quick start
 
@@ -121,9 +116,8 @@ added together from converging on the same minute forever. Checks run in small
 batches, one request per hostname at a time, with conditional requests and
 backoff on rate limits.
 
-Postgres is the only interface between the web app and the worker. Changing a
-setting takes effect on the next check with nothing to restart, and there is no
-message broker to run.
+Postgres is the only interface between the web app and the worker, so a setting
+changed in the UI takes effect on the next check without restarting anything.
 
 ## Known limitations
 
@@ -145,8 +139,8 @@ message broker to run.
   image's ~410 MB), because pnpm's auto-installed peer dependencies pull Next.js
   into both even though neither process loads it.
 
-DropWatch tracks one URL per product — it does not compare the same item across
-several retailers, and it does not compute all-time lows or averages.
+There is also no cross-retailer comparison and no all-time-low or average
+statistics; a product is one URL and the history is the history.
 
 ## Documentation
 
