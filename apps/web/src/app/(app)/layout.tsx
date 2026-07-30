@@ -44,7 +44,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <SidebarTrigger className="-ml-1" />
-          <Separator className="mr-2 data-[orientation=vertical]:h-4" orientation="vertical" />
+          <Separator
+            className="mr-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
+            orientation="vertical"
+          />
           <PageBreadcrumb />
           <div className="ml-auto">
             <ModeToggle />

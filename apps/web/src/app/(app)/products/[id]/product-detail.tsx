@@ -5,7 +5,6 @@ import { Skeleton } from "@price-tracker/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 
 import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
@@ -158,10 +157,6 @@ export default function ProductDetail({ productId }: { productId: string }) {
           </CardContent>
         </Card>
       </div>
-
-      <Link className="text-muted-foreground text-xs hover:underline" href="/">
-        ← Back to dashboard
-      </Link>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { auth } from "@price-tracker/auth";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AddProductForm } from "@/components/products/add-product-form";
@@ -29,10 +28,6 @@ export default async function NewProductPage() {
       </header>
 
       <AddProductForm />
-
-      <Link className="mt-6 inline-block text-muted-foreground text-xs hover:underline" href="/">
-        ← Back to dashboard
-      </Link>
     </main>
   );
 }

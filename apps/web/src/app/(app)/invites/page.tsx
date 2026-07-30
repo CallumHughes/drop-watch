@@ -1,6 +1,5 @@
 import { auth } from "@price-tracker/auth";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { InvitesManager } from "@/components/invites/invites-manager";
@@ -34,10 +33,6 @@ export default async function InvitesPage() {
       </header>
 
       <InvitesManager />
-
-      <Link className="mt-6 inline-block text-muted-foreground text-xs hover:underline" href="/">
-        ← Back to dashboard
-      </Link>
     </main>
   );
 }

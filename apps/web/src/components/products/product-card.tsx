@@ -67,7 +67,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
   const title = product.title ?? productHost(product.url);
 
   return (
-    <Card className="transition-colors hover:ring-foreground/25">
+    <Card className="relative transition-colors hover:ring-foreground/25">
       <CardHeader>
         <div className="flex items-start gap-3">
           {product.imageUrl ? (
@@ -82,7 +82,10 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
           ) : null}
           <div className="min-w-0 flex-1">
             <CardTitle className="truncate">
-              <Link className="hover:underline" href={`/products/${product.id}`}>
+              <Link
+                className="after:absolute after:inset-0 hover:underline"
+                href={`/products/${product.id}`}
+              >
                 {title}
               </Link>
             </CardTitle>
