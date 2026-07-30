@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-/** /dashboard — the product card grid. */
+/** / — the product card grid, which is the home page. */
 export class DashboardPage {
   /** The empty state an account with no products of its own sees. */
   readonly emptyState: Locator;
@@ -12,7 +12,7 @@ export class DashboardPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto("/dashboard");
+    await this.page.goto("/");
   }
 
   /**

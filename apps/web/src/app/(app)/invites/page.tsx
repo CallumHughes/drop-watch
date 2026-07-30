@@ -1,6 +1,5 @@
 import { auth } from "@price-tracker/auth";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { InvitesManager } from "@/components/invites/invites-manager";
@@ -20,7 +19,7 @@ export default async function InvitesPage() {
   // Redirect rather than 403: a signed-in non-admin has a perfectly good home
   // page, and every invites procedure re-checks the role server-side anyway.
   if (session.user.role !== "admin") {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   return (
@@ -34,13 +33,6 @@ export default async function InvitesPage() {
       </header>
 
       <InvitesManager />
-
-      <Link
-        className="mt-6 inline-block text-muted-foreground text-xs hover:underline"
-        href="/dashboard"
-      >
-        ← Back to dashboard
-      </Link>
     </main>
   );
 }

@@ -10,7 +10,7 @@
 import { test as base, expect as baseExpect, type Page } from "@playwright/test";
 
 import { BASE_URL } from "../constants";
-import { Header } from "./components/header";
+import { Sidebar } from "./components/sidebar";
 import { AddProductPage } from "./pages/add-product.page";
 import { DashboardPage } from "./pages/dashboard.page";
 import { ForgotPasswordPage } from "./pages/forgot-password.page";
@@ -33,9 +33,9 @@ import { WebhookSink } from "./support/webhook-sink";
  * to become someone other than the admin.
  */
 interface Visitor {
-  header: Header;
   invitePage: InvitePage;
   page: Page;
+  sidebar: Sidebar;
 }
 
 /**
@@ -52,10 +52,10 @@ interface SecondUser {
   addProduct: AddProductPage;
   dashboard: DashboardPage;
   email: string;
-  header: Header;
   page: Page;
   productDetail: ProductDetailPage;
   settings: SettingsPage;
+  sidebar: Sidebar;
 }
 
 const SECOND_USER_PASSWORD = "second-user-password-1";
@@ -67,7 +67,6 @@ interface Fixtures {
   /** This test's own product page on the fixture server, already published. */
   fixtureProduct: FixtureProduct;
   forgotPassword: ForgotPasswordPage;
-  header: Header;
   invitePage: InvitePage;
   invites: InvitesPage;
   loginPage: LoginPage;
@@ -80,6 +79,7 @@ interface Fixtures {
   secondFixtureProduct: FixtureProduct;
   secondUser: SecondUser;
   settings: SettingsPage;
+  sidebar: Sidebar;
   visitor: Visitor;
   webhookSink: WebhookSink;
 }
@@ -101,9 +101,6 @@ export const test = base.extend<Fixtures>({
   },
   forgotPassword: async ({ page }, use) => {
     await use(new ForgotPasswordPage(page));
-  },
-  header: async ({ page }, use) => {
-    await use(new Header(page));
   },
   invitePage: async ({ page }, use) => {
     await use(new InvitePage(page));
@@ -145,21 +142,26 @@ export const test = base.extend<Fixtures>({
     const invitePage = new InvitePage(page);
     await invitePage.goto(inviteUrl);
     await invitePage.signUp(`E2E User ${testInfo.parallelIndex}`, SECOND_USER_PASSWORD);
-    await page.waitForURL("**/dashboard");
+    // The dashboard lives at "/", which globs match ambiguously — a predicate
+    // is exact.
+    await page.waitForURL((url) => url.pathname === "/");
 
     await use({
       addProduct: new AddProductPage(page),
       dashboard: new DashboardPage(page),
       email,
-      header: new Header(page),
       page,
       productDetail: new ProductDetailPage(page),
       settings: new SettingsPage(page),
+      sidebar: new Sidebar(page),
     });
     await context.close();
   },
   settings: async ({ page }, use) => {
     await use(new SettingsPage(page));
+  },
+  sidebar: async ({ page }, use) => {
+    await use(new Sidebar(page));
   },
   visitor: async ({ browser }, use) => {
     // Options are passed explicitly rather than inherited: the empty
@@ -170,7 +172,7 @@ export const test = base.extend<Fixtures>({
       storageState: { cookies: [], origins: [] },
     });
     const page = await context.newPage();
-    await use({ header: new Header(page), invitePage: new InvitePage(page), page });
+    await use({ invitePage: new InvitePage(page), page, sidebar: new Sidebar(page) });
     await context.close();
   },
   webhookSink: async ({ request }, use) => {

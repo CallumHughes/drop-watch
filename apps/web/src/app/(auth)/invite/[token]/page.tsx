@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (session?.user) {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   const { token } = await params;

@@ -2,22 +2,26 @@ import type { Locator, Page } from "@playwright/test";
 
 import { ADMIN_NAME } from "../../constants";
 
-/** The cross-page header: nav links and the user dropdown. */
-export class Header {
+/** The signed-in shell's sidebar: nav links and the footer user dropdown. */
+export class Sidebar {
+  readonly addProductLink: Locator;
   readonly dashboardLink: Locator;
+  readonly invitesLink: Locator;
   readonly settingsLink: Locator;
-  /** The dropdown trigger, labelled with the signed-in user's name. */
+  /**
+   * The user dropdown trigger. Its accessible name spans the user's name AND
+   * email, so this is deliberately a substring match, not `exact`.
+   */
   readonly userMenuButton: Locator;
-  /** The "Sign In" link shown instead of the menu when signed out. */
-  readonly signInLink: Locator;
   readonly page: Page;
 
   constructor(page: Page) {
     this.page = page;
+    this.addProductLink = page.getByRole("link", { exact: true, name: "Add product" });
     this.dashboardLink = page.getByRole("link", { exact: true, name: "Dashboard" });
+    this.invitesLink = page.getByRole("link", { exact: true, name: "Invites" });
     this.settingsLink = page.getByRole("link", { exact: true, name: "Settings" });
-    this.userMenuButton = page.getByRole("button", { exact: true, name: ADMIN_NAME });
-    this.signInLink = page.getByRole("link", { name: "Sign In" });
+    this.userMenuButton = page.getByRole("button", { name: ADMIN_NAME });
   }
 
   /** An item inside the (open) user dropdown. */
@@ -31,7 +35,7 @@ export class Header {
    * cannot.
    */
   userMenuFor(name: string): Locator {
-    return this.page.getByRole("button", { exact: true, name });
+    return this.page.getByRole("button", { name });
   }
 
   async signOut(): Promise<void> {

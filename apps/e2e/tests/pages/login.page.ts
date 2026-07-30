@@ -2,8 +2,8 @@ import type { Locator, Page } from "@playwright/test";
 
 /**
  * /login — sign-in, and account creation while the instance has no account.
- * Both "Sign In" texts exist twice on the page (header link + form submit), so
- * everything here is scoped to the form.
+ * Field locators stay scoped to the form so they cannot drift onto anything
+ * the page grows around the card.
  */
 export class LoginPage {
   readonly emailInput: Locator;

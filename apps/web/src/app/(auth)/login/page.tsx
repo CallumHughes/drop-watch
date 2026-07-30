@@ -1,8 +1,6 @@
 "use client";
 
-import { env } from "@price-tracker/env/web";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useCallback, useState } from "react";
 
 import Loader from "@/components/loader";
@@ -34,22 +32,5 @@ export default function LoginPage() {
     return <SignUpForm onSwitchToSignIn={handleSwitchToSignIn} />;
   }
 
-  return (
-    <>
-      <SignInForm onSwitchToSignUp={signupOpen.data ? handleSwitchToSignUp : undefined} />
-      {/*
-       * Offered only when a mailer is configured, because without one the
-       * endpoint behind it is not registered and the page 404s. A dead
-       * "forgot password?" link is worse than no link — especially here,
-       * where it is the only route back into a box whose signup has closed.
-       */}
-      {env.NEXT_PUBLIC_EMAIL_ENABLED ? (
-        <div className="mx-auto w-full max-w-md px-6 text-center">
-          <Link className="text-muted-foreground text-sm hover:underline" href="/forgot-password">
-            Forgot password?
-          </Link>
-        </div>
-      ) : null}
-    </>
-  );
+  return <SignInForm onSwitchToSignUp={signupOpen.data ? handleSwitchToSignUp : undefined} />;
 }

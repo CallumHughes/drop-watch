@@ -1,6 +1,7 @@
 import { Button } from "@price-tracker/ui/components/button";
+import { Card, CardContent, CardHeader } from "@price-tracker/ui/components/card";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@price-tracker/ui/components/field";
 import { Input } from "@price-tracker/ui/components/input";
-import { Label } from "@price-tracker/ui/components/label";
 import { useForm } from "@tanstack/react-form";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useCallback } from "react";
@@ -76,7 +77,7 @@ export default function SignUpForm({
               return;
             }
           }
-          router.push("/dashboard");
+          router.push("/");
           toast.success("Sign up successful");
         },
       });
@@ -104,114 +105,96 @@ export default function SignUpForm({
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center font-bold text-3xl">Create Account</h1>
+    <Card>
+      <CardHeader className="text-center">
+        <h1 className="cn-font-heading font-medium text-xl">Create Account</h1>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit}>
+          <FieldGroup>
+            <form.Field name="name">
+              {(field) => {
+                const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
+                  field.handleChange(e.target.value);
+                return (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <FieldLabel htmlFor={field.name}>Name</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={handleChange}
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div>
-          <form.Field name="name">
-            {(field) => {
-              const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-                field.handleChange(e.target.value);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Name</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={handleChange}
-                    value={field.state.value}
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p className="text-red-500" key={error?.message}>
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              );
-            }}
-          </form.Field>
-        </div>
+            <form.Field name="email">
+              {(field) => {
+                const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
+                  field.handleChange(e.target.value);
+                return (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                    {/* Locked in invite mode as UX only — the address the token
+                        was issued for is enforced by the server's signup hook,
+                        not by this attribute. */}
+                    <Input
+                      disabled={invite !== undefined}
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={handleChange}
+                      type="email"
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-        <div>
-          <form.Field name="email">
-            {(field) => {
-              const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-                field.handleChange(e.target.value);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Email</Label>
-                  {/* Locked in invite mode as UX only — the address the token
-                      was issued for is enforced by the server's signup hook,
-                      not by this attribute. */}
-                  <Input
-                    disabled={invite !== undefined}
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={handleChange}
-                    type="email"
-                    value={field.state.value}
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p className="text-red-500" key={error?.message}>
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              );
-            }}
-          </form.Field>
-        </div>
+            <form.Field name="password">
+              {(field) => {
+                const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
+                  field.handleChange(e.target.value);
+                return (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={handleChange}
+                      type="password"
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-        <div>
-          <form.Field name="password">
-            {(field) => {
-              const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-                field.handleChange(e.target.value);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Password</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={handleChange}
-                    type="password"
-                    value={field.state.value}
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p className="text-red-500" key={error?.message}>
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              );
-            }}
-          </form.Field>
-        </div>
-
-        <form.Subscribe selector={selectSubmitState}>
-          {({ canSubmit, isSubmitting }) => (
-            <Button className="w-full" disabled={!canSubmit || isSubmitting} type="submit">
-              {isSubmitting ? "Submitting..." : "Sign Up"}
-            </Button>
-          )}
-        </form.Subscribe>
-      </form>
-
-      {onSwitchToSignIn ? (
-        <div className="mt-4 text-center">
-          <Button
-            className="text-indigo-600 hover:text-indigo-800"
-            onClick={onSwitchToSignIn}
-            variant="link"
-          >
-            Already have an account? Sign In
-          </Button>
-        </div>
-      ) : null}
-    </div>
+            <Field>
+              <form.Subscribe selector={selectSubmitState}>
+                {({ canSubmit, isSubmitting }) => (
+                  <Button disabled={!canSubmit || isSubmitting} type="submit">
+                    {isSubmitting ? "Submitting..." : "Sign Up"}
+                  </Button>
+                )}
+              </form.Subscribe>
+              {onSwitchToSignIn ? (
+                <Button className="mx-auto" onClick={onSwitchToSignIn} type="button" variant="link">
+                  Already have an account? Sign In
+                </Button>
+              ) : null}
+            </Field>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
