@@ -55,7 +55,11 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `pnpm --filter @drop-watch/web exec next dev --port ${WEB_PORT}`,
+      // CI serves a real build (the workflow runs `next build` first); local
+      // runs stay on the dev server so a single spec needs no rebuild.
+      command: process.env.CI
+        ? `pnpm --filter @drop-watch/web exec next start --port ${WEB_PORT}`
+        : `pnpm --filter @drop-watch/web exec next dev --port ${WEB_PORT}`,
       env: appEnv,
       reuseExistingServer: !process.env.CI,
       stdout: "ignore",

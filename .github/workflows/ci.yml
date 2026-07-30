@@ -107,6 +107,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:start
       - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
+      # The suite serves this build via `next start`, so anything the app reads
+      # at build time has to be set here rather than at run time — mirroring
+      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY matters because
+      # /forgot-password is prerendered and requireEmailEnabled() would bake a
+      # 404 into it. Invoked directly rather than through turbo, which does not
+      # hash NEXT_DIST_DIR and could hand back a `.next` build.
+      - run: pnpm --filter @drop-watch/web exec next build
+        env:
+          NEXT_DIST_DIR: .next-e2e
+          NEXT_PUBLIC_EMAIL_ENABLED: "true"
+          RESEND_API_KEY: re-e2e-fixture-key
+          SKIP_ENV_VALIDATION: 1
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
