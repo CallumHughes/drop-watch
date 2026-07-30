@@ -24,29 +24,6 @@ stays off until you add a Resend API key; everything else works without one. See
 inserts four demo products pointing at scraping-practice sites. No container runs
 it — in Docker the first account comes from the sign-up page instead.
 
-## Project structure
-
-```
-drop-watch/
-├── apps/
-│   ├── e2e/         # Playwright end-to-end suite (fixture server, page objects, specs)
-│   ├── web/         # Next.js — UI, oRPC route handlers, Better Auth
-│   └── worker/      # pg-boss: dispatcher + check handler
-├── packages/
-│   ├── api/         # oRPC routers
-│   ├── auth/        # Better Auth configuration
-│   ├── config/      # shared tsconfig base
-│   ├── core/        # extract/, rules/, notify/, fetch/ — pure logic
-│   ├── db/          # Drizzle schema, migrations, queue wiring, migrate image
-│   ├── email/       # optional: Resend transport + React Email templates
-│   ├── env/         # zod-validated env: ./db, ./email, ./seed, ./server, ./web, ./worker
-│   └── ui/          # shared shadcn/ui primitives
-```
-
-`packages/core/extract` is imported by both apps: the worker runs it on every
-scheduled check, and the web app runs the identical code for the add-product
-preview.
-
 ## Testing one URL from the command line
 
 ```bash
@@ -55,6 +32,11 @@ pnpm --filter @drop-watch/core test-url <url> [--selector <css>] [--locale <tag>
 
 Runs the real extraction chain against a live page and prints what each strategy
 found. The fastest way to tell whether a site is trackable at all.
+
+The chain lives in `packages/core/extract` and is imported by both apps: the
+worker runs it on every scheduled check, and the web app runs the identical code
+for the add-product preview, so a preview cannot drift from what a later check
+will record.
 
 ## Unit tests
 
