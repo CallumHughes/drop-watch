@@ -124,18 +124,15 @@ import { Button } from "@drop-watch/ui/components/button";
 
 Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 
-## Scripts
+## Before committing
 
-- `pnpm dev` / `pnpm dev:web` / `pnpm dev:worker` — development servers
-- `pnpm build` — build all applications
-- `pnpm test` — vitest across the workspace
-- `pnpm test:integration` — the database-backed suite in `packages/db`
-- `pnpm test:e2e` / `pnpm test:e2e:ui` — Playwright, headless or interactive
-- `pnpm check-types` — TypeScript across all apps
-- `pnpm check` / `pnpm fix` — Biome via ultracite (husky runs it pre-commit)
-- `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container
-- `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` — Drizzle
-- `pnpm db:verify-user <email>` — mark an account verified; the lockout escape hatch
-- `pnpm --filter @drop-watch/core test-url <url>` — run the extraction chain on one URL
-- `pnpm docker:build` / `docker:up` / `docker:logs` / `docker:down` — local container stack
-- `pnpm docker:prod:build` / `docker:prod:up` / `docker:prod:logs` / `docker:prod:down` — against host Postgres
+```bash
+pnpm check          # Biome via ultracite; `pnpm fix` writes the fixes
+pnpm check-types    # TypeScript across every workspace
+```
+
+Husky runs the formatter pre-commit, so `check` failing in CI usually means a
+lint rule rather than formatting.
+
+`pnpm run` lists the rest — the Drizzle (`db:*`) and container (`docker:*`)
+scripts are covered in [Installation](installation.md) and above.
