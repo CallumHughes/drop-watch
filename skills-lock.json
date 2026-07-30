@@ -12,6 +12,12 @@
       "skillPath": "better-auth/best-practices/SKILL.md",
       "computedHash": "61ba0ef64ed2e7c424401cc848ca33dd6d790a720c44727717dc0c5cba5fc122"
     },
+    "orchistrate": {
+      "source": "kentcdodds/kcd-skills",
+      "sourceType": "github",
+      "skillPath": "skills/orchistrate/SKILL.md",
+      "computedHash": "b6c6125d9820c91d202eff051bf9eb3af7f4efab62c9f6211deb7a93422dd8f0"
+    },
     "review-logging-patterns": {
       "source": "evlog.dev",
       "sourceType": "well-known",
@@ -22,6 +28,12 @@
       "sourceType": "github",
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "c1a68ee06a668aced9ab2b5fbdea5f989864123794eb2e056b339a072dbb7f10"
+    },
+    "ship-pr": {
+      "source": "kentcdodds/kcd-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ship-pr/SKILL.md",
+      "computedHash": "a56995fa113b3cfc59136391e249eccb8624e0596ffbc7b9a45c89964a742704"
     },
     "turborepo": {
       "source": "vercel/turborepo",
@@ -46,6 +58,12 @@
       "sourceType": "github",
       "skillPath": "skills/react-best-practices/SKILL.md",
       "computedHash": "ca7b0c0c6e5f2750043f7f0cd72d16ac4e2abc48f9b5500d047a4b77a2506212"
+    },
+    "visual-recap": {
+      "source": "kentcdodds/kcd-skills",
+      "sourceType": "github",
+      "skillPath": "skills/visual-recap/SKILL.md",
+      "computedHash": "6365e52be98c143ba58b2b612cd089d8fe2432dab31544176ef271f0e63a1dfe"
     },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
