@@ -76,18 +76,6 @@ jobs:
     name: Integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 15
     env:
       INTEGRATION_DATABASE_URL: postgresql://postgres:password@localhost:5432/drop-watch-integration
     steps:
@@ -98,24 +86,15 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Compose rather than a service container: the parity test runs pg_dump
+      # via `docker compose exec postgres`, for a client matching the server.
+      - run: pnpm db:start
       - run: pnpm test:integration
 
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 15
     env:
       E2E_DATABASE_URL: postgresql://postgres:password@localhost:5432/drop-watch-e2e
     steps:
@@ -126,6 +105,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm db:start
       - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
