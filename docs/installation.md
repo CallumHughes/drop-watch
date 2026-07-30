@@ -18,10 +18,12 @@ covers deploying against a Postgres you already run.
 `depends_on: migrate: { condition: service_completed_successfully }`, so a failed
 migration stops the deployment instead of letting the apps boot against an old
 schema. Migrations deliberately do **not** run at app boot — two processes racing
-`drizzle-kit migrate` on startup is a real failure mode.
+to migrate on startup is a real failure mode.
 
 All three images build from a `turbo prune --docker` workspace, so a change to
 the worker does not invalidate the web image's dependency layer, and vice versa.
+Each ships a bundle rather than a `node_modules` install: `next build` for `web`,
+rolldown for `worker` and `migrate`.
 
 ## Local stack (bundled Postgres)
 
