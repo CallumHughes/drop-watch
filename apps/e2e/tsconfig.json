@@ -1,5 +1,5 @@
 {
-  "extends": "@price-tracker/config/tsconfig.base.json",
+  "extends": "@drop-watch/config/tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "strictNullChecks": true

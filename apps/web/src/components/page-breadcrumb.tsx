@@ -7,7 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@price-tracker/ui/components/breadcrumb";
+} from "@drop-watch/ui/components/breadcrumb";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 

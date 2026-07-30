@@ -1,6 +1,6 @@
+import { invitesRouter } from "@drop-watch/api/routers/invites";
+import { auth } from "@drop-watch/auth";
 import { call } from "@orpc/server";
-import { invitesRouter } from "@price-tracker/api/routers/invites";
-import { auth } from "@price-tracker/auth";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * The token is validated server-side by calling the `invites.check` procedure
  * in-process (`call` with a sessionless context) — the browser oRPC client is
  * fetch-based and there is nothing to fetch from inside our own server
- * component, and importing `@price-tracker/db` here directly would put the web
+ * component, and importing `@drop-watch/db` here directly would put the web
  * app on the wrong side of the "UI reads the API" line. A dead token gets a
  * static explanation rather than a form doomed to a 403.
  */

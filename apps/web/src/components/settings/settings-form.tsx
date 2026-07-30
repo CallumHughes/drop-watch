@@ -1,18 +1,18 @@
 "use client";
 
-import type { Settings } from "@price-tracker/api/routers/settings";
+import type { Settings } from "@drop-watch/api/routers/settings";
 import {
   MAX_COOLDOWN_MINUTES,
   MAX_FAILURE_THRESHOLD,
   MIN_COOLDOWN_MINUTES,
   MIN_FAILURE_THRESHOLD,
-} from "@price-tracker/api/schemas/settings";
-import { Button } from "@price-tracker/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
-import { Checkbox } from "@price-tracker/ui/components/checkbox";
-import { Input } from "@price-tracker/ui/components/input";
-import { Label } from "@price-tracker/ui/components/label";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+} from "@drop-watch/api/schemas/settings";
+import { Button } from "@drop-watch/ui/components/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
+import { Checkbox } from "@drop-watch/ui/components/checkbox";
+import { Input } from "@drop-watch/ui/components/input";
+import { Label } from "@drop-watch/ui/components/label";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
 import { toast } from "sonner";

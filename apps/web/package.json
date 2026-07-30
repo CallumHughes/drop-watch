@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@drop-watch/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -16,11 +16,11 @@
     "@orpc/server": "catalog:",
     "@orpc/tanstack-query": "catalog:",
     "@orpc/zod": "catalog:",
-    "@price-tracker/api": "workspace:*",
-    "@price-tracker/auth": "workspace:*",
-    "@price-tracker/email": "workspace:*",
-    "@price-tracker/env": "workspace:*",
-    "@price-tracker/ui": "workspace:*",
+    "@drop-watch/api": "workspace:*",
+    "@drop-watch/auth": "workspace:*",
+    "@drop-watch/email": "workspace:*",
+    "@drop-watch/env": "workspace:*",
+    "@drop-watch/ui": "workspace:*",
     "@swc/helpers": "^0.5.23",
     "@tanstack/react-form": "^1.33.0",
     "@tanstack/react-query": "^5.101.2",
@@ -38,7 +38,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
     "@tanstack/react-query-devtools": "^5.101.2",
     "@types/node": "catalog:",

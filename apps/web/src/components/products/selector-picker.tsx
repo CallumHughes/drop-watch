@@ -1,7 +1,7 @@
 "use client";
 
-import type { SelectorPreview } from "@price-tracker/api/routers/preview";
-import { Input } from "@price-tracker/ui/components/input";
+import type { SelectorPreview } from "@drop-watch/api/routers/preview";
+import { Input } from "@drop-watch/ui/components/input";
 import type { ChangeEvent } from "react";
 import { useCallback, useId } from "react";
 

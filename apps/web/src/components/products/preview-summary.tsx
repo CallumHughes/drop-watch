@@ -1,4 +1,4 @@
-import type { PreviewExtraction } from "@price-tracker/api/routers/preview";
+import type { PreviewExtraction } from "@drop-watch/api/routers/preview";
 import Image from "next/image";
 
 import { formatPrice, formatStock, productHost } from "@/lib/format";

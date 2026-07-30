@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@price-tracker/ui/components/card";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import Image from "next/image";

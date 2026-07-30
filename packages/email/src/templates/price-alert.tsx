@@ -17,7 +17,7 @@
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
 /** @jsxImportSource react */
 
-import type { NotificationKind, NotificationPayload } from "@price-tracker/core/notify";
+import type { NotificationKind, NotificationPayload } from "@drop-watch/core/notify";
 import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
 
@@ -72,7 +72,7 @@ function alertCopy(payload: NotificationPayload): AlertCopy {
  *
  * A record keyed by {@link NotificationKind} rather than a `switch`, because
  * the record is exhaustive by construction: adding a rule to
- * `@price-tracker/core/rules` fails to compile here until someone writes the
+ * `@drop-watch/core/rules` fails to compile here until someone writes the
  * words a person will read, instead of silently falling through to a generic
  * "Alert:" line. `tracker_broken` has its own template and never reaches these
  * — the entries exist only so the type is total.

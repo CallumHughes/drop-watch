@@ -1,10 +1,10 @@
+import { createContext } from "@drop-watch/api/context";
+import { appRouter } from "@drop-watch/api/routers/index";
 import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
-import { createContext } from "@price-tracker/api/context";
-import { appRouter } from "@price-tracker/api/routers/index";
 import type { NextRequest } from "next/server";
 
 import { log, withEvlog } from "@/lib/evlog";

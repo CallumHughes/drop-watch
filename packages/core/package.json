@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/core",
+  "name": "@drop-watch/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,7 +24,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

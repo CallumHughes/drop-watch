@@ -1,5 +1,5 @@
-import type { ExtractionResult } from "@price-tracker/core/extract";
-import type { FetchPageResult } from "@price-tracker/core/fetch";
+import type { ExtractionResult } from "@drop-watch/core/extract";
+import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { describe, expect, it } from "vitest";
 import { toCheckOutcome } from "./outcome";
 

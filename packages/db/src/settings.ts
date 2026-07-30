@@ -7,9 +7,9 @@
  * the worker's very next check with nothing to restart and nothing to notify.
  */
 
-import type { NotifyConfig } from "@price-tracker/core/notify";
-import type { AlertTargets } from "@price-tracker/core/notify/channels";
-import { env } from "@price-tracker/env/db";
+import type { NotifyConfig } from "@drop-watch/core/notify";
+import type { AlertTargets } from "@drop-watch/core/notify/channels";
+import { env } from "@drop-watch/env/db";
 import { eq } from "drizzle-orm";
 
 import { db } from "./index";
@@ -91,13 +91,13 @@ export function notifyConfig(current: Settings): NotifyConfig | null {
 
 export interface AlertTargetsInput {
   /**
-   * `emailEnabled()` from `@price-tracker/email`, passed in rather than read.
+   * `emailEnabled()` from `@drop-watch/email`, passed in rather than read.
    *
    * The answer depends on `RESEND_API_KEY`, and this package must not learn
    * that variable exists — one module in the repo decides whether a mailer is
    * configured, and it is not this one. Injecting it also keeps the dependency
-   * pointing the right way: `@price-tracker/db` knows nothing of Resend or
-   * React, exactly as `@price-tracker/core` does not.
+   * pointing the right way: `@drop-watch/db` knows nothing of Resend or
+   * React, exactly as `@drop-watch/core` does not.
    */
   emailConfigured: boolean;
   /** The product owner's `user.id` — alerts are the owner's, nobody else's. */

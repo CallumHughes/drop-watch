@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
-import { Input } from "@price-tracker/ui/components/input";
-import { Label } from "@price-tracker/ui/components/label";
+import { Button } from "@drop-watch/ui/components/button";
+import { Input } from "@drop-watch/ui/components/input";
+import { Label } from "@drop-watch/ui/components/label";
 import { useForm } from "@tanstack/react-form";
 import { type ChangeEvent, type FormEvent, useCallback } from "react";
 import { toast } from "sonner";

@@ -1,4 +1,4 @@
-import { env } from "@price-tracker/env/db";
+import { env } from "@drop-watch/env/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 
 // biome-ignore lint/performance/noNamespaceImport: drizzle requires the full schema object.

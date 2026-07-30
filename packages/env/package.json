@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/env",
+  "name": "@drop-watch/env",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }

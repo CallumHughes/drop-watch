@@ -9,7 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@price-tracker/ui/components/sidebar";
+} from "@drop-watch/ui/components/sidebar";
 import { ChartLineIcon } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps } from "react";

@@ -1,4 +1,4 @@
-import type { CheckRun } from "@price-tracker/api/routers/products";
+import type { CheckRun } from "@drop-watch/api/routers/products";
 
 import { formatDateTime, formatDuration } from "@/lib/format";
 

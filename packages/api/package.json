@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/api",
+  "name": "@drop-watch/api",
   "type": "module",
   "exports": {
     ".": {
@@ -19,11 +19,11 @@
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
-    "@price-tracker/auth": "workspace:*",
-    "@price-tracker/core": "workspace:*",
-    "@price-tracker/db": "workspace:*",
-    "@price-tracker/email": "workspace:*",
-    "@price-tracker/env": "workspace:*",
+    "@drop-watch/auth": "workspace:*",
+    "@drop-watch/core": "workspace:*",
+    "@drop-watch/db": "workspace:*",
+    "@drop-watch/email": "workspace:*",
+    "@drop-watch/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "evlog": "catalog:",
@@ -31,7 +31,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

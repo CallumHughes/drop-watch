@@ -460,7 +460,7 @@ npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
 ```
 
 ```tsx
-import { Button } from "@price-tracker/ui/components/button";
+import { Button } from "@drop-watch/ui/components/button";
 ```
 
 Run the shadcn CLI from `apps/web` instead for app-specific blocks.
@@ -477,6 +477,6 @@ Run the shadcn CLI from `apps/web` instead for app-specific blocks.
 - `pnpm db:start` / `db:stop` / `db:down` — the development Postgres container
 - `pnpm db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` — Drizzle
 - `pnpm db:verify-user <email>` — mark an account verified; the lockout escape hatch
-- `pnpm --filter @price-tracker/core test-url <url>` — run the extraction chain on one URL
+- `pnpm --filter @drop-watch/core test-url <url>` — run the extraction chain on one URL
 - `pnpm docker:build` / `docker:up` / `docker:logs` / `docker:down` — local container stack
 - `pnpm docker:prod:build` / `docker:prod:up` / `docker:prod:logs` / `docker:prod:down` — against host Postgres

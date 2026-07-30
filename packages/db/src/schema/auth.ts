@@ -92,7 +92,7 @@ export const verification = pgTable(
 
 /**
  * A pending invitation to create an account. Not a Better Auth table — signup
- * is invite-only, enforced by the sign-up hook in `@price-tracker/auth`, and
+ * is invite-only, enforced by the sign-up hook in `@drop-watch/auth`, and
  * this is its ledger. Only the token's SHA-256 is stored; the raw token exists
  * once, in the link handed to the admin (and emailed when a mailer is
  * configured).

@@ -1,10 +1,6 @@
-import { auth } from "@price-tracker/auth";
-import { Separator } from "@price-tracker/ui/components/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@price-tracker/ui/components/sidebar";
+import { auth } from "@drop-watch/auth";
+import { Separator } from "@drop-watch/ui/components/separator";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@drop-watch/ui/components/sidebar";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 

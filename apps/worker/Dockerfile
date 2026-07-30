@@ -6,7 +6,7 @@
 # The worker has no build step — it runs its TypeScript directly through tsx —
 # so there is no separate runner stage to copy a bundle into. That also means
 # the install cannot be `--prod`: tsx resolves `tsconfig.json`, which extends
-# the shared `@price-tracker/config` base, and that is a dev dependency.
+# the shared `@drop-watch/config` base, and that is a dev dependency.
 
 FROM node:24-slim AS base
 RUN npm install --global pnpm@11

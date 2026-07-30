@@ -9,12 +9,12 @@
  *
  * This deliberately duplicates a few lines of `apps/web/src/lib/format.ts`
  * rather than sharing them. The worker renders these templates too and cannot
- * import from `apps/web`; pushing display code into `@price-tracker/core`
+ * import from `apps/web`; pushing display code into `@drop-watch/core`
  * would give a package that is otherwise pure logic a presentation layer.
  * Two small copies beat either.
  */
 
-import type { NotificationPayload } from "@price-tracker/core/notify";
+import type { NotificationPayload } from "@drop-watch/core/notify";
 
 /** `www.` carries no information on a host label, so it is dropped. */
 const WWW_PREFIX = /^www\./;

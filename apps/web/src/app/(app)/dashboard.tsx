@@ -1,14 +1,14 @@
 "use client";
 
-import { buttonVariants } from "@price-tracker/ui/components/button";
+import { buttonVariants } from "@drop-watch/ui/components/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@price-tracker/ui/components/empty";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+} from "@drop-watch/ui/components/empty";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 

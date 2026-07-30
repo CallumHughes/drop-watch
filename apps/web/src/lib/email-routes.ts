@@ -16,7 +16,7 @@
  * form that silently does nothing.
  */
 
-import { emailEnabled } from "@price-tracker/email";
+import { emailEnabled } from "@drop-watch/email";
 import { notFound } from "next/navigation";
 
 /** 404s the current route unless a mailer is configured. */

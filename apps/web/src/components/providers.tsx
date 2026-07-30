@@ -1,6 +1,6 @@
 "use client";
 
-import { Toaster } from "@price-tracker/ui/components/sonner";
+import { Toaster } from "@drop-watch/ui/components/sonner";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 

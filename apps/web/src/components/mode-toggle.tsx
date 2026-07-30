@@ -1,12 +1,12 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
+import { Button } from "@drop-watch/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@price-tracker/ui/components/dropdown-menu";
+} from "@drop-watch/ui/components/dropdown-menu";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback } from "react";

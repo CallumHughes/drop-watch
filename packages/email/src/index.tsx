@@ -3,14 +3,14 @@
  * seam that turns "send an alert" into an alert channel.
  *
  * Everything above this line is a template or a transport; everything that
- * calls it — Better Auth's callbacks in `@price-tracker/auth`, the worker's
+ * calls it — Better Auth's callbacks in `@drop-watch/auth`, the worker's
  * fan-out in `apps/worker/src/alerting.ts` — should be able to say what it
  * wants in one line and get back a result it never has to catch. So each
  * function here pairs a template with its subject and hands the pair to
  * {@link sendEmail}, and none of them throws.
  *
  * {@link emailChannel} is the other half of that: it wraps `sendAlertEmail` in
- * the `AlertChannel` shape `@price-tracker/core/notify/channels` defines, which
+ * the `AlertChannel` shape `@drop-watch/core/notify/channels` defines, which
  * is how the email transport reaches `deliverAlert` without `core` ever
  * importing Resend or React. Build the channel only when there is somebody to
  * send to — an unconfigured channel is *absent from the array*, never a channel
@@ -21,8 +21,8 @@
 /** @jsxRuntime automatic — see ./templates/layout.tsx for why this is here. */
 /** @jsxImportSource react */
 
-import type { NotificationPayload } from "@price-tracker/core/notify";
-import type { AlertChannel, ChannelSendResult } from "@price-tracker/core/notify/channels";
+import type { NotificationPayload } from "@drop-watch/core/notify";
+import type { AlertChannel, ChannelSendResult } from "@drop-watch/core/notify/channels";
 
 import { appUrl, type SendEmailResult, sendEmail } from "./client";
 import { CHANGE_EMAIL_SUBJECT, ChangeEmail } from "./templates/change-email";

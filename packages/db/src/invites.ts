@@ -2,14 +2,14 @@
  * The invitation ledger behind invite-only signup.
  *
  * Signup opens for exactly one bootstrap account and is invite-only after
- * that; the sign-up hook in `@price-tracker/auth` enforces it and this module
+ * that; the sign-up hook in `@drop-watch/auth` enforces it and this module
  * is what it consults. The raw token is generated here, handed back exactly
  * once, and only its SHA-256 is stored — a leaked database dump must not be a
  * stack of working invite links. 256 random bits also mean the lookup can be a
  * plain equality on the hash: there is nothing to brute-force in 48 hours.
  *
- * Lives in `@price-tracker/db` because both sides need it: the auth hook
- * validates and burns tokens, and `@price-tracker/api` creates, lists and
+ * Lives in `@drop-watch/db` because both sides need it: the auth hook
+ * validates and burns tokens, and `@drop-watch/api` creates, lists and
  * revokes invites for the admin page.
  */
 

@@ -7,7 +7,7 @@
  * section 3.
  */
 
-import type { AlertRule } from "@price-tracker/core/rules";
+import type { AlertRule } from "@drop-watch/core/rules";
 import { relations, sql } from "drizzle-orm";
 import {
   bigserial,
@@ -36,7 +36,7 @@ export const renderMode = pgEnum("render_mode", ["http", "browser"]);
 /**
  * Outcome of one check attempt.
  *
- * Maps onto the fetch layer's result union (`@price-tracker/core/fetch`):
+ * Maps onto the fetch layer's result union (`@drop-watch/core/fetch`):
  *
  * | fetch result    | check run                                             |
  * | --------------- | ----------------------------------------------------- |

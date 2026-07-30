@@ -14,7 +14,7 @@
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
 /** @jsxImportSource react */
 
-import type { NotificationPayload } from "@price-tracker/core/notify";
+import type { NotificationPayload } from "@drop-watch/core/notify";
 import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
 

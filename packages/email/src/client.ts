@@ -12,16 +12,16 @@
  * from the environment.
  *
  * {@link sendEmail} never throws. That is the same contract
- * `sendNotification` in `@price-tracker/core/notify` keeps, for the same
+ * `sendNotification` in `@drop-watch/core/notify` keeps, for the same
  * reason: a mail that could not be sent is a thing to log, never a thing that
  * fails the check, the sign-up or the request that triggered it. With no key
  * it short-circuits to `{ ok: false, error: EMAIL_NOT_CONFIGURED }`, which
  * callers can tell apart from a real failure exactly as `notifyConfig` in
- * `@price-tracker/db/settings` already separates "chose not to send" from
+ * `@drop-watch/db/settings` already separates "chose not to send" from
  * "tried and failed".
  */
 
-import { env } from "@price-tracker/env/email";
+import { env } from "@drop-watch/env/email";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
 import { Resend } from "resend";
@@ -90,7 +90,7 @@ export function appUrl(): string | null {
 
 /**
  * Constructed on first use rather than at import time, so that importing this
- * module — which `@price-tracker/auth` does unconditionally — costs nothing on
+ * module — which `@drop-watch/auth` does unconditionally — costs nothing on
  * an install with no key, and so the process starts even when the key is
  * garbage. The instance is a thin HTTP wrapper and is safe to share.
  */

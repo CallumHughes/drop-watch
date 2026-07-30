@@ -13,8 +13,8 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
-    "utils": "@price-tracker/ui/lib/utils",
-    "ui": "@price-tracker/ui/components",
+    "utils": "@drop-watch/ui/lib/utils",
+    "ui": "@drop-watch/ui/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

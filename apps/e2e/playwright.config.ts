@@ -53,7 +53,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `pnpm --filter web exec next dev --port ${WEB_PORT}`,
+      command: `pnpm --filter @drop-watch/web exec next dev --port ${WEB_PORT}`,
       env: appEnv,
       reuseExistingServer: !process.env.CI,
       stdout: "ignore",

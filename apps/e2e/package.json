@@ -1,5 +1,5 @@
 {
-  "name": "e2e",
+  "name": "@drop-watch/e2e",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "tsx": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "typescript": "catalog:"

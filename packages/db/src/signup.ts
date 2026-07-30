@@ -7,8 +7,8 @@
  * still be bootstrapped from the login page — it slams shut the moment the
  * first account exists, which is the behaviour EPICS.md asks for.
  *
- * Lives in `@price-tracker/db` because both sides need it: `@price-tracker/auth`
- * enforces it on the sign-up endpoint, and `@price-tracker/api` exposes it so
+ * Lives in `@drop-watch/db` because both sides need it: `@drop-watch/auth`
+ * enforces it on the sign-up endpoint, and `@drop-watch/api` exposes it so
  * the login page knows whether to offer the form at all.
  */
 

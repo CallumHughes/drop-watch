@@ -21,7 +21,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@price-tracker/ui/*": ["../../packages/ui/src/*"]
+      "@drop-watch/ui/*": ["../../packages/ui/src/*"]
     }
   },
   "include": [

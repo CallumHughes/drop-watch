@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/db",
+  "name": "@drop-watch/db",
   "type": "module",
   "exports": {
     ".": {
@@ -21,8 +21,8 @@
     "db:verify-user": "tsx --env-file-if-exists=../../apps/web/.env src/verify-user.ts"
   },
   "dependencies": {
-    "@price-tracker/core": "workspace:*",
-    "@price-tracker/env": "workspace:*",
+    "@drop-watch/core": "workspace:*",
+    "@drop-watch/env": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
@@ -31,7 +31,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/pg": "catalog:",
     "drizzle-kit": "^0.31.10",
     "tsx": "catalog:",

@@ -28,7 +28,7 @@ import type {
 /**
  * The result contract. Helpers that callers rarely need (`parsePrice`,
  * `parseAvailability`) stay on their own modules and are reachable as
- * `@price-tracker/core/extract/price` and `.../extract/availability`, which
+ * `@drop-watch/core/extract/price` and `.../extract/availability`, which
  * keeps this entrypoint from becoming a barrel over the whole package.
  */
 export type {

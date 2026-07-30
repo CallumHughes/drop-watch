@@ -1,17 +1,17 @@
 "use client";
 
-import type { Product } from "@price-tracker/api/routers/products";
+import type { Product } from "@drop-watch/api/routers/products";
 import {
   MAX_DROP_PERCENT,
   MAX_INTERVAL_MINUTES,
   MAX_JITTER_PERCENT,
   MIN_DROP_PERCENT,
   MIN_INTERVAL_MINUTES,
-} from "@price-tracker/api/schemas/products";
-import { Button } from "@price-tracker/ui/components/button";
-import { Checkbox } from "@price-tracker/ui/components/checkbox";
-import { Input } from "@price-tracker/ui/components/input";
-import { Label } from "@price-tracker/ui/components/label";
+} from "@drop-watch/api/schemas/products";
+import { Button } from "@drop-watch/ui/components/button";
+import { Checkbox } from "@drop-watch/ui/components/checkbox";
+import { Input } from "@drop-watch/ui/components/input";
+import { Label } from "@drop-watch/ui/components/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
 import { toast } from "sonner";

@@ -5,7 +5,7 @@
  * the webhook" were the same sentence. Email makes them two, and this module is
  * the joint. It knows how to run a list of channels and report what happened; it
  * does not know that one of them is Resend, because a channel is *injected* as
- * a `send` function. That is what keeps `@price-tracker/core` free of both
+ * a `send` function. That is what keeps `@drop-watch/core` free of both
  * Resend and React — the same injection trick `jitteredIntervalMs` uses in
  * `apps/worker/src/schedule.ts`, here for decoupling rather than testability,
  * though it buys that too.
@@ -52,8 +52,8 @@ export type ChannelSendResult =
  * Everything that is configured to receive alerts, resolved from the settings
  * row and the `user` table.
  *
- * The type lives here rather than in `@price-tracker/db` so that
- * `@price-tracker/email` — which turns targets into channels — can name it
+ * The type lives here rather than in `@drop-watch/db` so that
+ * `@drop-watch/email` — which turns targets into channels — can name it
  * without depending on the database, and so that "what counts as configured"
  * has one definition both the worker and the settings page read.
  */
@@ -144,7 +144,7 @@ export async function deliverAlert({
 
 /**
  * The Home Assistant channel. Lives here because core already owns the
- * transport; the email channel is built in `@price-tracker/email` for the
+ * transport; the email channel is built in `@drop-watch/email` for the
  * mirror-image reason.
  */
 export function webhookChannel(config: NotifyConfig): AlertChannel {

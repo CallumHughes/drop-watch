@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
-import { Skeleton } from "@price-tracker/ui/components/skeleton";
+import { Button } from "@drop-watch/ui/components/button";
+import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 

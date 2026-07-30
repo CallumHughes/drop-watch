@@ -3,12 +3,12 @@
  * handful of products for the worker to chew on.
  *
  * Idempotent — re-running it inserts nothing new and never overwrites a price
- * history. Run with `pnpm --filter @price-tracker/db db:seed`.
+ * history. Run with `pnpm --filter @drop-watch/db db:seed`.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { env } from "@price-tracker/env/seed";
+import { env } from "@drop-watch/env/seed";
 import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
 

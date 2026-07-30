@@ -203,7 +203,7 @@ interface RunStatus {
  *
  * A 304 is recorded as `ok` with no price point, so a page that simply has not
  * changed never counts as a failure. Structurally typed rather than taking the
- * `CheckRun` row, because `core` must not import `@price-tracker/db` — the
+ * `CheckRun` row, because `core` must not import `@drop-watch/db` — the
  * dependency runs the other way.
  */
 export function countLeadingFailures(runs: readonly RunStatus[]): number {

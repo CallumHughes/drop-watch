@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@price-tracker/ui/components/button";
-import { Input } from "@price-tracker/ui/components/input";
-import { Textarea } from "@price-tracker/ui/components/textarea";
-import { cn } from "@price-tracker/ui/lib/utils";
+import { Button } from "@drop-watch/ui/components/button";
+import { Input } from "@drop-watch/ui/components/input";
+import { Textarea } from "@drop-watch/ui/components/textarea";
+import { cn } from "@drop-watch/ui/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 

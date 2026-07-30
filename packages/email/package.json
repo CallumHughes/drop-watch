@@ -1,5 +1,5 @@
 {
-  "name": "@price-tracker/email",
+  "name": "@drop-watch/email",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@price-tracker/core": "workspace:*",
-    "@price-tracker/env": "workspace:*",
+    "@drop-watch/core": "workspace:*",
+    "@drop-watch/env": "workspace:*",
     "@react-email/components": "catalog:",
     "@react-email/render": "catalog:",
     "react": "catalog:",
@@ -24,7 +24,7 @@
     "resend": "catalog:"
   },
   "devDependencies": {
-    "@price-tracker/config": "workspace:*",
+    "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

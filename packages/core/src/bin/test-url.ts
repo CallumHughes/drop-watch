@@ -1,7 +1,7 @@
 /**
  * Manual smoke test for the extraction chain against a live URL.
  *
- *   pnpm --filter @price-tracker/core test-url <url> [--selector <css>] [--locale <tag>]
+ *   pnpm --filter @drop-watch/core test-url <url> [--selector <css>] [--locale <tag>]
  *
  * Prints the fetch outcome and the extraction result, including which strategy
  * won. This is the tool used to verify new sites before wiring them up.

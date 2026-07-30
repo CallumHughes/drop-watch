@@ -6,7 +6,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@price-tracker/ui/components/sidebar";
+} from "@drop-watch/ui/components/sidebar";
 import { LayoutDashboardIcon, PlusIcon, Settings2Icon, UserPlusIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

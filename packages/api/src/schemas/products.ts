@@ -8,7 +8,7 @@
  * client bundle must never do.
  */
 
-import { ALERT_RULES } from "@price-tracker/core/rules";
+import { ALERT_RULES } from "@drop-watch/core/rules";
 import { z } from "zod";
 
 export const MIN_INTERVAL_MINUTES = 5;

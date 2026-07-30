@@ -21,8 +21,8 @@ import {
   ENQUEUE_DUE_CHECKS_QUEUE,
   ensureQueues,
   type PgBoss,
-} from "@price-tracker/db/queue";
-import { env } from "@price-tracker/env/worker";
+} from "@drop-watch/db/queue";
+import { env } from "@drop-watch/env/worker";
 import { initLogger, log } from "evlog";
 import type { Job } from "pg-boss";
 import { type CheckSource, checkProduct } from "./check-product";

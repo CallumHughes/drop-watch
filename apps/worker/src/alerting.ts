@@ -24,30 +24,25 @@
  * consider the person told.
  */
 
-import { percentChange } from "@price-tracker/core/decimal";
-import type { NotificationPayload } from "@price-tracker/core/notify";
-import type { AlertChannel } from "@price-tracker/core/notify/channels";
-import { deliverAlert } from "@price-tracker/core/notify/channels";
-import { alertChannels } from "@price-tracker/core/notify/targets";
-import type {
-  AlertMemory,
-  AlertStateKey,
-  Observation,
-  RuleTrigger,
-} from "@price-tracker/core/rules";
+import { percentChange } from "@drop-watch/core/decimal";
+import type { NotificationPayload } from "@drop-watch/core/notify";
+import type { AlertChannel } from "@drop-watch/core/notify/channels";
+import { deliverAlert } from "@drop-watch/core/notify/channels";
+import { alertChannels } from "@drop-watch/core/notify/targets";
+import type { AlertMemory, AlertStateKey, Observation, RuleTrigger } from "@drop-watch/core/rules";
 import {
   cooldownMs,
   countLeadingFailures,
   evaluateAlerts,
   shouldReportBroken,
   TRACKER_BROKEN,
-} from "@price-tracker/core/rules";
-import { db } from "@price-tracker/db";
-import type { Product } from "@price-tracker/db/schema/products";
-import { alertState, checkRuns, pricePoints } from "@price-tracker/db/schema/products";
-import type { Settings } from "@price-tracker/db/schema/settings";
-import { alertTargets, loadSettings } from "@price-tracker/db/settings";
-import { emailChannel, emailEnabled } from "@price-tracker/email";
+} from "@drop-watch/core/rules";
+import { db } from "@drop-watch/db";
+import type { Product } from "@drop-watch/db/schema/products";
+import { alertState, checkRuns, pricePoints } from "@drop-watch/db/schema/products";
+import type { Settings } from "@drop-watch/db/schema/settings";
+import { alertTargets, loadSettings } from "@drop-watch/db/settings";
+import { emailChannel, emailEnabled } from "@drop-watch/email";
 import { and, desc, eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 

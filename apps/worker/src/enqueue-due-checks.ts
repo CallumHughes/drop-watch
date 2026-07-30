@@ -11,14 +11,14 @@
  * still running) ends up with exactly one job, not one per minute.
  */
 
-import { db } from "@price-tracker/db";
+import { db } from "@drop-watch/db";
 import {
   CHECK_PRODUCT_QUEUE,
   type CheckProductJob,
   checkProductSendOptions,
   type PgBoss,
-} from "@price-tracker/db/queue";
-import { products } from "@price-tracker/db/schema/products";
+} from "@drop-watch/db/queue";
+import { products } from "@drop-watch/db/schema/products";
 import { and, eq, lte } from "drizzle-orm";
 import { createLogger } from "evlog";
 

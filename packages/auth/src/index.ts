@@ -1,16 +1,16 @@
-import { createDb } from "@price-tracker/db";
-import { findPendingInvite, markInviteAccepted } from "@price-tracker/db/invites";
+import { createDb } from "@drop-watch/db";
+import { findPendingInvite, markInviteAccepted } from "@drop-watch/db/invites";
 // biome-ignore lint/performance/noNamespaceImport: drizzle adapter requires the full schema object.
-import * as schema from "@price-tracker/db/schema/auth";
-import { signupOpen } from "@price-tracker/db/signup";
+import * as schema from "@drop-watch/db/schema/auth";
+import { signupOpen } from "@drop-watch/db/signup";
 import {
   emailEnabled,
   type SendEmailResult,
   sendChangeEmailVerification,
   sendPasswordResetEmail,
   sendVerificationEmail,
-} from "@price-tracker/email";
-import { env } from "@price-tracker/env/server";
+} from "@drop-watch/email";
+import { env } from "@drop-watch/env/server";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
