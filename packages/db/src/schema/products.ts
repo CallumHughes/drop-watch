@@ -3,8 +3,7 @@
  * every check attempt, and the per-rule alert dedupe state.
  *
  * Money is `numeric(12,2)` everywhere and surfaces in TypeScript as a decimal
- * string. Never a float, and never round-tripped through `Number` — see PLAN.md
- * section 3.
+ * string. Never a float, and never round-tripped through `Number`.
  */
 
 import type { AlertRule } from "@drop-watch/core/rules";

@@ -2,9 +2,8 @@
  * The pure half of the add-product preview: the short-lived store that holds a
  * fetched page in memory, and the wire shape the picker renders.
  *
- * The plan is explicit that the selector picker must test against the HTML
- * fetched in step 2 rather than re-fetching per keystroke (PLAN.md §8), which
- * makes this cache the load-bearing part of the flow. Everything here is
+ * The selector picker must test against the HTML fetched in step 2 rather
+ * than re-fetching per keystroke, which makes this cache the load-bearing part of the flow. Everything here is
  * deliberately free of database and network imports so it can be tested
  * without either — the router does the fetching, this does the remembering.
  */

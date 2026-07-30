@@ -8,7 +8,7 @@
  *
  * The settings row is still the single source of truth for both apps — the
  * worker reads it on every check — so a webhook changed here takes effect
- * immediately with nothing to restart (PLAN.md §1: Postgres is the interface).
+ * immediately with nothing to restart — Postgres is the interface.
  */
 
 import type { ChannelResult } from "@drop-watch/core/notify/channels";

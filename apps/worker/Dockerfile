@@ -1,6 +1,6 @@
 # The background worker: pg-boss, the minutely dispatcher, and every check.
 #
-# Same `turbo prune` shape as the web image (PLAN.md §9), scoped to `worker`, so
+# Same `turbo prune` shape as the web image, scoped to `worker`, so
 # a UI-only change never rebuilds this one.
 #
 # The worker has no build step — it runs its TypeScript directly through tsx —
@@ -15,7 +15,7 @@ WORKDIR /app
 FROM base AS pruner
 RUN npm install --global turbo@2.10.7
 COPY . .
-RUN turbo prune worker --docker
+RUN turbo prune @drop-watch/worker --docker
 
 FROM base AS runner
 COPY --from=pruner /app/out/json/ .

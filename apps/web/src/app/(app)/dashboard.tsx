@@ -20,7 +20,7 @@ const SKELETON_CARDS = ["a", "b", "c"] as const;
 
 /**
  * The product grid, polled every {@link LIVE_REFETCH_MS}. Polling rather than
- * SSE is a deliberate first cut (PLAN.md §8); the worker writes on its own
+ * SSE is a deliberate first cut; the worker writes on its own
  * schedule, so a fixed interval keeps the dashboard within a check of the
  * truth without any push plumbing.
  */

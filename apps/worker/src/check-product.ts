@@ -95,7 +95,7 @@ function buildWrite(
   const pricePoint: NewPricePoint = {
     currency,
     // Decimal string all the way from the parser into `numeric(12,2)`. Never
-    // through Number — see PLAN.md §3.
+    // through Number.
     price: extraction.price,
     productId: product.id,
   };

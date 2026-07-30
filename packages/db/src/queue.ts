@@ -3,8 +3,7 @@
  * boss instance.
  *
  * This lives in `@drop-watch/db` rather than in `apps/worker` because
- * Postgres is the only interface between the web app and the worker (PLAN.md
- * §1) — the "check now" button in `apps/web` enqueues onto the same queue the
+ * Postgres is the only interface between the web app and the worker — the "check now" button in `apps/web` enqueues onto the same queue the
  * worker consumes, and neither side can import from the other's app.
  *
  * Ownership is deliberately lopsided: the **worker** owns the `pgboss` schema
@@ -43,7 +42,7 @@ const CHECK_EXPIRE_SECONDS = 120;
 /** The dispatcher only reads an index and sends jobs; it is never slow. */
 const DISPATCH_EXPIRE_SECONDS = 60;
 
-/** Per EPICS.md: three attempts, backing off, before a job is given up on. */
+/** Three attempts, backing off, before a job is given up on. */
 const CHECK_RETRY_LIMIT = 3;
 
 /**
@@ -53,7 +52,7 @@ const CHECK_RETRY_LIMIT = 3;
  * every minute: at most one job per product may be queued *or* active, so a
  * product that stays due (because the worker is down, or a check is still
  * running) accumulates exactly one job rather than one per tick. It is also the
- * "never two checks in flight for one product" guarantee from PLAN.md §5.
+ * "never two checks in flight for one product" guarantee.
  *
  * `short` on the dispatcher does the same for the cron itself.
  */
@@ -80,7 +79,7 @@ export const QUEUE_DEFINITIONS: readonly Queue[] = [
   },
 ];
 
-/** Cron expression for the dispatcher. Every minute, per PLAN.md §5. */
+/** Cron expression for the dispatcher. Every minute. */
 export const ENQUEUE_DUE_CHECKS_CRON = "* * * * *";
 
 /**

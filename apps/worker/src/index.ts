@@ -1,7 +1,7 @@
 /**
  * The worker process.
  *
- * Standalone Node, deliberately not booted from inside Next.js (PLAN.md §1): a
+ * Standalone Node, deliberately not booted from inside Next.js: a
  * crawl burst must not block the dashboard's event loop, and a hot reload must
  * never leave two schedulers racing. Postgres — via pg-boss — is the only
  * interface between the two.

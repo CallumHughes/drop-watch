@@ -5,9 +5,9 @@ import ForgotPasswordForm from "./forgot-password-form";
 /**
  * The way back into a tracker whose signup has closed.
  *
- * Signup shuts for good once the first account exists, so on a single-user box
- * a forgotten password has no self-service fix other than this one — short of
- * the SQL in the README. It only exists when a mailer does; without one the
+ * Self-service signup shuts once the first account exists, so a forgotten
+ * password has no self-service fix other than this one — short of the SQL in
+ * docs/notifications.md. It only exists when a mailer does; without one the
  * route 404s, since the endpoint behind it is not registered either.
  */
 export default function ForgotPasswordPage() {

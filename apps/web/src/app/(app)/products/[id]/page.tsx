@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import ProductDetail from "./product-detail";
 
-/** Prices must never come from the App Router's cache — see PLAN.md §8. */
+/** Prices must never come from the App Router's cache. */
 export const dynamic = "force-dynamic";
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {

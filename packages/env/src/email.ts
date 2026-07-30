@@ -25,7 +25,8 @@ export const env = createEnv({
     /**
      * The `From:` address. Defaults to Resend's `onboarding@resend.dev`, which
      * needs no verified domain but which Resend will only deliver to the
-     * address that owns the Resend account — fine for a single-user tracker,
+     * address that owns the Resend account — fine while you are the only
+     * recipient,
      * useless for anything else.
      */
     EMAIL_FROM: z.string().min(1).optional(),

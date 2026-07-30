@@ -1,9 +1,9 @@
 /**
  * Password reset.
  *
- * The reason email exists on a single-user app at all: signup slams shut
- * after the first account, so without a reset link a forgotten password means
- * editing the database by hand. The copy says out loud that nothing has
+ * The reason email is worth configuring at all: self-service signup slams
+ * shut after the first account, so without a reset link a forgotten password
+ * means editing the database by hand. The copy says out loud that nothing has
  * changed yet, because a "reset your password" mail that arrives unrequested
  * reads like a break-in until it explains itself.
  */

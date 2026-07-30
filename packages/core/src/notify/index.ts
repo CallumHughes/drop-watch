@@ -1,5 +1,5 @@
 /**
- * The Home Assistant webhook client (PLAN.md §7).
+ * The Home Assistant webhook client.
  *
  * Webhooks need no auth token — the webhook id *is* the secret, and
  * `local_only: true` keeps it LAN-bound. The payload is the shape the plan

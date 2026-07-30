@@ -6,7 +6,7 @@
  * "Once" is the whole design. `page` is the only procedure here that reaches
  * out to the internet; `testSelector` and `source` are pure reads of the cached
  * body, which is what makes the picker safe to drive from every keystroke
- * (PLAN.md §8). The chain itself is `@drop-watch/core/extract` — the same
+ * The chain itself is `@drop-watch/core/extract` — the same
  * module `apps/worker` calls — so the preview cannot drift from what a
  * scheduled check will later record.
  *

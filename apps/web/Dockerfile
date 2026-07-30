@@ -1,6 +1,6 @@
 # The Next.js dashboard.
 #
-# Built from a `turbo prune` workspace rather than the whole repo (PLAN.md §9):
+# Built from a `turbo prune` workspace rather than the whole repo:
 # the pruner emits only the packages `web` actually depends on, so a change to
 # `apps/worker` cannot invalidate this image's dependency layer.
 #
@@ -17,7 +17,7 @@ FROM base AS pruner
 # point of the prune step, so it comes from npm rather than the workspace.
 RUN npm install --global turbo@2.10.7
 COPY . .
-RUN turbo prune web --docker
+RUN turbo prune @drop-watch/web --docker
 
 FROM base AS builder
 # NODE_ENV is deliberately not set here: pnpm reads it and would skip the dev
@@ -49,7 +49,7 @@ ENV BETTER_AUTH_SECRET=build-time-placeholder-secret-not-used-at-runtime
 ARG NEXT_PUBLIC_EMAIL_ENABLED=false
 ENV NEXT_PUBLIC_EMAIL_ENABLED=${NEXT_PUBLIC_EMAIL_ENABLED}
 
-RUN NODE_ENV=production pnpm exec turbo build --filter=web
+RUN NODE_ENV=production pnpm exec turbo build --filter=@drop-watch/web
 # standalone output excludes public/; ensure it exists so the runner copy never fails
 RUN mkdir -p apps/web/public
 

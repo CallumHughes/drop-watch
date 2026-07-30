@@ -1,7 +1,7 @@
 /**
  * Alert rule evaluation.
  *
- * Pure by design (PLAN.md §10): no database, no network, no clock of its own.
+ * Pure by design: no database, no network, no clock of its own.
  * The worker loads the observations and the dedupe state, this decides what
  * should fire, and the worker sends and records. That split is what makes the
  * part which is genuinely easy to get wrong — the dedupe — testable without a
@@ -16,7 +16,7 @@
  *          OR price < lastAlertedPrice
  *          OR now - lastAlertedAt > cooldown)
  *
- * per PLAN.md §6, keyed by `(productId, rule)` with a 12h default cooldown.
+ * keyed by `(productId, rule)` with a 12h default cooldown.
  */
 
 import { toMinorUnits } from "../decimal";
@@ -36,7 +36,7 @@ export const WATCH_BROKEN = "watch_broken";
 /** Every key that can appear in `alert_state.rule`. */
 export type AlertStateKey = AlertRule | typeof WATCH_BROKEN;
 
-/** 12 hours, per PLAN.md §6. Overridable from the settings table. */
+/** 12 hours. Overridable from the settings table. */
 export const DEFAULT_COOLDOWN_MINUTES = 720;
 
 /** Consecutive non-`ok` checks before a product is declared broken. */
@@ -167,7 +167,7 @@ export function conditionsMet(
 }
 
 /**
- * The dedupe gate from PLAN.md §6. A cheaper price is always news; the same
+ * The dedupe gate. A cheaper price is always news; the same
  * price again is only news once the cooldown has run out.
  */
 export function shouldFire(

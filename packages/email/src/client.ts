@@ -29,7 +29,8 @@ import { Resend } from "resend";
 /**
  * Resend's shared sender, which needs no verified domain but which Resend will
  * only deliver to the address that owns the account. That is enough for a
- * single-user install and useless for anything else, so `EMAIL_FROM` exists.
+ * install where you are the only recipient, and useless for anything else, so
+ * `EMAIL_FROM` exists.
  */
 const DEFAULT_FROM = "onboarding@resend.dev";
 

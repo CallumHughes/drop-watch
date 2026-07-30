@@ -16,7 +16,7 @@ const MIN_INTERVAL_MINUTES = 1;
 /**
  * Spread of one reschedule, in milliseconds.
  *
- * Jitter is not optional (PLAN.md §5): without it every product sharing an
+ * Jitter is not optional: without it every product sharing an
  * interval fires on the same second forever, which is both a thundering herd
  * against target sites and a self-inflicted latency spike. The offset is
  * symmetric — `±jitterPercent` of the interval — so the long-run average stays

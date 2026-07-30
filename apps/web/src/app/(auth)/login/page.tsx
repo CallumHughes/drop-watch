@@ -12,10 +12,10 @@ import { orpc } from "@/utils/orpc";
  * Sign-in, plus account creation only while this instance has no account at
  * all.
  *
- * The tracker is single-user (PLAN.md §8), so the sign-up form exists purely to
- * bootstrap an install whose seed script was never run. Once an account exists
- * the switch disappears — and the endpoint refuses regardless, since hiding a
- * form is presentation, not security.
+ * The sign-up form exists purely to bootstrap an install whose seed script was
+ * never run. Once an account exists the switch disappears and later accounts
+ * arrive by invite — and the endpoint refuses regardless, since hiding a form
+ * is presentation, not security.
  */
 export default function LoginPage() {
   const signupOpen = useQuery(orpc.signupOpen.queryOptions());

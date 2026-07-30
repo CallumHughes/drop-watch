@@ -8,7 +8,7 @@ import { z } from "zod";
 //
 // The Home Assistant variables live here rather than in `worker.ts` because
 // they are *seed values*, not runtime config: the `settings` table is created
-// from them on first boot and edited in the UI thereafter (EPICS.md, Epic 7).
+// from them on first boot and edited in the UI thereafter.
 // Both `apps/web` and `apps/worker` reach the webhook config through
 // `@drop-watch/db/settings`, so one definition serves both.
 export const env = createEnv({
@@ -18,7 +18,7 @@ export const env = createEnv({
     DATABASE_URL: z.string().min(1),
     /** Base URL of the Home Assistant instance, e.g. http://homeassistant:8123. */
     HA_URL: z.url().optional(),
-    /** The webhook id, which is itself the secret — see PLAN.md §7. */
+    /** The webhook id, which is itself the secret. */
     HA_WEBHOOK_ID: z.string().min(1).optional(),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   },
