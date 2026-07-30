@@ -26,7 +26,7 @@
     "db:migrate": "turbo run db:migrate -F @drop-watch/db",
     "db:seed": "turbo run db:seed -F @drop-watch/db",
     "db:verify-user": "turbo run db:verify-user -F @drop-watch/db --",
-    "db:start": "docker compose up -d postgres",
+    "db:start": "docker compose up -d --wait postgres",
     "db:watch": "docker compose up postgres",
     "db:stop": "docker compose stop postgres",
     "db:down": "docker compose down postgres",

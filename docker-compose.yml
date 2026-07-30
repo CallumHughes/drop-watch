@@ -126,11 +126,17 @@ services:
       - "5432:5432"
     volumes:
       - drop-watch_postgres_data:/var/lib/postgresql
+    # -d names the target database, not just the server: on a fresh volume
+    # `pg_isready` answers on the init-time socket before `POSTGRES_DB` has been
+    # created, so checking the server alone reports ready too early and whatever
+    # runs next (db:push) fails against a database that does not exist yet.
+    # Paired with `--wait` in the db:start script, which is what actually blocks.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U postgres -d drop-watch"]
+      start_period: 30s
+      interval: 2s
       timeout: 5s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
 volumes:
