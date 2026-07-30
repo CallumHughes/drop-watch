@@ -20,8 +20,8 @@ const selectSubmitState = (state: { canSubmit: boolean; isSubmitting: boolean })
 });
 
 /**
- * @param onSwitchToSignUp - omitted once an account exists, which closes signup
- *   for good on this single-user tracker.
+ * @param onSwitchToSignUp - omitted once an account exists, after which new
+ *   accounts arrive by invite rather than self-service signup.
  */
 export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: () => void }) {
   const router = useRouter();

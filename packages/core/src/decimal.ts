@@ -2,7 +2,7 @@
  * Arithmetic on the decimal strings that `numeric(12,2)` columns produce.
  *
  * Prices never become JS floats — not in the database, not on the wire, and not
- * on the way to a "£3.20 under target" badge (PLAN.md §10). Everything here
+ * on the way to a "£3.20 under target" badge. Everything here
  * works in integer minor units via `bigint`, so the values the UI renders are
  * exactly the values Postgres stores.
  *

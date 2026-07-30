@@ -11,7 +11,7 @@ import { orpc } from "@/utils/orpc";
  * The fetched markup, on demand.
  *
  * Reading the page source is how you find the class name to type into the
- * picker, which is why PLAN.md §8 asks for it. It is loaded lazily and never
+ * picker, which is why it exists. It is loaded lazily and never
  * re-fetched: this is the same cached body the selector runs against, so
  * opening the panel costs one read of memory the server already holds.
  */

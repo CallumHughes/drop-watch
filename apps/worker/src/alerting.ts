@@ -7,7 +7,7 @@
  * critical path of the check itself.
  *
  * That last part is the rule worth stating twice: **alerting must never fail a
- * check** (PLAN.md §7). By the time anything here runs the price point and the
+ * check**. By the time anything here runs the price point and the
  * `check_runs` row are already committed, and every exit from this module is a
  * log line. Home Assistant being down costs you a notification, never a
  * measurement and never a pg-boss retry.
@@ -173,7 +173,7 @@ async function deliver(
     log.info("alert sent");
   } else {
     // Logged, never thrown: the check is already committed and a notification
-    // is not allowed to undo it (PLAN.md §7).
+    // is not allowed to undo it.
     log.warn("alert delivery failed");
   }
   log.emit();

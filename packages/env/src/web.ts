@@ -14,7 +14,7 @@ import { z } from "zod";
 // itself — the same predicate, not a second reading of `RESEND_API_KEY` — so
 // in development setting the key alone is enough. `NEXT_PUBLIC_*` is inlined
 // at build time, so a Docker image built without the key needs the value
-// passed as a build argument — see README.md.
+// passed as a build argument — see docs/notifications.md.
 export const env = createEnv({
   client: {
     NEXT_PUBLIC_EMAIL_ENABLED: z.stringbool().default(false),

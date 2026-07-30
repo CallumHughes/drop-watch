@@ -6,7 +6,7 @@ import { AddProductForm } from "@/components/products/add-product-form";
 
 /**
  * The preview fetches a live page, so nothing about this route may be cached —
- * same rule as every other price-reading view (PLAN.md §8).
+ * same rule as every other price-reading view.
  */
 export const dynamic = "force-dynamic";
 

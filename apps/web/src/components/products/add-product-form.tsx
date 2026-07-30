@@ -167,7 +167,7 @@ function SavePanel({
  *
  * The URL is fetched exactly once, at step two. Everything after that — every
  * selector edit, the page source panel — reads the server's cached copy of that
- * response (PLAN.md §8). Saving pins `nextCheckAt` to now, so the product's
+ * response. Saving pins `nextCheckAt` to now, so the product's
  * first real check lands within a minute rather than after a full interval.
  */
 export function AddProductForm() {

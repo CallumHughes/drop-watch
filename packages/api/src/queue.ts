@@ -2,7 +2,7 @@
  * The web side's single pg-boss connection.
  *
  * Postgres is the only interface between `apps/web` and `apps/worker`
- * (PLAN.md §1), so "check now" is a `send()` onto the queue the worker already
+ * so "check now" is a `send()` onto the queue the worker already
  * consumes. Two rules govern what happens here:
  *
  * 1. **Sender only.** `createSenderBoss()` does not migrate, supervise, or

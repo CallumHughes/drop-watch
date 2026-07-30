@@ -77,7 +77,7 @@ function Field({
 /**
  * Interval, jitter and alert thresholds. Saving writes straight to `products`;
  * the worker reads the new interval on the product's next reschedule, so there
- * is nothing to notify — Postgres is the interface (PLAN.md §1).
+ * is nothing to notify — Postgres is the interface.
  */
 export function WatchSettingsForm({ product }: { product: Product }) {
   const queryClient = useQueryClient();

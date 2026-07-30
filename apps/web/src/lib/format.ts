@@ -3,10 +3,10 @@
  *
  * `Intl.NumberFormat` is fed the raw decimal string rather than a number:
  * ES2023 formatters accept strings and format them exactly, which keeps the
- * "never through a float" rule (PLAN.md §10) intact all the way to the pixel.
+ * "never through a float" rule intact all the way to the pixel.
  */
 
-/** Live views poll rather than push. SSE is the upgrade path — see PLAN.md §8. */
+/** Live views poll rather than push. SSE is the upgrade path. */
 export const LIVE_REFETCH_MS = 15_000;
 
 const MINUTE_MS = 60_000;

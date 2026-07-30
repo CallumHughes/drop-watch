@@ -1,11 +1,11 @@
 /**
  * Whether self-service signup is still open.
  *
- * This tracker is single-user (PLAN.md §1, §8): one seeded admin, and signup
- * closed once that admin exists. The check is a live query rather than a static
- * `emailAndPassword.disableSignUp` flag so a fresh install with no seed run can
- * still be bootstrapped from the login page — it slams shut the moment the
- * first account exists, which is the behaviour EPICS.md asks for.
+ * Open only until the instance has its first account, which becomes the admin.
+ * Everyone after that joins by invite. The check is a live query rather than a
+ * static `emailAndPassword.disableSignUp` flag so a fresh install with no seed
+ * run can still be bootstrapped from the login page — it slams shut the moment
+ * the first account exists.
  *
  * Lives in `@drop-watch/db` because both sides need it: `@drop-watch/auth`
  * enforces it on the sign-up endpoint, and `@drop-watch/api` exposes it so

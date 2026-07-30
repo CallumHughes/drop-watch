@@ -69,7 +69,7 @@ function Verdict({ test, url }: { test: SelectorPreview; url: string }) {
  * and what price falls out of it.
  *
  * Every test here runs server-side against the HTML fetched once when the
- * preview was created — no keystroke re-downloads the page (PLAN.md §8). The
+ * preview was created — no keystroke re-downloads the page. The
  * caller owns the selector string and the query; this component only shows the
  * verdict, which keeps the value that gets saved and the value being tested the
  * same thing.

@@ -7,7 +7,7 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# (or `pnpm docker:prod:up`, which is the same thing). See README.md.
+# (or `pnpm docker:prod:up`, which is the same thing). See docs/installation.md.
 
 name: drop-watch
 

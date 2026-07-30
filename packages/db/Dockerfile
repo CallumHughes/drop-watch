@@ -1,8 +1,8 @@
 # The one-shot migration job.
 #
 # Migrations run in their own container, not at web/worker boot, because two
-# processes racing `drizzle-kit migrate` on startup is exactly the failure the
-# plan calls out (PLAN.md §9). Compose gates both apps behind
+# processes racing `drizzle-kit migrate` on startup is a real failure mode.
+# Compose gates both apps behind
 # `service_completed_successfully` on this one, so a bad migration stops the
 # deployment instead of half-starting it.
 #

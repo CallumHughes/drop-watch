@@ -3,7 +3,7 @@
  *
  * Both `apps/web` (the settings page) and `apps/worker` (every alert it sends)
  * come through here, which is the point: Postgres is the only interface
- * between them (PLAN.md §1), so a webhook URL changed in the UI takes effect on
+ * between them, so a webhook URL changed in the UI takes effect on
  * the worker's very next check with nothing to restart and nothing to notify.
  */
 

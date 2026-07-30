@@ -4,7 +4,7 @@
 #   pnpm docker:prod:up            # the same thing
 #
 # What it changes: the database is the PostgreSQL instance already running on
-# the host (PLAN.md §3), not a container. `DATABASE_URL` is required — there is
+# the host, not a container. `DATABASE_URL` is required — there is
 # no sensible default for someone else's database.
 
 services:
@@ -25,7 +25,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL to the host Postgres, e.g. postgresql://drop_watch:password@host.docker.internal:5432/drop_watch}
     # A no-op on Docker Desktop, which already resolves the name; required on
-    # Linux, where host.docker.internal otherwise does not exist (PLAN.md §3).
+    # Linux, where host.docker.internal otherwise does not exist.
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

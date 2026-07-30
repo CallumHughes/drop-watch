@@ -8,7 +8,7 @@ import Dashboard from "./dashboard";
 
 /**
  * Never cached. The App Router would happily serve a price from days ago, which
- * is catastrophic in an app whose whole purpose is freshness (PLAN.md §8).
+ * is catastrophic in an app whose whole purpose is freshness.
  */
 export const dynamic = "force-dynamic";
 

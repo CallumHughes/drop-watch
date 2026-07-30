@@ -3,7 +3,7 @@
  *
  * Locale ambiguity is the main correctness trap in this app: `1,234` is either
  * 1234 or 1.234 depending on where the page was written. The rules here are
- * settled (see PLAN.md §4):
+ * settled:
  *
  * - If both `.` and `,` appear, the rightmost one is the decimal separator.
  * - If only one appears and exactly three digits follow it, it is a thousands

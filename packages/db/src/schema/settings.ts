@@ -4,8 +4,8 @@
  *
  * A table rather than environment variables, because the settings page has to
  * be able to *write* it — env-only config would make that page a read-only
- * display of something you still have to edit a compose file to change
- * (EPICS.md, Epic 7). The environment still gets the first word: on first boot
+ * display of something you still have to edit a compose file to change. The
+ * environment still gets the first word: on first boot
  * the row is created from `HA_URL` / `HA_WEBHOOK_ID`, after which the UI owns
  * it.
  *
@@ -25,7 +25,7 @@ import { boolean, check, integer, pgTable, text, timestamp } from "drizzle-orm/p
 /** The only id the table will accept. */
 export const SETTINGS_ID = 1;
 
-/** 12 hours, per PLAN.md §6. Mirrors `DEFAULT_COOLDOWN_MINUTES` in core. */
+/** 12 hours. Mirrors `DEFAULT_COOLDOWN_MINUTES` in core. */
 const DEFAULT_COOLDOWN_MINUTES = 720;
 
 /** Consecutive non-`ok` checks before a product is declared broken. */

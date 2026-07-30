@@ -187,7 +187,7 @@ function failed(error: string, invalidSelector = false): SelectorTest {
  * Runs the `selector` strategy alone and reports what it saw.
  *
  * This is what the add-product selector picker calls on every edit, against
- * HTML fetched once and held in memory (PLAN.md §8) — the document is parsed
+ * HTML fetched once and held in memory — the document is parsed
  * here but never re-downloaded. It returns the same {@link ExtractionResult}
  * a scheduled check would record, so what the picker shows is what will be
  * tracked.
