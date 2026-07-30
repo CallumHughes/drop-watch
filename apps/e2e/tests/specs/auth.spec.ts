@@ -3,6 +3,7 @@ import { expect, test } from "../fixtures";
 
 const HTTP_OK = 200;
 const INVALID_CREDENTIALS_PATTERN = /invalid email or password/i;
+const APP_TITLE_PATTERN = /DropWatch/;
 
 /**
  * Every test here runs without the shared storage state: they exercise the
@@ -44,6 +45,9 @@ test.describe("authentication", () => {
     // is exact.
     await page.waitForURL((url) => url.pathname === "/");
     await expect(sidebar.userMenuButton).toBeVisible();
+    // Both halves of the shell's branding: the footer chrome above, and the
+    // document title the root layout sets for every route.
+    await expect(page).toHaveTitle(APP_TITLE_PATTERN);
   });
 
   test("signing out ends the session", async ({ loginPage, page, sidebar }) => {

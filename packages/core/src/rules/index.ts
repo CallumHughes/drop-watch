@@ -8,7 +8,7 @@
  * Postgres connection.
  *
  * The dedupe is the whole game. A naive implementation notifies every three
- * hours forever about a product sitting a pound under target, and a tracker
+ * hours forever about a product sitting a pound under target, and a watcher
  * that cries wolf gets muted and then deleted. So a rule fires only when
  *
  *     condition is true
@@ -27,14 +27,14 @@ export type AlertRule = (typeof ALERT_RULES)[number];
 
 /**
  * The synthetic rule the consecutive-failure alarm dedupes against. It is not
- * user-selectable — a tracker that has stopped working is always worth saying
+ * user-selectable — a watch that has stopped working is always worth saying
  * once — but it shares `alert_state` so "have we already said this" is one
  * mechanism rather than two.
  */
-export const TRACKER_BROKEN = "tracker_broken";
+export const WATCH_BROKEN = "watch_broken";
 
 /** Every key that can appear in `alert_state.rule`. */
-export type AlertStateKey = AlertRule | typeof TRACKER_BROKEN;
+export type AlertStateKey = AlertRule | typeof WATCH_BROKEN;
 
 /** 12 hours, per PLAN.md §6. Overridable from the settings table. */
 export const DEFAULT_COOLDOWN_MINUTES = 720;
@@ -218,10 +218,10 @@ export function countLeadingFailures(runs: readonly RunStatus[]): number {
 }
 
 /**
- * Whether to send the "this tracker is broken" notification.
+ * Whether to send the "this watch is broken" notification.
  *
  * Fires once when the streak reaches the threshold and stays silent afterwards
- * — `alreadyReported` is the presence of a `tracker_broken` row, which the
+ * — `alreadyReported` is the presence of a `watch_broken` row, which the
  * worker deletes on the first successful check. Selectors rot silently, and
  * without this you simply stop getting deals and never notice.
  */

@@ -18,7 +18,7 @@ export const BASE_URL = `http://localhost:${WEB_PORT}`;
 export const FIXTURE_URL = `http://localhost:${FIXTURE_PORT}`;
 
 export const E2E_DATABASE_URL =
-  process.env.E2E_DATABASE_URL ?? "postgresql://postgres:password@localhost:5432/price-tracker-e2e";
+  process.env.E2E_DATABASE_URL ?? "postgresql://postgres:password@localhost:5432/drop-watch-e2e";
 
 /** Created through the UI by auth.setup.ts — the instance's only account. */
 export const ADMIN_EMAIL = "admin@e2e.local";

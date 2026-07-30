@@ -65,8 +65,8 @@ export const checkRunStatus = pgEnum("check_run_status", [
 /** Which link in the extraction chain produced a price. Mirrors `ExtractorStrategy`. */
 export type ExtractorUsed = "jsonld" | "microdata" | "opengraph" | "selector";
 
-/** `alertState` also tracks the synthetic "this tracker is broken" notification. */
-export type AlertStateRule = AlertRule | "tracker_broken";
+/** `alertState` also tracks the synthetic "this watch is broken" notification. */
+export type AlertStateRule = AlertRule | "watch_broken";
 
 export const products = pgTable(
   "products",

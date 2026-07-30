@@ -187,7 +187,7 @@ function Editor({ settings }: { settings: Settings }) {
             <Input
               id={webhookId}
               onChange={onWebhookChange}
-              placeholder="price_tracker"
+              placeholder="drop_watch"
               value={haWebhookId}
             />
           </Field>

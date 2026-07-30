@@ -29,8 +29,8 @@ import { CHANGE_EMAIL_SUBJECT, ChangeEmail } from "./templates/change-email";
 import { INVITE_SUBJECT, Invite } from "./templates/invite";
 import { PriceAlert, priceAlertSubject } from "./templates/price-alert";
 import { RESET_PASSWORD_SUBJECT, ResetPassword } from "./templates/reset-password";
-import { TrackerBroken, trackerBrokenSubject } from "./templates/tracker-broken";
 import { VERIFY_EMAIL_SUBJECT, VerifyEmail } from "./templates/verify-email";
+import { WatchBroken, watchBrokenSubject } from "./templates/watch-broken";
 
 // `emailEnabled` is the switch every caller has to read, so it is surfaced on
 // the entry point rather than leaving consumers to know it lives in `./client`:
@@ -53,11 +53,11 @@ export interface ChangeEmailInput extends AuthEmailInput {
 }
 
 /**
- * Absolute link to a product's page in the tracker, or `null` when `APP_URL`
+ * Absolute link to a product page in DropWatch, or `null` when `APP_URL`
  * is unset. `null` rather than a relative path on purpose: the templates fall
  * back to the shop's own URL, which is at least clickable from an inbox.
  */
-function trackerLink(productId: string): string | null {
+function watchLink(productId: string): string | null {
   const base = appUrl();
   if (base === null) {
     return null;
@@ -107,26 +107,26 @@ export function sendChangeEmailVerification({
 
 /**
  * One alert to every account address, in a single send — recipients are the
- * people who share the tracker, so there is nothing to hide between them and
+ * people who share the account, so there is nothing to hide between them and
  * one mail is cheaper than n.
  *
- * The payload's `rule` picks the template: `tracker_broken` says the opposite
+ * The payload's `rule` picks the template: `watch_broken` says the opposite
  * thing from a price alert and gets its own.
  */
 export function sendAlertEmail(
   recipients: readonly string[],
   payload: NotificationPayload
 ): Promise<SendEmailResult> {
-  const trackerUrl = trackerLink(payload.productId);
-  if (payload.rule === "tracker_broken") {
+  const watchUrl = watchLink(payload.productId);
+  if (payload.rule === "watch_broken") {
     return sendEmail({
-      react: <TrackerBroken payload={payload} trackerUrl={trackerUrl} />,
-      subject: trackerBrokenSubject(payload),
+      react: <WatchBroken payload={payload} watchUrl={watchUrl} />,
+      subject: watchBrokenSubject(payload),
       to: recipients,
     });
   }
   return sendEmail({
-    react: <PriceAlert payload={payload} trackerUrl={trackerUrl} />,
+    react: <PriceAlert payload={payload} watchUrl={watchUrl} />,
     subject: priceAlertSubject(payload),
     to: recipients,
   });

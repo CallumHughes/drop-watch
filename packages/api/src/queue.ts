@@ -16,7 +16,7 @@
 import { createSenderBoss, type PgBoss } from "@drop-watch/db/queue";
 import { log } from "evlog";
 
-const globalForBoss = globalThis as { __priceTrackerSenderBoss?: Promise<PgBoss> };
+const globalForBoss = globalThis as { __dropWatchSenderBoss?: Promise<PgBoss> };
 
 async function startSenderBoss(): Promise<PgBoss> {
   const boss = createSenderBoss();
@@ -34,14 +34,14 @@ async function startSenderBoss(): Promise<PgBoss> {
  * database that was briefly unreachable does not poison every later send.
  */
 export function getSenderBoss(): Promise<PgBoss> {
-  const existing = globalForBoss.__priceTrackerSenderBoss;
+  const existing = globalForBoss.__dropWatchSenderBoss;
   if (existing) {
     return existing;
   }
   const starting = startSenderBoss().catch((error: unknown) => {
-    globalForBoss.__priceTrackerSenderBoss = undefined;
+    globalForBoss.__dropWatchSenderBoss = undefined;
     throw error;
   });
-  globalForBoss.__priceTrackerSenderBoss = starting;
+  globalForBoss.__dropWatchSenderBoss = starting;
   return starting;
 }

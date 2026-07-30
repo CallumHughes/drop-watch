@@ -38,7 +38,7 @@ export function AppSidebar({
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <ChartLineIcon className="size-4" />
               </div>
-              <span className="truncate font-medium">Price Tracker</span>
+              <span className="truncate font-medium">DropWatch</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

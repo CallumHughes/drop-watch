@@ -56,14 +56,14 @@ function listen(
 
 describe("webhookUrl", () => {
   it("builds the Home Assistant webhook path", () => {
-    expect(webhookUrl("http://homeassistant:8123", "price_tracker")).toBe(
-      "http://homeassistant:8123/api/webhook/price_tracker"
+    expect(webhookUrl("http://homeassistant:8123", "drop_watch")).toBe(
+      "http://homeassistant:8123/api/webhook/drop_watch"
     );
   });
 
   it("tolerates a trailing slash on the base URL", () => {
-    expect(webhookUrl("http://homeassistant:8123/", "price_tracker")).toBe(
-      "http://homeassistant:8123/api/webhook/price_tracker"
+    expect(webhookUrl("http://homeassistant:8123/", "drop_watch")).toBe(
+      "http://homeassistant:8123/api/webhook/drop_watch"
     );
   });
 
@@ -77,10 +77,10 @@ describe("webhookUrl", () => {
 describe("sendNotification", () => {
   it("posts the payload as JSON to the webhook path", async () => {
     const { origin, received } = await listen(() => ({ status: 200 }));
-    const result = await sendNotification({ haUrl: origin, webhookId: "price_tracker" }, payload);
+    const result = await sendNotification({ haUrl: origin, webhookId: "drop_watch" }, payload);
 
     expect(result).toEqual({ httpStatus: 200, ok: true });
-    expect(received.map((request) => request.path)).toEqual(["/api/webhook/price_tracker"]);
+    expect(received.map((request) => request.path)).toEqual(["/api/webhook/drop_watch"]);
     expect(received.map((request) => JSON.parse(request.body))).toEqual([payload]);
   });
 

@@ -63,15 +63,15 @@ const MAX_SELECTOR_LENGTH = 500;
  * database pool is: a Next.js hot reload re-evaluates this module, and a fresh
  * cache would silently invalidate every preview the user had open.
  */
-const globalForPreviews = globalThis as { __priceTrackerPreviews?: PreviewCache };
+const globalForPreviews = globalThis as { __dropWatchPreviews?: PreviewCache };
 
 function previewCache(): PreviewCache {
-  const existing = globalForPreviews.__priceTrackerPreviews;
+  const existing = globalForPreviews.__dropWatchPreviews;
   if (existing) {
     return existing;
   }
   const cache = new PreviewCache({ maxEntries: MAX_PREVIEWS, ttlMs: PREVIEW_TTL_MS });
-  globalForPreviews.__priceTrackerPreviews = cache;
+  globalForPreviews.__dropWatchPreviews = cache;
   return cache;
 }
 

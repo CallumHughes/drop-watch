@@ -1,13 +1,13 @@
 /**
- * The "this tracker has stopped working" alarm.
+ * The "this watch has stopped working" alarm.
  *
  * Separate from the price alert because it says the opposite thing: not "here
  * is a number you were waiting for" but "there is no number, and there has not
- * been one for a while". A silent tracker looks exactly like a product whose
+ * been one for a while". A silent watch looks exactly like a product whose
  * price never moved, which is the failure mode this mail exists to break.
  *
  * It carries the two fields the payload adds for precisely this case —
- * `consecutiveFailures` and `error` — because a broken-tracker mail without
+ * `consecutiveFailures` and `error` — because a broken-watch mail without
  * the error text is a mail that can only be acted on by going and looking.
  */
 
@@ -45,32 +45,32 @@ const actionStyle: CSSProperties = {
   margin: "20px 0 12px",
 };
 
-/** The subject. Names the product, because the tracker watches several. */
-export function trackerBrokenSubject(payload: NotificationPayload): string {
-  return `Tracker broken: ${productLabel(payload)}`;
+/** The subject. Names the product, because DropWatch watches several. */
+export function watchBrokenSubject(payload: NotificationPayload): string {
+  return `Watch broken: ${productLabel(payload)}`;
 }
 
-export interface TrackerBrokenProps {
+export interface WatchBrokenProps {
   payload: NotificationPayload;
-  /** Absolute link to the product in the tracker, or `null` without `APP_URL`. */
-  trackerUrl: string | null;
+  /** Absolute link to the product in DropWatch, or `null` without `APP_URL`. */
+  watchUrl: string | null;
 }
 
-export function TrackerBroken({ payload, trackerUrl }: TrackerBrokenProps) {
+export function WatchBroken({ payload, watchUrl }: WatchBrokenProps) {
   const label = productLabel(payload);
   const failures = payload.consecutiveFailures;
 
   return (
     <EmailLayout
       heading={`${APP_NAME} can no longer check ${label}`}
-      preview={trackerBrokenSubject(payload)}
+      preview={watchBrokenSubject(payload)}
     >
       <Text style={paragraphStyle}>
         {failures === null
           ? "Checks for this product keep failing"
           : `The last ${failures} checks for this product failed in a row`}
         , so its price is no longer being tracked. The usual causes are a page that has moved, a
-        selector that no longer matches, or a shop that has started blocking the tracker.
+        selector that no longer matches, or a shop that has started blocking DropWatch.
       </Text>
       {payload.error === null ? null : <Text style={errorStyle}>{payload.error}</Text>}
       <Text style={paragraphStyle}>
@@ -81,8 +81,8 @@ export function TrackerBroken({ payload, trackerUrl }: TrackerBrokenProps) {
         .
       </Text>
       <Text style={actionStyle}>
-        <Link href={trackerUrl ?? payload.url} style={buttonStyle}>
-          {trackerUrl === null ? "Open the product page" : "Open in Price Tracker"}
+        <Link href={watchUrl ?? payload.url} style={buttonStyle}>
+          {watchUrl === null ? "Open the product page" : "Open in DropWatch"}
         </Link>
       </Text>
       <Text style={mutedStyle}>

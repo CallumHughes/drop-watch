@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-/** /products/[id] — stats, history, check log and the tracking settings form. */
+/** /products/[id] — stats, history, check log and the watch settings form. */
 export class ProductDetailPage {
   readonly checkNowButton: Locator;
   readonly targetPriceInput: Locator;
@@ -28,7 +28,7 @@ export class ProductDetailPage {
     this.dropRuleCheckbox = page.getByRole("checkbox", { name: "Price drop" });
     this.restockRuleCheckbox = page.getByRole("checkbox", { name: "Restock" });
     this.saveSettingsButton = page.getByRole("button", { name: "Save settings" });
-    this.settingsSavedToast = page.getByText("Tracking settings saved.");
+    this.settingsSavedToast = page.getByText("Watch settings saved.");
   }
 
   async goto(productId: string): Promise<void> {

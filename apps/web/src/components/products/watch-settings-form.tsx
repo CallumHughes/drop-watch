@@ -79,7 +79,7 @@ function Field({
  * the worker reads the new interval on the product's next reschedule, so there
  * is nothing to notify — Postgres is the interface (PLAN.md §1).
  */
-export function TrackingSettingsForm({ product }: { product: Product }) {
+export function WatchSettingsForm({ product }: { product: Product }) {
   const queryClient = useQueryClient();
   const intervalId = useId();
   const jitterId = useId();
@@ -98,7 +98,7 @@ export function TrackingSettingsForm({ product }: { product: Product }) {
         toast.error(`Could not save: ${error.message}`);
       },
       onSuccess: () => {
-        toast.success("Tracking settings saved.");
+        toast.success("Watch settings saved.");
         queryClient.invalidateQueries({ queryKey: orpc.products.key() });
       },
     })

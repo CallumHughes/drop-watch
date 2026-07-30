@@ -6,7 +6,7 @@
  * that fails.** `deliverAlert` reports every channel it is handed, so a channel
  * built for a destination nobody configured turns into a failure row — in the
  * worker's log on the back of every single alert, and in the settings page's
- * test results. A tracker with no mailer must behave exactly as it did before
+ * test results. An install with no mailer must behave exactly as it did before
  * email existed, and that property lives here.
  *
  * The email channel is *injected* for the same reason `channels.ts` injects

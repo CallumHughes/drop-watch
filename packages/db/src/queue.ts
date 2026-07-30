@@ -89,7 +89,7 @@ export const ENQUEUE_DUE_CHECKS_CRON = "* * * * *";
  */
 export function createWorkerBoss(): PgBoss {
   return new PgBoss({
-    application_name: "price-tracker-worker",
+    application_name: "drop-watch-worker",
     connectionString: env.DATABASE_URL,
     migrate: true,
     schedule: true,
@@ -107,7 +107,7 @@ const SENDER_POOL_SIZE = 2;
  */
 export function createSenderBoss(): PgBoss {
   return new PgBoss({
-    application_name: "price-tracker-sender",
+    application_name: "drop-watch-sender",
     connectionString: env.DATABASE_URL,
     max: SENDER_POOL_SIZE,
     migrate: false,

@@ -179,6 +179,7 @@ export function createAuth() {
   const mailer = emailEnabled();
 
   return betterAuth({
+    appName: "DropWatch",
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(db, {
       provider: "pg",

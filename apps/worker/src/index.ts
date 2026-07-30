@@ -76,7 +76,7 @@ function installShutdown(boss: PgBoss): void {
 }
 
 async function main(): Promise<void> {
-  initLogger({ env: { environment: env.NODE_ENV, service: "price-tracker-worker" } });
+  initLogger({ env: { environment: env.NODE_ENV, service: "drop-watch-worker" } });
 
   const boss = createWorkerBoss();
   // pg-boss surfaces background maintenance failures on this event rather than

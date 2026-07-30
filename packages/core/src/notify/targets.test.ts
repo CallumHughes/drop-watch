@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { AlertChannel, AlertTargets } from "./channels";
 import { alertChannels } from "./targets";
 
-const webhook = { haUrl: "http://ha.local:8123", webhookId: "price_tracker" };
+const webhook = { haUrl: "http://ha.local:8123", webhookId: "drop_watch" };
 
 /** Records what it was asked to build, so "never built" is assertable. */
 function fakeEmailFactory(): {
@@ -53,7 +53,7 @@ describe("alertChannels", () => {
     const channels = alertChannels(targets({ webhook }), email.build);
 
     expect(channels.map((channel) => channel.name)).toEqual(["webhook"]);
-    expect(channels[0]?.target).toBe("http://ha.local:8123/api/webhook/price_tracker");
+    expect(channels[0]?.target).toBe("http://ha.local:8123/api/webhook/drop_watch");
     // The load-bearing one: no mailer means the factory is never even called.
     expect(email.calls).toEqual([]);
   });

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  description: "price-tracker",
-  title: "price-tracker",
+  description: "DropWatch",
+  title: "DropWatch",
 };
 
 export default function RootLayout({

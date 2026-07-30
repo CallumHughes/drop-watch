@@ -17,10 +17,10 @@ export function createDb() {
 
 // Reuse one pool across Next.js dev hot reloads; a fresh pool per reload
 // exhausts Postgres connections.
-const globalForDb = globalThis as { __priceTrackerDb?: ReturnType<typeof createDb> };
+const globalForDb = globalThis as { __dropWatchDb?: ReturnType<typeof createDb> };
 
-export const db = globalForDb.__priceTrackerDb ?? createDb();
+export const db = globalForDb.__dropWatchDb ?? createDb();
 
 if (env.NODE_ENV !== "production") {
-  globalForDb.__priceTrackerDb = db;
+  globalForDb.__dropWatchDb = db;
 }

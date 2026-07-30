@@ -3,7 +3,7 @@
  *
  * Email is opt-in and `RESEND_API_KEY` is the switch: setting it is the
  * statement "I want the mailer", and leaving it unset must leave a self-hoster
- * with a fully working, webhook-only tracker rather than a half-broken auth
+ * with a fully working, webhook-only install rather than a half-broken auth
  * flow. That decision only holds if the capability is decided in exactly one
  * place, so {@link emailEnabled} is it — no other module in the repo reads the
  * variable, and every branch that behaves differently with a mailer (Better
@@ -29,7 +29,7 @@ import { Resend } from "resend";
 /**
  * Resend's shared sender, which needs no verified domain but which Resend will
  * only deliver to the address that owns the account. That is enough for a
- * single-user tracker and useless for anything else, so `EMAIL_FROM` exists.
+ * single-user install and useless for anything else, so `EMAIL_FROM` exists.
  */
 const DEFAULT_FROM = "onboarding@resend.dev";
 

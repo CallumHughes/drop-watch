@@ -130,7 +130,7 @@ export const settingsRouter = {
         price: "55.44",
         productId: sample?.id ?? "00000000-0000-0000-0000-000000000000",
         rule: "test",
-        title: sample?.title ?? "Price tracker test",
+        title: sample?.title ?? "DropWatch test",
         url: sample?.url ?? "https://example.com/",
       },
     });
