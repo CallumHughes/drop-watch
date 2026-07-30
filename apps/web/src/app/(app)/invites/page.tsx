@@ -20,7 +20,7 @@ export default async function InvitesPage() {
   // Redirect rather than 403: a signed-in non-admin has a perfectly good home
   // page, and every invites procedure re-checks the role server-side anyway.
   if (session.user.role !== "admin") {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   return (
@@ -35,10 +35,7 @@ export default async function InvitesPage() {
 
       <InvitesManager />
 
-      <Link
-        className="mt-6 inline-block text-muted-foreground text-xs hover:underline"
-        href="/dashboard"
-      >
+      <Link className="mt-6 inline-block text-muted-foreground text-xs hover:underline" href="/">
         ← Back to dashboard
       </Link>
     </main>

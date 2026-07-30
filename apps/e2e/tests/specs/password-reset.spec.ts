@@ -21,10 +21,10 @@ test.describe("password reset", () => {
   test("a reset link from the mail sets a working password", async ({
     emailSink,
     forgotPassword,
-    header,
     loginPage,
     page,
     resetPassword,
+    sidebar,
   }) => {
     await test.step("reach the form from the login page's link", async () => {
       await loginPage.goto();
@@ -64,8 +64,8 @@ test.describe("password reset", () => {
 
     await test.step("the password it set actually signs in", async () => {
       await loginPage.login(ADMIN_EMAIL, ADMIN_PASSWORD);
-      await page.waitForURL("**/dashboard");
-      await expect(header.userMenuButton).toBeVisible();
+      await page.waitForURL((url) => url.pathname === "/");
+      await expect(sidebar.userMenuButton).toBeVisible();
     });
   });
 });

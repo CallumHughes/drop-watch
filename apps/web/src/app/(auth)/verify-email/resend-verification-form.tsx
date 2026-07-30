@@ -16,7 +16,7 @@ const selectSubmitState = (state: { canSubmit: boolean; isSubmitting: boolean })
 });
 
 /** Where the link drops the user once the address is confirmed. */
-const AFTER_VERIFICATION = "/dashboard";
+const AFTER_VERIFICATION = "/";
 
 /**
  * Sends the verification mail again.

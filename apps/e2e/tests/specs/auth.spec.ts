@@ -20,7 +20,7 @@ test.describe("authentication", () => {
   });
 
   test("the dashboard redirects a signed-out visitor to login", async ({ loginPage, page }) => {
-    await page.goto("/dashboard");
+    await page.goto("/");
     await page.waitForURL("**/login");
     await expect(loginPage.signInHeading).toBeVisible();
   });
@@ -37,24 +37,30 @@ test.describe("authentication", () => {
     await expect(loginPage.signInHeading).toBeVisible();
   });
 
-  test("signing in lands on the dashboard", async ({ header, loginPage, page }) => {
+  test("signing in lands on the dashboard", async ({ loginPage, page, sidebar }) => {
     await loginPage.goto();
     await loginPage.login(ADMIN_EMAIL, ADMIN_PASSWORD);
-    await page.waitForURL("**/dashboard");
-    await expect(header.userMenuButton).toBeVisible();
+    // The dashboard lives at "/", which globs match ambiguously — a predicate
+    // is exact.
+    await page.waitForURL((url) => url.pathname === "/");
+    await expect(sidebar.userMenuButton).toBeVisible();
   });
 
-  test("signing out ends the session", async ({ header, loginPage, page }) => {
+  test("signing out ends the session", async ({ loginPage, page, sidebar }) => {
     await test.step("sign in with a session of this test's own", async () => {
       await loginPage.goto();
       await loginPage.login(ADMIN_EMAIL, ADMIN_PASSWORD);
-      await page.waitForURL("**/dashboard");
+      await page.waitForURL((url) => url.pathname === "/");
     });
 
-    await test.step("sign out returns to the public home page", async () => {
-      await header.signOut();
-      await expect(header.signInLink).toBeVisible();
-      await page.goto("/dashboard");
+    await test.step("sign out lands back on the login page", async () => {
+      await sidebar.signOut();
+      await page.waitForURL("**/login");
+      await expect(loginPage.signInHeading).toBeVisible();
+    });
+
+    await test.step("the dashboard no longer lets the old session in", async () => {
+      await page.goto("/");
       await page.waitForURL("**/login");
     });
   });

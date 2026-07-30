@@ -46,10 +46,7 @@ export default async function SettingsPage() {
         <EmailPrefsForm />
       </div>
 
-      <Link
-        className="mt-6 inline-block text-muted-foreground text-xs hover:underline"
-        href="/dashboard"
-      >
+      <Link className="mt-6 inline-block text-muted-foreground text-xs hover:underline" href="/">
         ← Back to dashboard
       </Link>
     </main>

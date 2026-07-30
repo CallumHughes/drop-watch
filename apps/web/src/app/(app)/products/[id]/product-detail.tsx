@@ -159,7 +159,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
         </Card>
       </div>
 
-      <Link className="text-muted-foreground text-xs hover:underline" href="/dashboard">
+      <Link className="text-muted-foreground text-xs hover:underline" href="/">
         ← Back to dashboard
       </Link>
     </div>

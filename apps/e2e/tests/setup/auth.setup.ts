@@ -27,10 +27,10 @@ const EMAIL_TIMEOUT_MS = 15_000;
  */
 test("bootstrap: sign up, verify by email, point alerts at the sinks", async ({
   emailSink,
-  header,
   loginPage,
   page,
   settings,
+  sidebar,
 }) => {
   await test.step("a fresh instance offers signup", async () => {
     await loginPage.goto();
@@ -57,8 +57,8 @@ test("bootstrap: sign up, verify by email, point alerts at the sinks", async ({
       throw new Error("verification mail never captured");
     }
     await page.goto(extractAuthLink(verificationMail, "/api/auth/verify-email"));
-    await page.goto("/dashboard");
-    await expect(header.userMenuButton).toBeVisible();
+    await page.goto("/");
+    await expect(sidebar.userMenuButton).toBeVisible();
   });
 
   await test.step("configure both alert channels: sink webhook and email", async () => {

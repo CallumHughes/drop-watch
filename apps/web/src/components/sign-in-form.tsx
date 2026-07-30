@@ -1,7 +1,10 @@
+import { env } from "@price-tracker/env/web";
 import { Button } from "@price-tracker/ui/components/button";
+import { Card, CardContent, CardHeader } from "@price-tracker/ui/components/card";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@price-tracker/ui/components/field";
 import { Input } from "@price-tracker/ui/components/input";
-import { Label } from "@price-tracker/ui/components/label";
 import { useForm } from "@tanstack/react-form";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useCallback } from "react";
 import { toast } from "sonner";
@@ -40,7 +43,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: ()
             toast.error(error.error.message || error.error.statusText);
           },
           onSuccess: () => {
-            router.push("/dashboard");
+            router.push("/");
             toast.success("Sign in successful");
           },
         }
@@ -68,84 +71,89 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: ()
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
+    <Card>
+      <CardHeader className="text-center">
+        <h1 className="cn-font-heading font-medium text-xl">Welcome Back</h1>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit}>
+          <FieldGroup>
+            <form.Field name="email">
+              {(field) => {
+                const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
+                  field.handleChange(e.target.value);
+                return (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={handleChange}
+                      type="email"
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div>
-          <form.Field name="email">
-            {(field) => {
-              const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-                field.handleChange(e.target.value);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Email</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={handleChange}
-                    type="email"
-                    value={field.state.value}
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p className="text-red-500" key={error?.message}>
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              );
-            }}
-          </form.Field>
-        </div>
+            <form.Field name="password">
+              {(field) => {
+                const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
+                  field.handleChange(e.target.value);
+                return (
+                  <Field data-invalid={field.state.meta.errors.length > 0 || undefined}>
+                    <div className="flex items-center">
+                      <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                      {/*
+                       * Offered only when a mailer is configured, because
+                       * without one the endpoint behind it is not registered
+                       * and the page 404s. A dead "forgot password?" link is
+                       * worse than no link — especially here, where it is the
+                       * only route back into a box whose signup has closed.
+                       */}
+                      {env.NEXT_PUBLIC_EMAIL_ENABLED ? (
+                        <Link
+                          className="ml-auto text-sm underline-offset-4 hover:underline"
+                          href="/forgot-password"
+                        >
+                          Forgot password?
+                        </Link>
+                      ) : null}
+                    </div>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={handleChange}
+                      type="password"
+                      value={field.state.value}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                );
+              }}
+            </form.Field>
 
-        <div>
-          <form.Field name="password">
-            {(field) => {
-              const handleChange = (e: ChangeEvent<HTMLInputElement>) =>
-                field.handleChange(e.target.value);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor={field.name}>Password</Label>
-                  <Input
-                    id={field.name}
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={handleChange}
-                    type="password"
-                    value={field.state.value}
-                  />
-                  {field.state.meta.errors.map((error) => (
-                    <p className="text-red-500" key={error?.message}>
-                      {error?.message}
-                    </p>
-                  ))}
-                </div>
-              );
-            }}
-          </form.Field>
-        </div>
-
-        <form.Subscribe selector={selectSubmitState}>
-          {({ canSubmit, isSubmitting }) => (
-            <Button className="w-full" disabled={!canSubmit || isSubmitting} type="submit">
-              {isSubmitting ? "Submitting..." : "Sign In"}
-            </Button>
-          )}
-        </form.Subscribe>
-      </form>
-
-      {onSwitchToSignUp ? (
-        <div className="mt-4 text-center">
-          <Button
-            className="text-indigo-600 hover:text-indigo-800"
-            onClick={onSwitchToSignUp}
-            variant="link"
-          >
-            Need an account? Sign Up
-          </Button>
-        </div>
-      ) : null}
-    </div>
+            <Field>
+              <form.Subscribe selector={selectSubmitState}>
+                {({ canSubmit, isSubmitting }) => (
+                  <Button disabled={!canSubmit || isSubmitting} type="submit">
+                    {isSubmitting ? "Submitting..." : "Sign In"}
+                  </Button>
+                )}
+              </form.Subscribe>
+              {onSwitchToSignUp ? (
+                <Button className="mx-auto" onClick={onSwitchToSignUp} type="button" variant="link">
+                  Need an account? Sign Up
+                </Button>
+              ) : null}
+            </Field>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

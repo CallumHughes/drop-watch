@@ -38,18 +38,20 @@ test.describe("invites", () => {
 
     await test.step("completing the form lands on the dashboard, signed in", async () => {
       await visitor.invitePage.signUp(inviteeName, "invitee-password-1");
-      await visitor.page.waitForURL("**/dashboard");
-      await expect(visitor.header.userMenuFor(inviteeName)).toBeVisible();
+      // The dashboard lives at "/", which globs match ambiguously — a
+      // predicate is exact.
+      await visitor.page.waitForURL((url) => url.pathname === "/");
+      await expect(visitor.sidebar.userMenuFor(inviteeName)).toBeVisible();
     });
 
     await test.step("the new account is not an admin", async () => {
-      await visitor.header.userMenuFor(inviteeName).click();
-      await expect(visitor.header.menuItem("Account")).toBeVisible();
-      await expect(visitor.header.menuItem("Invites")).toBeHidden();
+      await visitor.sidebar.userMenuFor(inviteeName).click();
+      await expect(visitor.sidebar.menuItem("Account")).toBeVisible();
+      await expect(visitor.sidebar.invitesLink).toBeHidden();
       await visitor.page.keyboard.press("Escape");
 
       await visitor.page.goto("/invites");
-      await visitor.page.waitForURL("**/dashboard");
+      await visitor.page.waitForURL((url) => url.pathname === "/");
     });
   });
 
