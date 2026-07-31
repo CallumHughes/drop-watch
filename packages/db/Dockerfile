@@ -10,7 +10,7 @@
 # needs. That is also why the job uses drizzle's runtime migrator over the
 # `drizzle-kit` CLI — see packages/db/src/migrate.ts.
 
-FROM node:24-slim AS base
+FROM node:25-slim AS base
 RUN npm install --global pnpm@11
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN --mount=type=cache,target=/pnpm-store pnpm install --frozen-lockfile --store
 COPY --from=pruner /app/out/full/ .
 RUN pnpm exec turbo build --filter=@drop-watch/db
 
-FROM node:24-slim AS runner
+FROM node:25-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 

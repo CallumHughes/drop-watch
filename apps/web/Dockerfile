@@ -8,7 +8,7 @@
 # what makes that pay off: `pnpm install` re-runs only when a package.json or
 # the lockfile changes, not on every source edit.
 
-FROM node:24-slim AS base
+FROM node:25-slim AS base
 RUN npm install --global pnpm@11
 WORKDIR /app
 
@@ -53,7 +53,7 @@ RUN NODE_ENV=production pnpm exec turbo build --filter=@drop-watch/web
 # standalone output excludes public/; ensure it exists so the runner copy never fails
 RUN mkdir -p apps/web/public
 
-FROM node:24-slim AS runner
+FROM node:25-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
