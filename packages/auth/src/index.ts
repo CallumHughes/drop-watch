@@ -243,6 +243,11 @@ export function createAuth() {
       before: guardSignup,
     },
     plugins: [admin(), nextCookies()],
+    // Stated rather than inherited: Better Auth's own default is "on in
+    // production", which made the e2e suite fail only once it drove a real
+    // build. Sign-in allows 3 requests per 10s per address, so the suite —
+    // every worker on 127.0.0.1 — sets this false.
+    rateLimit: { enabled: env.AUTH_RATE_LIMIT_ENABLED ?? env.NODE_ENV === "production" },
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [env.CORS_ORIGIN],
     user: {

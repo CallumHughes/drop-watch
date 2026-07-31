@@ -54,6 +54,10 @@ export const SINK_WEBHOOK_ID = "e2e-sink";
  */
 export const appEnv: Record<string, string> = {
   APP_URL: BASE_URL,
+  // `next start` runs in production mode, where Better Auth rate-limits
+  // sign-in to 3 requests per 10s per address — and every worker here shares
+  // 127.0.0.1.
+  AUTH_RATE_LIMIT_ENABLED: "false",
   BETTER_AUTH_SECRET: "e2e-only-secret-e2e-only-secret-e2e-only",
   BETTER_AUTH_URL: BASE_URL,
   CORS_ORIGIN: BASE_URL,

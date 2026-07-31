@@ -43,7 +43,9 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], storageState: ADMIN_STORAGE_STATE },
     },
   ],
-  reporter: process.env.CI ? [["html", { open: "never" }], ["github"]] : "list",
+  // `list` first in CI: html writes to disk and github only annotates failures,
+  // so without it the log is a row of dots and a summary.
+  reporter: process.env.CI ? [["list"], ["html", { open: "never" }], ["github"]] : "list",
   retries: process.env.CI ? 1 : 0,
   testDir: "./tests",
   timeout: 60_000,
@@ -53,7 +55,11 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `pnpm --filter @drop-watch/web exec next dev --port ${WEB_PORT}`,
+      // CI serves a real build (the workflow runs `next build` first); local
+      // runs stay on the dev server so a single spec needs no rebuild.
+      command: process.env.CI
+        ? `pnpm --filter @drop-watch/web exec next start --port ${WEB_PORT}`
+        : `pnpm --filter @drop-watch/web exec next dev --port ${WEB_PORT}`,
       env: appEnv,
       reuseExistingServer: !process.env.CI,
       stdout: "ignore",

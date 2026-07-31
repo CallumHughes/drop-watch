@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # turbo's default in CI is to group a task's output and print it once the
+  # task exits, which holds the whole log back until the run is over.
+  TURBO_LOG_ORDER: stream
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+  types:
+    name: Types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check-types
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Same as apps/web/Dockerfile: no runtime environment exists at build time.
+      SKIP_ENV_VALIDATION: 1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      INTEGRATION_DATABASE_URL: postgresql://postgres:password@localhost:5432/drop-watch-integration
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Compose rather than a service container: the parity test runs pg_dump
+      # via `docker compose exec postgres`, for a client matching the server.
+      - run: pnpm db:start
+      - run: pnpm test:integration
+
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:password@localhost:5432/drop-watch-e2e
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:start
+      - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
+      # The suite serves this build via `next start`, so anything the app reads
+      # at build time has to be set here rather than at run time — mirroring
+      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY matters because
+      # /forgot-password is prerendered and requireEmailEnabled() would bake a
+      # 404 into it. Invoked directly rather than through turbo, which does not
+      # hash NEXT_DIST_DIR and could hand back a `.next` build.
+      - run: pnpm --filter @drop-watch/web exec next build
+        env:
+          NEXT_DIST_DIR: .next-e2e
+          NEXT_PUBLIC_EMAIL_ENABLED: "true"
+          RESEND_API_KEY: re-e2e-fixture-key
+          SKIP_ENV_VALIDATION: 1
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report
+          retention-days: 7
