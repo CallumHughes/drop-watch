@@ -18,6 +18,7 @@
     "@orpc/zod": "catalog:",
     "@drop-watch/api": "workspace:*",
     "@drop-watch/auth": "workspace:*",
+    "@drop-watch/core": "workspace:*",
     "@drop-watch/email": "workspace:*",
     "@drop-watch/env": "workspace:*",
     "@drop-watch/ui": "workspace:*",

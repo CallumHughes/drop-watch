@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAvailability } from "./availability";
+import { availabilityState, parseAvailability } from "./availability";
 
 describe("parseAvailability", () => {
   it("strips the schema.org URL prefix", () => {
@@ -48,5 +48,35 @@ describe("parseAvailability", () => {
     expect(parseAvailability(null)).toBeNull();
     expect(parseAvailability("")).toBeNull();
     expect(parseAvailability("   ")).toBeNull();
+  });
+});
+
+describe("availabilityState", () => {
+  it("maps the specific tokens ahead of the boolean", () => {
+    expect(availabilityState("BackOrder", false)).toBe("back_order");
+    expect(availabilityState("Discontinued", false)).toBe("discontinued");
+    expect(availabilityState("LimitedAvailability", true)).toBe("limited");
+    expect(availabilityState("PreOrder", false)).toBe("pre_order");
+    expect(availabilityState("PreSale", false)).toBe("pre_order");
+  });
+
+  it("is case- and separator-insensitive", () => {
+    expect(availabilityState("back_order", false)).toBe("back_order");
+    expect(availabilityState("pre-order", false)).toBe("pre_order");
+  });
+
+  it("falls back to the boolean for a plain in/out-of-stock token", () => {
+    expect(availabilityState("InStock", true)).toBe("in_stock");
+    expect(availabilityState("OutOfStock", false)).toBe("out_of_stock");
+  });
+
+  it("falls back to the boolean when availability is null", () => {
+    expect(availabilityState(null, true)).toBe("in_stock");
+    expect(availabilityState(null, false)).toBe("out_of_stock");
+  });
+
+  it("is unknown when neither says anything", () => {
+    expect(availabilityState(null, null)).toBe("unknown");
+    expect(availabilityState("MadeToOrder", null)).toBe("unknown");
   });
 });

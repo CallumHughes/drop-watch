@@ -6,6 +6,8 @@
  * "never through a float" rule intact all the way to the pixel.
  */
 
+import { type AvailabilityState, availabilityState } from "@drop-watch/core/extract/availability";
+
 /** Live views poll rather than push. SSE is the upgrade path. */
 export const LIVE_REFETCH_MS = 15_000;
 
@@ -80,4 +82,19 @@ export function formatStock(inStock: boolean | null): string {
     return "Stock unknown";
   }
   return inStock ? "In stock" : "Out of stock";
+}
+
+const AVAILABILITY_LABELS: Record<AvailabilityState, string> = {
+  back_order: "Back-order",
+  discontinued: "Discontinued",
+  in_stock: "In stock",
+  limited: "Limited availability",
+  out_of_stock: "Out of stock",
+  pre_order: "Pre-order",
+  unknown: "Unknown",
+};
+
+/** Human label for the rich availability state, not just the in/out boolean. */
+export function formatAvailability(availability: string | null, inStock: boolean | null): string {
+  return AVAILABILITY_LABELS[availabilityState(availability, inStock)];
 }

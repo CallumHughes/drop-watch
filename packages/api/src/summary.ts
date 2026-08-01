@@ -20,6 +20,8 @@ import type { CheckRun, Product } from "@drop-watch/db/schema/products";
 
 /** One observation. `price` is a decimal string; `inStock` is null when unknown. */
 export interface PriceSample {
+  /** Bare schema.org token, e.g. "InStock". Null when the page said nothing usable. */
+  availability: string | null;
   /** The currency the page quoted, which is what `price` is denominated in. */
   currency: string;
   inStock: boolean | null;

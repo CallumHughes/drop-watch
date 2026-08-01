@@ -38,6 +38,8 @@ export const settings = pgTable(
     alertsEnabled: boolean("alerts_enabled").default(true).notNull(),
     /** Per `(productId, rule)` quiet period after an alert fires. */
     cooldownMinutes: integer("cooldown_minutes").default(DEFAULT_COOLDOWN_MINUTES).notNull(),
+    /** Discord webhook URL. Null until configured — nothing is sent. */
+    discordWebhookUrl: text("discord_webhook_url"),
     /** Consecutive failures before the "tracker broken" alert fires. */
     failureThreshold: integer("failure_threshold").default(DEFAULT_FAILURE_THRESHOLD).notNull(),
     /** Base URL of Home Assistant. Null until configured — nothing is sent. */
@@ -45,6 +47,14 @@ export const settings = pgTable(
     /** Webhook id. It is the secret; `local_only: true` keeps it LAN-bound. */
     haWebhookId: text("ha_webhook_id"),
     id: integer("id").primaryKey().default(SETTINGS_ID),
+    /** Optional bearer token for a protected ntfy topic. */
+    ntfyToken: text("ntfy_token"),
+    /** Full ntfy topic URL, e.g. https://ntfy.sh/my-topic. */
+    ntfyUrl: text("ntfy_url"),
+    /** Bot token from @BotFather. It is the secret. */
+    telegramBotToken: text("telegram_bot_token"),
+    /** Destination chat id the bot must already be a member of. */
+    telegramChatId: text("telegram_chat_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())

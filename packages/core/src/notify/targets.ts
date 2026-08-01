@@ -22,6 +22,7 @@
 
 import type { AlertChannel, AlertTargets } from "./channels";
 import { webhookChannel } from "./channels";
+import { discordChannel, ntfyChannel, telegramChannel } from "./http-channels";
 
 /** Builds the email channel for a non-empty recipient list. */
 export type EmailChannelFactory = (recipients: readonly string[]) => AlertChannel;
@@ -30,12 +31,15 @@ export type EmailChannelFactory = (recipients: readonly string[]) => AlertChanne
  * The channels to attempt for a set of resolved targets, in the order they are
  * reported.
  *
- * Each half is gated on its own evidence of being configured, and the evidence
- * is the target itself: a `null` webhook and an empty recipient list both mean
- * "nothing was set up here". Whoever resolved the targets has already applied
- * the master switch, the toggles and the "is a mailer even installed" question
- * — see `alertTargets` in `@drop-watch/db/settings` — so there is nothing
- * left to second-guess.
+ * Each channel is gated on its own evidence of being configured, and the
+ * evidence is the target itself: a `null` webhook and an empty recipient list
+ * both mean "nothing was set up here". Whoever resolved the targets has
+ * already applied the master switch, the toggles and the "is a mailer even
+ * installed" question — see `alertTargets` in `@drop-watch/db/settings` — so
+ * there is nothing left to second-guess.
+ *
+ * Order: webhook, ntfy, discord, telegram, then email — stable so the
+ * settings page's test-result rows do not reshuffle between saves.
  *
  * An empty result is a legitimate, quiet outcome: nothing is configured, so
  * nothing is attempted and nothing failed.
@@ -47,6 +51,15 @@ export function alertChannels(
   const channels: AlertChannel[] = [];
   if (targets.webhook) {
     channels.push(webhookChannel(targets.webhook));
+  }
+  if (targets.ntfy) {
+    channels.push(ntfyChannel(targets.ntfy));
+  }
+  if (targets.discord) {
+    channels.push(discordChannel(targets.discord));
+  }
+  if (targets.telegram) {
+    channels.push(telegramChannel(targets.telegram));
   }
   if (targets.recipients.length > 0) {
     channels.push(emailChannel(targets.recipients));

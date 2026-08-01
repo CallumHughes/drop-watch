@@ -27,6 +27,9 @@ export const CHECK_PRODUCT_QUEUE = "check-product";
 /** Ad-hoc checks from the UI's "check now" button. Same handler, own queue. */
 export const CHECK_PRODUCT_NOW_QUEUE = "check-product-now";
 
+/** Daily retention sweep. Deletes `check_runs` rows older than 30 days. */
+export const PURGE_CHECK_RUNS_QUEUE = "purge-check-runs";
+
 /** Payload for both `check-product` and `check-product-now`. */
 export interface CheckProductJob {
   productId: string;
@@ -44,6 +47,9 @@ const DISPATCH_EXPIRE_SECONDS = 60;
 
 /** Three attempts, backing off, before a job is given up on. */
 const CHECK_RETRY_LIMIT = 3;
+
+/** A bulk delete can take a while; longer than a check but still bounded. */
+const PURGE_EXPIRE_SECONDS = 300;
 
 /**
  * Queue definitions, applied by {@link ensureQueues} at worker boot.
@@ -77,10 +83,19 @@ export const QUEUE_DEFINITIONS: readonly Queue[] = [
     retryBackoff: true,
     retryLimit: CHECK_RETRY_LIMIT,
   },
+  {
+    expireInSeconds: PURGE_EXPIRE_SECONDS,
+    name: PURGE_CHECK_RUNS_QUEUE,
+    policy: "short",
+    retryLimit: CHECK_RETRY_LIMIT,
+  },
 ];
 
 /** Cron expression for the dispatcher. Every minute. */
 export const ENQUEUE_DUE_CHECKS_CRON = "* * * * *";
+
+/** Cron expression for the retention sweep. Daily, off-peak. */
+export const PURGE_CHECK_RUNS_CRON = "0 3 * * *";
 
 /**
  * The worker's boss: migrates the `pgboss` schema, runs maintenance, and runs

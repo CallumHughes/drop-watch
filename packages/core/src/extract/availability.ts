@@ -59,3 +59,42 @@ export function parseAvailability(raw: string | undefined | null): Availability 
   }
   return { availability: token };
 }
+
+/** Display-level stock state, richer than the plain boolean the rules engine compares. */
+export type AvailabilityState =
+  | "back_order"
+  | "discontinued"
+  | "in_stock"
+  | "limited"
+  | "out_of_stock"
+  | "pre_order"
+  | "unknown";
+
+/** Specific tokens mapped ahead of the plain in/out-of-stock split. */
+const STATE_TOKENS: ReadonlyMap<string, AvailabilityState> = new Map([
+  ["backorder", "back_order"],
+  ["discontinued", "discontinued"],
+  ["limitedavailability", "limited"],
+  ["preorder", "pre_order"],
+  ["presale", "pre_order"],
+]);
+
+/**
+ * The richest state a stored `availability` token (plus the `inStock`
+ * boolean derived from it) can support. Falls back to the boolean, then to
+ * "unknown" when neither says anything.
+ */
+export function availabilityState(
+  availability: string | null,
+  inStock: boolean | null
+): AvailabilityState {
+  const key = availability?.toLowerCase().replace(SEPARATORS, "");
+  const state = key ? STATE_TOKENS.get(key) : undefined;
+  if (state) {
+    return state;
+  }
+  if (inStock === null) {
+    return "unknown";
+  }
+  return inStock ? "in_stock" : "out_of_stock";
+}

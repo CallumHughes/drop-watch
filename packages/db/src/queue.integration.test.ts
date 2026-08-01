@@ -12,6 +12,7 @@ import {
   ENQUEUE_DUE_CHECKS_QUEUE,
   ensureQueues,
   type PgBoss,
+  PURGE_CHECK_RUNS_QUEUE,
   QUEUE_DEFINITIONS,
   sendCheckNow,
 } from "./queue";
@@ -85,7 +86,12 @@ describe("with a worker boss", () => {
     const queues = await worker.getQueues();
     const ownQueues = queues.filter((queue) => !queue.name.startsWith("__pgboss__"));
     expect(ownQueues.map((queue) => queue.name).sort()).toEqual(
-      [CHECK_PRODUCT_NOW_QUEUE, CHECK_PRODUCT_QUEUE, ENQUEUE_DUE_CHECKS_QUEUE].sort()
+      [
+        CHECK_PRODUCT_NOW_QUEUE,
+        CHECK_PRODUCT_QUEUE,
+        ENQUEUE_DUE_CHECKS_QUEUE,
+        PURGE_CHECK_RUNS_QUEUE,
+      ].sort()
     );
 
     const checkQueue = await worker.getQueue(CHECK_PRODUCT_QUEUE);

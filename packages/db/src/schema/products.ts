@@ -149,7 +149,8 @@ export const pricePoints = pgTable(
 
 /**
  * One row per attempt, including failures. This table is what makes "why did
- * this silently stop working" answerable. Retain ~30 days.
+ * this silently stop working" answerable. Retain ~30 days, enforced by the
+ * worker's daily purge job (`apps/worker/src/purge-check-runs.ts`).
  */
 export const checkRuns = pgTable(
   "check_runs",
@@ -171,6 +172,8 @@ export const checkRuns = pgTable(
   (table) => [
     // Detail-page log, and the consecutive-failure window Epic 7 reads.
     index("check_runs_product_id_started_at_idx").on(table.productId, table.startedAt.desc()),
+    // The retention sweep's predicate; the composite above cannot serve it.
+    index("check_runs_started_at_idx").on(table.startedAt),
   ]
 );
 

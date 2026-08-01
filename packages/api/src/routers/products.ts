@@ -86,6 +86,7 @@ async function recentSamples(limit: number, ownerId: string): Promise<Map<string
   const ranked = db.$with("ranked_price_points").as(
     db
       .select({
+        availability: pricePoints.availability,
         currency: pricePoints.currency,
         inStock: pricePoints.inStock,
         observedAt: pricePoints.observedAt,
@@ -111,6 +112,7 @@ async function recentSamples(limit: number, ownerId: string): Promise<Map<string
   for (const row of rows) {
     const samples = byProduct.get(row.productId) ?? [];
     samples.push({
+      availability: row.availability,
       currency: row.currency,
       inStock: row.inStock,
       observedAt: row.observedAt,
@@ -166,6 +168,7 @@ async function recentRuns(limit: number, ownerId: string): Promise<Map<string, C
 async function loadSamples(productId: string, limit: number): Promise<PriceSample[]> {
   const rows = await db
     .select({
+      availability: pricePoints.availability,
       currency: pricePoints.currency,
       inStock: pricePoints.inStock,
       observedAt: pricePoints.observedAt,
@@ -176,6 +179,40 @@ async function loadSamples(productId: string, limit: number): Promise<PriceSampl
     .orderBy(desc(pricePoints.observedAt))
     .limit(limit);
   return rows.reverse();
+}
+
+/** Min/max/avg over one product's whole price history. Prices stay decimal strings. */
+export interface PriceStats {
+  avg: string;
+  count: number;
+  max: string;
+  min: string;
+}
+
+/**
+ * One aggregate query; null when the product has no price points yet.
+ * Filtered to the product's current currency — a retailer that geo-flips
+ * GBP→USD must not fold both into one average.
+ */
+async function loadStats(product: Product): Promise<PriceStats | null> {
+  const [row] = await db
+    .select({
+      avg: sql<string | null>`avg(${pricePoints.price})::numeric(12,2)`,
+      count: sql<number>`count(*)::int`,
+      max: sql<string | null>`max(${pricePoints.price})`,
+      min: sql<string | null>`min(${pricePoints.price})`,
+    })
+    .from(pricePoints)
+    .where(
+      and(
+        eq(pricePoints.productId, product.id),
+        product.currency ? eq(pricePoints.currency, product.currency) : undefined
+      )
+    );
+  if (!row || row.count === 0 || row.avg === null || row.max === null || row.min === null) {
+    return null;
+  }
+  return { avg: row.avg, count: row.count, max: row.max, min: row.min };
 }
 
 /** The single-product path. Plain indexed reads — no window function needed. */
@@ -330,6 +367,14 @@ export const productsRouter = {
       summarise(product, samples.get(product.id) ?? [], runs.get(product.id) ?? [])
     );
   }),
+
+  /** Min/max/avg price and observation count over the whole recorded history. */
+  stats: protectedProcedure
+    .input(productIdInput)
+    .handler(async ({ context, input }): Promise<PriceStats | null> => {
+      const product = await loadProduct(input.id, context.session.user.id);
+      return await loadStats(product);
+    }),
 
   /** Tracking settings: interval, jitter, alert rules, target, active. */
   update: protectedProcedure

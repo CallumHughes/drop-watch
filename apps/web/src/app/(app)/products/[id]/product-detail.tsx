@@ -12,9 +12,9 @@ import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { StatusBadge } from "@/components/products/status-badge";
 import { WatchSettingsForm } from "@/components/products/watch-settings-form";
 import {
+  formatAvailability,
   formatPrice,
   formatRelative,
-  formatStock,
   LIVE_REFETCH_MS,
   productHost,
 } from "@/lib/format";
@@ -57,6 +57,9 @@ export default function ProductDetail({ productId }: { productId: string }) {
       refetchInterval: LIVE_REFETCH_MS,
     })
   );
+  // No live polling: a whole-history aggregate is too heavy to re-run every
+  // 15s for numbers that move once per check.
+  const stats = useQuery(orpc.products.stats.queryOptions({ input, staleTime: LIVE_REFETCH_MS }));
 
   if (detail.isPending) {
     return <Skeleton className="h-96 w-full" />;
@@ -109,7 +112,10 @@ export default function ProductDetail({ productId }: { productId: string }) {
           label="Current price"
           value={latest ? formatPrice(latest.price, latest.currency) : "—"}
         />
-        <Stat label="Stock" value={latest ? formatStock(latest.inStock) : "—"} />
+        <Stat
+          label="Stock"
+          value={latest ? formatAvailability(latest.availability, latest.inStock) : "—"}
+        />
         <Stat
           label="Last checked"
           value={lastCheck ? formatRelative(lastCheck.startedAt) : "never"}
@@ -121,7 +127,15 @@ export default function ProductDetail({ productId }: { productId: string }) {
         <CardHeader>
           <CardTitle>Price history</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {stats.data ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Stat label="Min" value={formatPrice(stats.data.min, product.currency)} />
+              <Stat label="Max" value={formatPrice(stats.data.max, product.currency)} />
+              <Stat label="Avg" value={formatPrice(stats.data.avg, product.currency)} />
+              <Stat label="Observations" value={String(stats.data.count)} />
+            </div>
+          ) : null}
           {history.isPending ? (
             <Skeleton className="h-72 w-full" />
           ) : (

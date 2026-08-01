@@ -43,6 +43,20 @@
       "when": 1785312765823,
       "tag": "0005_white_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785589916870,
+      "tag": "0006_productive_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785592677348,
+      "tag": "0007_overconfident_vampiro",
+      "breakpoints": true
     }
   ]
 }

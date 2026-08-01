@@ -81,8 +81,9 @@ primitives:
   - id: notifier
     group: domain
     summary: >
-      Home Assistant webhook client and channel/target resolution. Never
-      throws: a notification failure must not fail a check.
+      Alert channels — Home Assistant webhook, ntfy, Discord, Telegram — and
+      channel/target resolution. Never throws: a notification failure must not
+      fail a check.
     code:
       - packages/core/src/notify/**
 
