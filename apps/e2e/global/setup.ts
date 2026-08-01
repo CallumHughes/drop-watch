@@ -5,7 +5,7 @@
  * auth.setup.ts and every run starts from nothing), the schema is pushed, and
  * only then is the worker started — its pg-boss boot migrates the `pgboss`
  * schema into the same database. Readiness is polled from that schema: the
- * worker creates its queues last-but-one, so `check-product-now` existing
+ * worker creates its queues last-but-one, so `check-listing-now` existing
  * means jobs sent by "check now" will be picked up.
  *
  * The returned function is the teardown (Playwright runs it after the suite):
@@ -74,7 +74,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function queueExists(client: Client): Promise<boolean> {
   try {
     const result = await client.query(
-      "SELECT 1 FROM pgboss.queue WHERE name = 'check-product-now'"
+      "SELECT 1 FROM pgboss.queue WHERE name = 'check-listing-now'"
     );
     return result.rowCount !== null && result.rowCount > 0;
   } catch {
