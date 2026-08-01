@@ -18,21 +18,21 @@ import { PgBoss, type Queue, type SendOptions } from "pg-boss";
 /** Re-exported so callers can type a boss without depending on pg-boss directly. */
 export type { PgBoss } from "pg-boss";
 
-/** Minutely dispatcher. Finds products whose `nextCheckAt` has passed. */
+/** Minutely dispatcher. Finds listings whose `nextCheckAt` has passed. */
 export const ENQUEUE_DUE_CHECKS_QUEUE = "enqueue-due-checks";
 
 /** Scheduled checks, enqueued by the dispatcher. */
-export const CHECK_PRODUCT_QUEUE = "check-product";
+export const CHECK_LISTING_QUEUE = "check-listing";
 
 /** Ad-hoc checks from the UI's "check now" button. Same handler, own queue. */
-export const CHECK_PRODUCT_NOW_QUEUE = "check-product-now";
+export const CHECK_LISTING_NOW_QUEUE = "check-listing-now";
 
 /** Daily retention sweep. Deletes `check_runs` rows older than 30 days. */
 export const PURGE_CHECK_RUNS_QUEUE = "purge-check-runs";
 
-/** Payload for both `check-product` and `check-product-now`. */
-export interface CheckProductJob {
-  productId: string;
+/** Payload for both `check-listing` and `check-listing-now`. */
+export interface CheckListingJob {
+  listingId: string;
 }
 
 /**
@@ -55,10 +55,10 @@ const PURGE_EXPIRE_SECONDS = 300;
  * Queue definitions, applied by {@link ensureQueues} at worker boot.
  *
  * `exclusive` on the check queues is what makes the dispatcher safe to run
- * every minute: at most one job per product may be queued *or* active, so a
- * product that stays due (because the worker is down, or a check is still
+ * every minute: at most one job per listing may be queued *or* active, so a
+ * listing that stays due (because the worker is down, or a check is still
  * running) accumulates exactly one job rather than one per tick. It is also the
- * "never two checks in flight for one product" guarantee.
+ * "never two checks in flight for one listing" guarantee.
  *
  * `short` on the dispatcher does the same for the cron itself.
  */
@@ -71,14 +71,14 @@ export const QUEUE_DEFINITIONS: readonly Queue[] = [
   },
   {
     expireInSeconds: CHECK_EXPIRE_SECONDS,
-    name: CHECK_PRODUCT_QUEUE,
+    name: CHECK_LISTING_QUEUE,
     policy: "exclusive",
     retryBackoff: true,
     retryLimit: CHECK_RETRY_LIMIT,
   },
   {
     expireInSeconds: CHECK_EXPIRE_SECONDS,
-    name: CHECK_PRODUCT_NOW_QUEUE,
+    name: CHECK_LISTING_NOW_QUEUE,
     policy: "exclusive",
     retryBackoff: true,
     retryLimit: CHECK_RETRY_LIMIT,
@@ -142,16 +142,16 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
  * Send options for a check job. The `singletonKey` is what the `exclusive`
  * policy keys on, so "check now" pressed twice enqueues once.
  */
-export function checkProductSendOptions(productId: string): SendOptions {
-  return { singletonKey: productId };
+export function checkListingSendOptions(listingId: string): SendOptions {
+  return { singletonKey: listingId };
 }
 
 /**
  * Enqueue an immediate check — this is the "check now" button's entire
  * contract with the worker. Resolves to the job id, or `null` when a check for
- * this product is already queued or running.
+ * this listing is already queued or running.
  */
-export function sendCheckNow(boss: PgBoss, productId: string): Promise<string | null> {
-  const job: CheckProductJob = { productId };
-  return boss.send(CHECK_PRODUCT_NOW_QUEUE, job, checkProductSendOptions(productId));
+export function sendCheckNow(boss: PgBoss, listingId: string): Promise<string | null> {
+  const job: CheckListingJob = { listingId };
+  return boss.send(CHECK_LISTING_NOW_QUEUE, job, checkListingSendOptions(listingId));
 }

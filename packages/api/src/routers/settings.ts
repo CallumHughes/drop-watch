@@ -16,7 +16,7 @@ import { deliverAlert } from "@drop-watch/core/notify/channels";
 import { alertChannels } from "@drop-watch/core/notify/targets";
 import { db } from "@drop-watch/db";
 import { user } from "@drop-watch/db/schema/auth";
-import { products } from "@drop-watch/db/schema/products";
+import { listings, products } from "@drop-watch/db/schema/products";
 import type { Settings } from "@drop-watch/db/schema/settings";
 import {
   alertTargets,
@@ -111,9 +111,18 @@ export const settingsRouter = {
       return [];
     }
 
+    // The sample's URL now lives on its listing, not the product — one join,
+    // since every product still has exactly one listing.
     const [sample] = await db
-      .select()
+      .select({
+        currency: products.currency,
+        id: products.id,
+        imageUrl: products.imageUrl,
+        title: products.title,
+        url: listings.url,
+      })
       .from(products)
+      .innerJoin(listings, eq(listings.productId, products.id))
       .where(eq(products.userId, context.session.user.id))
       .orderBy(asc(products.createdAt))
       .limit(1);
@@ -125,6 +134,7 @@ export const settingsRouter = {
         error: null,
         imageUrl: sample?.imageUrl ?? null,
         inStock: true,
+        listingId: null,
         pctChange: "-12.0",
         previousPrice: "63.00",
         price: "55.44",

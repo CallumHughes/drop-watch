@@ -1,9 +1,9 @@
 /**
- * One check of one product: fetch → extract → record → reschedule.
+ * One check of one listing: fetch → extract → record → reschedule.
  *
  * The whole point of the design here is the transaction in `persist`. The price
  * point, the check-run audit row, and the `nextCheckAt` advance are written
- * together or not at all, so a worker killed mid-check leaves the product
+ * together or not at all, so a worker killed mid-check leaves the listing
  * exactly as it was — still due, no half-written attempt — and the dispatcher
  * picks it up again. Delivery is at-least-once, as it is with any queue: a
  * crash can cost a repeated check, never a corrupt or missing one.
@@ -17,8 +17,8 @@ import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage } from "@drop-watch/core/fetch";
 import { db } from "@drop-watch/db";
-import type { NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
-import { checkRuns, pricePoints, products } from "@drop-watch/db/schema/products";
+import type { Listing, NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
+import { checkRuns, listings, pricePoints, products } from "@drop-watch/db/schema/products";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
@@ -29,47 +29,50 @@ import { nextCheckAt } from "./schedule";
 export type CheckSource = "scheduled" | "manual";
 
 /**
- * Products whose check is running right now, in this process.
+ * Listings whose check is running right now, in this process.
  *
  * pg-boss's `exclusive` queue policy already stops one queue from running two
- * jobs for a product, but `check-product` and `check-product-now` are separate
+ * jobs for a listing, but `check-listing` and `check-listing-now` are separate
  * queues — a "check now" pressed a second after the dispatcher fired would
  * otherwise double-fetch the same page. Cheap belt to pg-boss's braces.
  */
 const inFlight = new Set<string>();
 
-function strategiesFor(product: Product): readonly ExtractorStrategy[] {
-  // A product pinned to `selector` should fail loudly when its selector rots,
+function strategiesFor(listing: Listing): readonly ExtractorStrategy[] {
+  // A listing pinned to `selector` should fail loudly when its selector rots,
   // not quietly start reporting whatever JSON-LD the page happens to carry.
-  return product.extractor === "selector" ? ["selector"] : STRATEGY_ORDER;
+  return listing.extractor === "selector" ? ["selector"] : STRATEGY_ORDER;
 }
 
 /** `undefined` rather than `null`, because that is what the fetch layer takes. */
-function conditionalRequest(product: Product): { etag?: string; lastModified?: string } {
+function conditionalRequest(listing: Listing): { etag?: string; lastModified?: string } {
   const options: { etag?: string; lastModified?: string } = {};
-  if (product.etag) {
-    options.etag = product.etag;
+  if (listing.etag) {
+    options.etag = listing.etag;
   }
-  if (product.lastModified) {
-    options.lastModified = product.lastModified;
+  if (listing.lastModified) {
+    options.lastModified = listing.lastModified;
   }
   return options;
 }
 
 interface CheckWrite {
+  /** Columns to backfill onto `listings` alongside the reschedule. */
+  listingUpdate: Partial<Listing>;
   pricePoint: NewPricePoint | null;
-  /** Columns to backfill onto `products` alongside the reschedule. */
+  /** Columns to backfill onto `products`; empty when there is nothing to write. */
   productUpdate: Partial<Product>;
 }
 
 function buildWrite(
+  listing: Listing,
   product: Product,
   fetched: Extract<FetchPageResult, { status: "ok" | "not_modified" }>,
   extraction: ExtractionResult | null,
   currency: string | null,
   outcome: CheckOutcome
 ): CheckWrite {
-  const productUpdate: Partial<Product> = {
+  const listingUpdate: Partial<Listing> = {
     // Only overwrite validators we actually received; a 304 without an ETag
     // must not wipe the one that produced it.
     ...(fetched.etag ? { etag: fetched.etag } : {}),
@@ -77,17 +80,23 @@ function buildWrite(
   };
 
   if (!(outcome.recordPricePoint && extraction?.ok && currency)) {
-    return { pricePoint: null, productUpdate };
+    return { listingUpdate, pricePoint: null, productUpdate: {} };
   }
 
-  // Backfill only what the product does not already have — the user's own
-  // title or image edits outrank whatever a page says this week.
+  // Backfill only what is not already set — the user's own title, image or
+  // currency edits outrank whatever a page says this week.
+  if (!listing.currency) {
+    listingUpdate.currency = currency;
+  }
+
+  const productUpdate: Partial<Product> = {};
   if (!product.title && extraction.title) {
     productUpdate.title = extraction.title;
   }
   if (!product.imageUrl && extraction.imageUrl) {
     productUpdate.imageUrl = extraction.imageUrl;
   }
+  // Product currency denominates targetPrice, so it gets the same backfill.
   if (!product.currency) {
     productUpdate.currency = currency;
   }
@@ -96,8 +105,8 @@ function buildWrite(
     currency,
     // Decimal string all the way from the parser into `numeric(12,2)`. Never
     // through Number.
+    listingId: listing.id,
     price: extraction.price,
-    productId: product.id,
   };
   if (extraction.availability !== undefined) {
     pricePoint.availability = extraction.availability;
@@ -106,7 +115,7 @@ function buildWrite(
     pricePoint.inStock = extraction.inStock;
   }
 
-  return { pricePoint, productUpdate };
+  return { listingUpdate, pricePoint, productUpdate };
 }
 
 /**
@@ -115,40 +124,40 @@ function buildWrite(
  * pg-boss's retries stay reserved for genuine infrastructure faults (the
  * fetch layer already retries transport errors itself).
  */
-export async function checkProduct(productId: string, source: CheckSource): Promise<void> {
-  if (inFlight.has(productId)) {
-    createLogger({ action: "check_product", productId, source }).warn("check already in flight");
+export async function checkListing(listingId: string, source: CheckSource): Promise<void> {
+  if (inFlight.has(listingId)) {
+    createLogger({ action: "check_listing", listingId, source }).warn("check already in flight");
     return;
   }
-  inFlight.add(productId);
+  inFlight.add(listingId);
   try {
-    await runCheck(productId, source);
+    await runCheck(listingId, source);
   } finally {
-    inFlight.delete(productId);
+    inFlight.delete(listingId);
   }
 }
 
-function extractFrom(product: Product, fetched: FetchPageResult): ExtractionResult | null {
+function extractFrom(listing: Listing, fetched: FetchPageResult): ExtractionResult | null {
   if (fetched.status !== "ok") {
     return null;
   }
   return extract(fetched.body, {
-    strategies: strategiesFor(product),
+    strategies: strategiesFor(listing),
     url: fetched.url,
-    ...(product.locale ? { locale: product.locale } : {}),
-    ...(product.selector ? { selector: product.selector } : {}),
+    ...(listing.locale ? { locale: listing.locale } : {}),
+    ...(listing.selector ? { selector: listing.selector } : {}),
   });
 }
 
 function buildCheckRun(
-  product: Product,
+  listing: Listing,
   startedAt: Date,
   durationMs: number,
   outcome: CheckOutcome
 ): NewCheckRun {
   return {
     durationMs,
-    productId: product.id,
+    listingId: listing.id,
     startedAt,
     status: outcome.status,
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
@@ -159,11 +168,11 @@ function buildCheckRun(
 
 /**
  * Everything a check produces, committed atomically. This is what makes a
- * killed worker safe: either the attempt is fully recorded and the product is
- * rescheduled, or none of it happened and the product is still due.
+ * killed worker safe: either the attempt is fully recorded and the listing is
+ * rescheduled, or none of it happened and the listing is still due.
  */
 function persist(
-  product: Product,
+  listing: Listing,
   checkRun: NewCheckRun,
   write: CheckWrite,
   scheduledFor: Date
@@ -174,55 +183,69 @@ function persist(
     }
     await tx.insert(checkRuns).values(checkRun);
     await tx
-      .update(products)
-      .set({ ...write.productUpdate, nextCheckAt: scheduledFor })
-      .where(eq(products.id, product.id));
+      .update(listings)
+      .set({ ...write.listingUpdate, nextCheckAt: scheduledFor })
+      .where(eq(listings.id, listing.id));
+    if (Object.keys(write.productUpdate).length > 0) {
+      await tx.update(products).set(write.productUpdate).where(eq(products.id, listing.productId));
+    }
   });
 }
 
 async function loadCheckable(
-  productId: string,
+  listingId: string,
   log: ReturnType<typeof createLogger>
-): Promise<Product | null> {
-  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  if (!product) {
-    log.warn("product not found");
+): Promise<{ listing: Listing; product: Product } | null> {
+  const [row] = await db
+    .select({ listing: listings, product: products })
+    .from(listings)
+    .innerJoin(products, eq(listings.productId, products.id))
+    .where(eq(listings.id, listingId))
+    .limit(1);
+  if (!row) {
+    log.warn("listing not found");
     log.emit();
     return null;
   }
-  if (!product.active) {
+  if (!row.product.active) {
     log.warn("product inactive, skipping");
     log.emit();
     return null;
   }
-  return product;
+  if (!row.listing.active) {
+    log.warn("listing inactive, skipping");
+    log.emit();
+    return null;
+  }
+  return row;
 }
 
-async function runCheck(productId: string, source: CheckSource): Promise<void> {
-  const log = createLogger({ action: "check_product", productId, source });
-  const product = await loadCheckable(productId, log);
-  if (!product) {
+async function runCheck(listingId: string, source: CheckSource): Promise<void> {
+  const log = createLogger({ action: "check_listing", listingId, source });
+  const checkable = await loadCheckable(listingId, log);
+  if (!checkable) {
     return;
   }
+  const { listing, product } = checkable;
 
-  log.set({ url: product.url });
+  log.set({ productId: product.id, url: listing.url });
 
   const startedAt = new Date();
-  const fetched = await fetchPage(product.url, conditionalRequest(product));
-  const extraction = extractFrom(product, fetched);
+  const fetched = await fetchPage(listing.url, conditionalRequest(listing));
+  const extraction = extractFrom(listing, fetched);
   const extractedCurrency = extraction?.ok ? extraction.currency : undefined;
-  const currency = extractedCurrency ?? product.currency ?? null;
+  const currency = extractedCurrency ?? listing.currency ?? null;
   const outcome = toCheckOutcome(fetched, extraction, currency);
 
-  const scheduledFor = nextCheckAt(new Date(), product.intervalMinutes, product.jitterPercent);
+  const scheduledFor = nextCheckAt(new Date(), listing.intervalMinutes, listing.jitterPercent);
   const write =
     fetched.status === "ok" || fetched.status === "not_modified"
-      ? buildWrite(product, fetched, extraction, currency, outcome)
-      : { pricePoint: null, productUpdate: {} };
+      ? buildWrite(listing, product, fetched, extraction, currency, outcome)
+      : { listingUpdate: {}, pricePoint: null, productUpdate: {} };
 
   await persist(
-    product,
-    buildCheckRun(product, startedAt, fetched.durationMs, outcome),
+    listing,
+    buildCheckRun(listing, startedAt, fetched.durationMs, outcome),
     write,
     scheduledFor
   );
@@ -247,6 +270,7 @@ async function runCheck(productId: string, source: CheckSource): Promise<void> {
   // After the commit and after the log line: the measurement is safe whatever
   // Home Assistant does next.
   await runAlerting({
+    listing,
     outcome,
     pricePointWritten: write.pricePoint !== null,
     product,

@@ -69,8 +69,9 @@ export default function ProductDetail({ productId }: { productId: string }) {
     return <p className="text-muted-foreground text-sm">This product could not be loaded.</p>;
   }
 
-  const { lastCheck, latest, product } = detail.data;
-  const title = product.title ?? productHost(product.url);
+  const { lastCheck, latest, listings, nextCheckAt, product } = detail.data;
+  const primaryListing = listings[0]?.listing;
+  const title = product.title ?? (primaryListing ? productHost(primaryListing.url) : "—");
 
   return (
     <div className="flex flex-col gap-6">
@@ -94,15 +95,17 @@ export default function ProductDetail({ productId }: { productId: string }) {
               lastStatus={lastCheck?.status ?? null}
             />
           </div>
-          <a
-            className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:underline"
-            href={product.url}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            {productHost(product.url)}
-            <ExternalLink className="size-3" />
-          </a>
+          {primaryListing ? (
+            <a
+              className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:underline"
+              href={primaryListing.url}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {productHost(primaryListing.url)}
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
         </div>
         <CheckNowButton productId={product.id} />
       </div>
@@ -120,7 +123,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
           label="Last checked"
           value={lastCheck ? formatRelative(lastCheck.startedAt) : "never"}
         />
-        <Stat label="Next check" value={formatRelative(product.nextCheckAt)} />
+        <Stat label="Next check" value={nextCheckAt ? formatRelative(nextCheckAt) : "never"} />
       </div>
 
       <Card>
@@ -154,7 +157,15 @@ export default function ProductDetail({ productId }: { productId: string }) {
             <CardTitle>Watch settings</CardTitle>
           </CardHeader>
           <CardContent>
-            <WatchSettingsForm key={product.updatedAt.toISOString()} product={product} />
+            {primaryListing ? (
+              <WatchSettingsForm
+                key={product.updatedAt.toISOString()}
+                listing={primaryListing}
+                product={product}
+              />
+            ) : (
+              <p className="text-muted-foreground text-sm">No listing to configure.</p>
+            )}
           </CardContent>
         </Card>
 

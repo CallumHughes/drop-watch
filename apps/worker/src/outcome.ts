@@ -2,7 +2,7 @@
  * Turns a fetch result plus an extraction result into the row that goes into
  * `check_runs`.
  *
- * Kept pure and separate from the orchestration in `check-product.ts` because
+ * Kept pure and separate from the orchestration in `check-listing.ts` because
  * this mapping is the part that is easy to get subtly wrong (a 304 is a
  * success; a dead hostname is not an HTTP error) and the part Epic 7's
  * consecutive-failure alarm depends on. The table it implements is documented

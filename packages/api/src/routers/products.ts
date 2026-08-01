@@ -6,11 +6,17 @@
  * per account, and an id that belongs to someone else answers NOT_FOUND, never
  * FORBIDDEN, so "not yours" is indistinguishable from "doesn't exist".
  *
+ * A product's scrape-shaped detail — url, extractor, schedule, cache
+ * validators — lives on its `listings`, not on the product itself. This PR
+ * keeps the external surface unchanged (every product still has exactly one
+ * listing, created alongside it), so every query here resolves through that
+ * listing rather than exposing it as its own procedure yet.
+ *
  * Two shapes matter here. `summary` is what a product card needs — latest
  * price, a short sparkline, distance from target, and whether recent checks
- * have been failing — assembled for every product in three queries rather than
- * three per product. `history` and `checkRuns` are the detail page's deeper
- * reads, paged by an explicit limit.
+ * have been failing — assembled for every product in a handful of queries
+ * rather than several per product. `history` and `checkRuns` are the detail
+ * page's deeper reads, paged by an explicit limit.
  *
  * Prices stay decimal strings from `numeric(12,2)` all the way to the UI, and
  * the derived numbers (target distance, percentage change) are computed in
@@ -20,8 +26,14 @@
 
 import { db } from "@drop-watch/db";
 import { sendCheckNow } from "@drop-watch/db/queue";
-import type { CheckRun, NewProduct, Product } from "@drop-watch/db/schema/products";
-import { checkRuns, pricePoints, products } from "@drop-watch/db/schema/products";
+import type {
+  CheckRun,
+  Listing,
+  NewListing,
+  NewProduct,
+  Product,
+} from "@drop-watch/db/schema/products";
+import { checkRuns, listings, pricePoints, products } from "@drop-watch/db/schema/products";
 import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -51,8 +63,8 @@ const MAX_CHECK_RUNS = 500;
  * Re-exported so `apps/web` can name these shapes without taking a dependency
  * on `@drop-watch/db` — the UI reads the API, not the database.
  */
-export type { CheckRun, Product } from "@drop-watch/db/schema/products";
-export type { CheckStatus, PriceSample, ProductSummary } from "../summary";
+export type { CheckRun, Listing, Product } from "@drop-watch/db/schema/products";
+export type { CheckStatus, ListingSummary, PriceSample, ProductSummary } from "../summary";
 
 const productIdInput = z.object({ id: z.uuid() });
 
@@ -73,14 +85,40 @@ async function loadProduct(id: string, ownerId: string): Promise<Product> {
   return product;
 }
 
+/** A product's own listings, oldest first — `listings[0]` is the original one. */
+async function loadListings(productId: string): Promise<Listing[]> {
+  return await db
+    .select()
+    .from(listings)
+    .where(eq(listings.productId, productId))
+    .orderBy(asc(listings.createdAt));
+}
+
+/** Every listing an owner has, across all their products, grouped by product. */
+async function loadOwnerListings(ownerId: string): Promise<Map<string, Listing[]>> {
+  const rows = await db
+    .select()
+    .from(listings)
+    .where(eq(listings.userId, ownerId))
+    .orderBy(asc(listings.createdAt));
+  const byProduct = new Map<string, Listing[]>();
+  for (const listing of rows) {
+    const group = byProduct.get(listing.productId) ?? [];
+    group.push(listing);
+    byProduct.set(listing.productId, group);
+  }
+  return byProduct;
+}
+
 /**
  * The most recent `limit` price points for every product *of one owner* at
  * once.
  *
  * A window function rather than a query per product: the dashboard is a list,
- * and `price_points(product_id, observed_at DESC)` serves the partition
- * directly. The join to `products` exists purely to filter by owner — without
- * it, other accounts' sparkline data would be computed and shipped.
+ * and `price_points(listing_id, observed_at DESC)` serves the partition
+ * directly. The join to `listings` both filters by owner and recovers the
+ * product each point belongs to — the ranking is per listing, but the
+ * returned map stays keyed by product, which is what the dashboard consumes.
  */
 async function recentSamples(limit: number, ownerId: string): Promise<Map<string, PriceSample[]>> {
   const ranked = db.$with("ranked_price_points").as(
@@ -89,16 +127,17 @@ async function recentSamples(limit: number, ownerId: string): Promise<Map<string
         availability: pricePoints.availability,
         currency: pricePoints.currency,
         inStock: pricePoints.inStock,
+        listingId: pricePoints.listingId,
         observedAt: pricePoints.observedAt,
         price: pricePoints.price,
-        productId: pricePoints.productId,
-        rank: sql<number>`row_number() over (partition by ${pricePoints.productId} order by ${pricePoints.observedAt} desc)`.as(
+        productId: listings.productId,
+        rank: sql<number>`row_number() over (partition by ${pricePoints.listingId} order by ${pricePoints.observedAt} desc)`.as(
           "rank"
         ),
       })
       .from(pricePoints)
-      .innerJoin(products, eq(pricePoints.productId, products.id))
-      .where(eq(products.userId, ownerId))
+      .innerJoin(listings, eq(pricePoints.listingId, listings.id))
+      .where(eq(listings.userId, ownerId))
   );
 
   const rows = await db
@@ -115,6 +154,7 @@ async function recentSamples(limit: number, ownerId: string): Promise<Map<string
       availability: row.availability,
       currency: row.currency,
       inStock: row.inStock,
+      listingId: row.listingId,
       observedAt: row.observedAt,
       price: row.price,
     });
@@ -125,7 +165,7 @@ async function recentSamples(limit: number, ownerId: string): Promise<Map<string
 
 /**
  * The most recent `limit` check runs per product of one owner, newest first.
- * Owner-filtered for the same reason as {@link recentSamples}.
+ * Owner-filtered and product-grouped for the same reason as {@link recentSamples}.
  */
 async function recentRuns(limit: number, ownerId: string): Promise<Map<string, CheckRun[]>> {
   const ranked = db.$with("ranked_check_runs").as(
@@ -136,16 +176,17 @@ async function recentRuns(limit: number, ownerId: string): Promise<Map<string, C
         extractorUsed: checkRuns.extractorUsed,
         httpStatus: checkRuns.httpStatus,
         id: checkRuns.id,
-        productId: checkRuns.productId,
-        rank: sql<number>`row_number() over (partition by ${checkRuns.productId} order by ${checkRuns.startedAt} desc)`.as(
+        listingId: checkRuns.listingId,
+        productId: listings.productId,
+        rank: sql<number>`row_number() over (partition by ${checkRuns.listingId} order by ${checkRuns.startedAt} desc)`.as(
           "rank"
         ),
         startedAt: checkRuns.startedAt,
         status: checkRuns.status,
       })
       .from(checkRuns)
-      .innerJoin(products, eq(checkRuns.productId, products.id))
-      .where(eq(products.userId, ownerId))
+      .innerJoin(listings, eq(checkRuns.listingId, listings.id))
+      .where(eq(listings.userId, ownerId))
   );
 
   const rows = await db
@@ -156,10 +197,10 @@ async function recentRuns(limit: number, ownerId: string): Promise<Map<string, C
     .orderBy(desc(ranked.startedAt));
 
   const byProduct = new Map<string, CheckRun[]>();
-  for (const { rank: _rank, ...run } of rows) {
-    const runs = byProduct.get(run.productId) ?? [];
+  for (const { rank: _rank, productId, ...run } of rows) {
+    const runs = byProduct.get(productId) ?? [];
     runs.push(run);
-    byProduct.set(run.productId, runs);
+    byProduct.set(productId, runs);
   }
   return byProduct;
 }
@@ -171,14 +212,36 @@ async function loadSamples(productId: string, limit: number): Promise<PriceSampl
       availability: pricePoints.availability,
       currency: pricePoints.currency,
       inStock: pricePoints.inStock,
+      listingId: pricePoints.listingId,
       observedAt: pricePoints.observedAt,
       price: pricePoints.price,
     })
     .from(pricePoints)
-    .where(eq(pricePoints.productId, productId))
+    .innerJoin(listings, eq(pricePoints.listingId, listings.id))
+    .where(eq(listings.productId, productId))
     .orderBy(desc(pricePoints.observedAt))
     .limit(limit);
   return rows.reverse();
+}
+
+/** The most recent `limit` check runs for one product, newest first. */
+async function loadRuns(productId: string, limit: number): Promise<CheckRun[]> {
+  return await db
+    .select({
+      durationMs: checkRuns.durationMs,
+      error: checkRuns.error,
+      extractorUsed: checkRuns.extractorUsed,
+      httpStatus: checkRuns.httpStatus,
+      id: checkRuns.id,
+      listingId: checkRuns.listingId,
+      startedAt: checkRuns.startedAt,
+      status: checkRuns.status,
+    })
+    .from(checkRuns)
+    .innerJoin(listings, eq(checkRuns.listingId, listings.id))
+    .where(eq(listings.productId, productId))
+    .orderBy(desc(checkRuns.startedAt))
+    .limit(limit);
 }
 
 /** Min/max/avg over one product's whole price history. Prices stay decimal strings. */
@@ -203,9 +266,10 @@ async function loadStats(product: Product): Promise<PriceStats | null> {
       min: sql<string | null>`min(${pricePoints.price})`,
     })
     .from(pricePoints)
+    .innerJoin(listings, eq(pricePoints.listingId, listings.id))
     .where(
       and(
-        eq(pricePoints.productId, product.id),
+        eq(listings.productId, product.id),
         product.currency ? eq(pricePoints.currency, product.currency) : undefined
       )
     );
@@ -217,46 +281,120 @@ async function loadStats(product: Product): Promise<PriceStats | null> {
 
 /** The single-product path. Plain indexed reads — no window function needed. */
 async function summariseOne(product: Product): Promise<ProductSummary> {
-  const [samples, runs] = await Promise.all([
+  const [productListings, samples, runs] = await Promise.all([
+    loadListings(product.id),
     loadSamples(product.id, SPARKLINE_POINTS),
-    db
-      .select()
-      .from(checkRuns)
-      .where(eq(checkRuns.productId, product.id))
-      .orderBy(desc(checkRuns.startedAt))
-      .limit(FAILURE_WINDOW),
+    loadRuns(product.id, FAILURE_WINDOW),
   ]);
-  return summarise(product, samples, runs);
+  return summarise(product, productListings, samples, runs);
 }
 
 type UpdateInput = z.infer<typeof productUpdateInput>;
 
-/**
- * Only the keys actually supplied, so `targetPrice: null` clears the target
- * while omitting it leaves the target alone.
- */
-function buildPatch(input: UpdateInput): Partial<Product> {
-  const { id: _id, ...changes } = input;
+/** Only the keys actually supplied, routed onto the product row. */
+function buildProductPatch(input: UpdateInput): Partial<Product> {
+  const { active, dropPercent, rules, targetPrice } = input;
   const patch: Partial<Product> = {};
-  for (const [key, value] of Object.entries(changes)) {
-    if (value !== undefined) {
-      Object.assign(patch, { [key]: value });
-    }
+  if (active !== undefined) {
+    patch.active = active;
+  }
+  if (dropPercent !== undefined) {
+    patch.dropPercent = dropPercent;
+  }
+  if (rules !== undefined) {
+    patch.rules = rules;
+  }
+  if (targetPrice !== undefined) {
+    patch.targetPrice = targetPrice;
   }
   return patch;
 }
 
-type CreateInput = z.infer<typeof productCreateInput>;
+/** Only the keys actually supplied, routed onto every one of the product's listings. */
+function buildListingPatch(input: UpdateInput): Partial<Listing> {
+  const { intervalMinutes, jitterPercent } = input;
+  const patch: Partial<Listing> = {};
+  if (intervalMinutes !== undefined) {
+    patch.intervalMinutes = intervalMinutes;
+  }
+  if (jitterPercent !== undefined) {
+    patch.jitterPercent = jitterPercent;
+  }
+  return patch;
+}
 
 /**
- * The insert, with `nextCheckAt` pinned to now so the minutely dispatcher picks
- * the product up on its next tick rather than after a first full interval —
- * adding something and watching nothing happen for three hours reads as a bug.
+ * Applies a shortened interval's pull-in to each of the product's listings
+ * individually — {@link pulledInNextCheckAt} decides per listing, against that
+ * listing's own `nextCheckAt`, whether the new interval moves its next check
+ * sooner. A listing whose next check is already sooner than the new interval
+ * implies is left alone.
  */
-function buildInsert(input: CreateInput, ownerId: string, now: Date): NewProduct {
-  const { url, ...rest } = input;
-  const values: NewProduct = { nextCheckAt: now, url, userId: ownerId };
-  for (const [key, value] of Object.entries(rest)) {
+async function pullInNextCheckAt(
+  productId: string,
+  intervalMinutes: number,
+  now: Date
+): Promise<void> {
+  const productListings = await loadListings(productId);
+  const pulls = productListings
+    .map((listing) => ({
+      id: listing.id,
+      nextCheckAt: pulledInNextCheckAt(listing, intervalMinutes, now),
+    }))
+    .filter((entry): entry is { id: string; nextCheckAt: Date } => entry.nextCheckAt !== undefined);
+  await Promise.all(
+    pulls.map((entry) =>
+      db.update(listings).set({ nextCheckAt: entry.nextCheckAt }).where(eq(listings.id, entry.id))
+    )
+  );
+}
+
+type CreateInput = z.infer<typeof productCreateInput>;
+
+const PRODUCT_INSERT_KEYS = [
+  "currency",
+  "dropPercent",
+  "imageUrl",
+  "rules",
+  "targetPrice",
+  "title",
+] as const;
+const LISTING_INSERT_KEYS = [
+  "currency",
+  "extractor",
+  "intervalMinutes",
+  "jitterPercent",
+  "locale",
+  "selector",
+] as const;
+
+/** Only the supplied create-input keys that belong on the product row. */
+function buildProductInsert(input: CreateInput, ownerId: string): NewProduct {
+  const values: NewProduct = { userId: ownerId };
+  for (const key of PRODUCT_INSERT_KEYS) {
+    const value = input[key];
+    if (value !== undefined) {
+      Object.assign(values, { [key]: value });
+    }
+  }
+  return values;
+}
+
+/**
+ * Only the supplied create-input keys that belong on the listing row, plus
+ * `nextCheckAt` pinned to now so the minutely dispatcher picks the listing up
+ * on its next tick rather than after a first full interval — adding something
+ * and watching nothing happen for three hours reads as a bug.
+ */
+function buildListingInsert(
+  input: CreateInput,
+  productId: string,
+  ownerId: string,
+  now: Date
+): NewListing {
+  const values: NewListing = { nextCheckAt: now, productId, url: input.url, userId: ownerId };
+  for (const key of LISTING_INSERT_KEYS) {
+    const value = input[key];
     if (value !== undefined) {
       Object.assign(values, { [key]: value });
     }
@@ -266,9 +404,10 @@ function buildInsert(input: CreateInput, ownerId: string, now: Date): NewProduct
 
 export const productsRouter = {
   /**
-   * Enqueues an immediate check onto the queue the worker already consumes.
-   * `already_checking` is a normal outcome, not an error: pg-boss's exclusive
-   * policy means a product with a check queued or running takes no second job.
+   * Enqueues an immediate check per active listing, onto the queue the worker
+   * already consumes. `already_checking` is a normal outcome, not an error:
+   * pg-boss's exclusive policy means a listing with a check queued or running
+   * takes no second job.
    */
   checkNow: protectedProcedure
     .input(productIdInput)
@@ -278,14 +417,21 @@ export const productsRouter = {
         input,
       }): Promise<{ jobId: string | null; status: "already_checking" | "queued" }> => {
         const product = await loadProduct(input.id, context.session.user.id);
+        const activeListings = await db
+          .select()
+          .from(listings)
+          .where(and(eq(listings.productId, product.id), eq(listings.active, true)));
         const boss = await getSenderBoss();
-        const jobId = await sendCheckNow(boss, product.id);
+        const jobIds = await Promise.all(
+          activeListings.map((listing) => sendCheckNow(boss, listing.id))
+        );
+        const jobId = jobIds.find((id): id is string => id !== null) ?? null;
         return jobId ? { jobId, status: "queued" } : { jobId: null, status: "already_checking" };
       }
     ),
   /**
-   * Every check attempt for one product, newest first. This is the answer to
-   * "why did this silently stop working".
+   * Every check attempt for one product's listing(s), newest first. This is
+   * the answer to "why did this silently stop working".
    */
   checkRuns: protectedProcedure
     .input(
@@ -295,37 +441,48 @@ export const productsRouter = {
     )
     .handler(async ({ context, input }): Promise<CheckRun[]> => {
       await loadProduct(input.id, context.session.user.id);
-      return await db
-        .select()
-        .from(checkRuns)
-        .where(eq(checkRuns.productId, input.id))
-        .orderBy(desc(checkRuns.startedAt))
-        .limit(input.limit);
+      return await loadRuns(input.id, input.limit);
     }),
 
   /**
-   * Confirm-and-save, the end of the add-product flow.
+   * Confirm-and-save, the end of the add-product flow. Inserts the product and
+   * its first (and, for now, only) listing together, so a duplicate-URL
+   * conflict on the listing rolls the product insert back too.
    *
    * Returns the same {@link ProductSummary} the dashboard renders, so the new
    * card can be seeded into the list without a round trip. It has no history
-   * yet — the worker writes the first price point when it picks the product up,
-   * which `nextCheckAt` makes happen within a minute.
+   * yet — the worker writes the first price point when it picks the listing
+   * up, which `nextCheckAt` makes happen within a minute.
    */
   create: protectedProcedure
     .input(productCreateInput)
     .handler(async ({ context, input }): Promise<ProductSummary> => {
-      const [created] = await db
-        .insert(products)
-        .values(buildInsert(input, context.session.user.id, new Date()))
-        // `(userId, url)` is unique. Adding something *you* already track is a
-        // mistake worth naming, not a duplicate row — another account tracking
-        // the same URL is none of your business and conflicts with nothing.
-        .onConflictDoNothing({ target: [products.userId, products.url] })
-        .returning();
-      if (!created) {
-        throw new ORPCError("CONFLICT", { message: "That URL is already being tracked." });
-      }
-      return summarise(created, [], []);
+      const ownerId = context.session.user.id;
+      const now = new Date();
+      const { listing, product } = await db.transaction(async (tx) => {
+        const [insertedProduct] = await tx
+          .insert(products)
+          .values(buildProductInsert(input, ownerId))
+          .returning();
+        if (!insertedProduct) {
+          throw new ORPCError("INTERNAL_SERVER_ERROR", {
+            message: "Product insert returned no row",
+          });
+        }
+        const [insertedListing] = await tx
+          .insert(listings)
+          .values(buildListingInsert(input, insertedProduct.id, ownerId, now))
+          // `(userId, url)` is unique. Adding something *you* already track is a
+          // mistake worth naming, not a duplicate row — another account tracking
+          // the same URL is none of your business and conflicts with nothing.
+          .onConflictDoNothing({ target: [listings.userId, listings.url] })
+          .returning();
+        if (!insertedListing) {
+          throw new ORPCError("CONFLICT", { message: "That URL is already being tracked." });
+        }
+        return { listing: insertedListing, product: insertedProduct };
+      });
+      return summarise(product, [listing], [], []);
     }),
 
   detail: protectedProcedure
@@ -354,17 +511,23 @@ export const productsRouter = {
   /** The dashboard: one summary per product the requester tracks. */
   list: protectedProcedure.handler(async ({ context }): Promise<ProductSummary[]> => {
     const ownerId = context.session.user.id;
-    const [rows, samples, runs] = await Promise.all([
+    const [rows, ownerListings, samples, runs] = await Promise.all([
       db
         .select()
         .from(products)
         .where(eq(products.userId, ownerId))
-        .orderBy(asc(products.title), asc(products.url)),
+        .orderBy(asc(products.title), asc(products.createdAt)),
+      loadOwnerListings(ownerId),
       recentSamples(SPARKLINE_POINTS, ownerId),
       recentRuns(FAILURE_WINDOW, ownerId),
     ]);
     return rows.map((product) =>
-      summarise(product, samples.get(product.id) ?? [], runs.get(product.id) ?? [])
+      summarise(
+        product,
+        ownerListings.get(product.id) ?? [],
+        samples.get(product.id) ?? [],
+        runs.get(product.id) ?? []
+      )
     );
   }),
 
@@ -376,24 +539,36 @@ export const productsRouter = {
       return await loadStats(product);
     }),
 
-  /** Tracking settings: interval, jitter, alert rules, target, active. */
+  /**
+   * Tracking settings: rules, target and drop-percent land on the product;
+   * interval and jitter land on every one of its listings.
+   */
   update: protectedProcedure
     .input(productUpdateInput)
     .handler(async ({ context, input }): Promise<ProductSummary> => {
       const product = await loadProduct(input.id, context.session.user.id);
-      const patch = buildPatch(input);
-      const nextCheckAt = pulledInNextCheckAt(product, input.intervalMinutes, new Date());
-      if (nextCheckAt) {
-        patch.nextCheckAt = nextCheckAt;
+      const now = new Date();
+
+      const productPatch = buildProductPatch(input);
+      const updated =
+        Object.keys(productPatch).length > 0
+          ? ((
+              await db
+                .update(products)
+                .set(productPatch)
+                .where(eq(products.id, product.id))
+                .returning()
+            )[0] ?? product)
+          : product;
+
+      const listingPatch = buildListingPatch(input);
+      if (Object.keys(listingPatch).length > 0) {
+        await db.update(listings).set(listingPatch).where(eq(listings.productId, product.id));
       }
-      if (Object.keys(patch).length === 0) {
-        return await summariseOne(product);
+      if (input.intervalMinutes !== undefined) {
+        await pullInNextCheckAt(product.id, input.intervalMinutes, now);
       }
-      const [updated] = await db
-        .update(products)
-        .set(patch)
-        .where(eq(products.id, product.id))
-        .returning();
-      return await summariseOne(updated ?? product);
+
+      return await summariseOne(updated);
     }),
 };

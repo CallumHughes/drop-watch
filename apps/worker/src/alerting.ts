@@ -22,6 +22,10 @@
  * splitting it per channel to re-send an email nobody received would also
  * re-send the notification that did arrive. One channel landing is enough to
  * consider the person told.
+ *
+ * Watch-broken dedupe does not live in `alert_state` — it is one alarm per
+ * listing, so it lives on `listings.brokenReportedAt`: set when the alarm is
+ * sent, cleared on the first ok check.
  */
 
 import { percentChange } from "@drop-watch/core/decimal";
@@ -29,7 +33,13 @@ import type { NotificationPayload } from "@drop-watch/core/notify";
 import type { AlertChannel } from "@drop-watch/core/notify/channels";
 import { deliverAlert } from "@drop-watch/core/notify/channels";
 import { alertChannels } from "@drop-watch/core/notify/targets";
-import type { AlertMemory, AlertStateKey, Observation, RuleTrigger } from "@drop-watch/core/rules";
+import type {
+  AlertMemory,
+  AlertRule,
+  AlertStateKey,
+  Observation,
+  RuleTrigger,
+} from "@drop-watch/core/rules";
 import {
   cooldownMs,
   countLeadingFailures,
@@ -38,12 +48,12 @@ import {
   WATCH_BROKEN,
 } from "@drop-watch/core/rules";
 import { db } from "@drop-watch/db";
-import type { Product } from "@drop-watch/db/schema/products";
-import { alertState, checkRuns, pricePoints } from "@drop-watch/db/schema/products";
+import type { Listing, Product } from "@drop-watch/db/schema/products";
+import { alertState, checkRuns, listings, pricePoints } from "@drop-watch/db/schema/products";
 import type { Settings } from "@drop-watch/db/schema/settings";
 import { alertTargets, loadSettings } from "@drop-watch/db/settings";
 import { emailChannel, emailEnabled } from "@drop-watch/email";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 
 import type { CheckOutcome } from "./outcome";
@@ -58,14 +68,15 @@ interface Sample extends Observation {
 
 /** Everything the worker knows once a check has been committed. */
 export interface AlertContext {
+  listing: Listing;
   outcome: CheckOutcome;
   /** True when this check wrote a price point — the price rules need one. */
   pricePointWritten: boolean;
   product: Product;
 }
 
-/** The newest `limit` observations for a product, newest first. */
-async function recentSamples(productId: string, limit: number): Promise<Sample[]> {
+/** The newest `limit` observations for a listing, newest first. */
+async function recentSamples(listingId: string, limit: number): Promise<Sample[]> {
   return await db
     .select({
       currency: pricePoints.currency,
@@ -73,12 +84,12 @@ async function recentSamples(productId: string, limit: number): Promise<Sample[]
       price: pricePoints.price,
     })
     .from(pricePoints)
-    .where(eq(pricePoints.productId, productId))
+    .where(eq(pricePoints.listingId, listingId))
     .orderBy(desc(pricePoints.observedAt), desc(pricePoints.id))
     .limit(limit);
 }
 
-/** The dedupe state for a product, keyed by rule. */
+/** The dedupe state for a product's price rules, keyed by rule. */
 async function loadMemory(productId: string): Promise<Map<AlertStateKey, AlertMemory>> {
   const rows = await db.select().from(alertState).where(eq(alertState.productId, productId));
   return new Map(
@@ -89,7 +100,7 @@ async function loadMemory(productId: string): Promise<Map<AlertStateKey, AlertMe
   );
 }
 
-function rememberAlert(productId: string, rule: AlertStateKey, price: string | null, now: Date) {
+function rememberAlert(productId: string, rule: AlertRule, price: string | null, now: Date) {
   return db
     .insert(alertState)
     .values({ lastAlertedAt: now, lastAlertedPrice: price, productId, rule })
@@ -99,14 +110,18 @@ function rememberAlert(productId: string, rule: AlertStateKey, price: string | n
     });
 }
 
-function forgetAlert(productId: string, rule: AlertStateKey) {
-  return db
-    .delete(alertState)
-    .where(and(eq(alertState.productId, productId), eq(alertState.rule, rule)));
+/** Clears the broken-watch flag, but only when it is actually set. */
+function clearBrokenReported(listingId: string) {
+  return db.update(listings).set({ brokenReportedAt: null }).where(eq(listings.id, listingId));
+}
+
+function markBrokenReported(listingId: string, now: Date) {
+  return db.update(listings).set({ brokenReportedAt: now }).where(eq(listings.id, listingId));
 }
 
 function priceAlertPayload(
   product: Product,
+  listing: Listing,
   trigger: RuleTrigger,
   latest: Sample,
   previous: Sample | null
@@ -117,34 +132,37 @@ function priceAlertPayload(
     error: null,
     imageUrl: product.imageUrl,
     inStock: latest.inStock,
+    listingId: listing.id,
     pctChange: previous ? percentChange(previous.price, latest.price) : null,
     previousPrice: previous ? previous.price : null,
     price: latest.price,
     productId: product.id,
     rule: trigger.rule,
     title: product.title,
-    url: product.url,
+    url: listing.url,
   };
 }
 
 function brokenPayload(
   product: Product,
+  listing: Listing,
   consecutiveFailures: number,
   outcome: CheckOutcome
 ): NotificationPayload {
   return {
     consecutiveFailures,
-    currency: product.currency,
+    currency: listing.currency,
     error: outcome.error ?? outcome.status,
     imageUrl: product.imageUrl,
     inStock: null,
+    listingId: listing.id,
     pctChange: null,
     previousPrice: null,
     price: null,
     productId: product.id,
     rule: WATCH_BROKEN,
     title: product.title,
-    url: product.url,
+    url: listing.url,
   };
 }
 
@@ -183,11 +201,12 @@ async function deliver(
 /** Price rules: target, drop_percent, restock — evaluated, sent, remembered. */
 async function runPriceAlerts(
   product: Product,
+  listing: Listing,
   channels: readonly AlertChannel[],
   settings: Settings,
   now: Date
 ): Promise<void> {
-  const [latest, previous = null] = await recentSamples(product.id, OBSERVATION_WINDOW);
+  const [latest, previous = null] = await recentSamples(listing.id, OBSERVATION_WINDOW);
   if (!latest) {
     return;
   }
@@ -209,7 +228,7 @@ async function runPriceAlerts(
     // biome-ignore lint/performance/noAwaitInLoops: a product rarely fires two rules at once, and the ones that do should arrive in rule order rather than racing.
     const sent = await deliver(
       channels,
-      priceAlertPayload(product, trigger, latest, previous),
+      priceAlertPayload(product, listing, trigger, latest, previous),
       trigger.reason
     );
     if (sent) {
@@ -222,41 +241,44 @@ async function runPriceAlerts(
  * The "this watch is broken" alarm.
  *
  * One notification when the failure streak reaches the threshold, then silence
- * until a check succeeds — recovery is the `watch_broken` row being deleted,
- * which happens on every successful check whether or not one was ever sent.
+ * until a check succeeds — recovery is `listings.brokenReportedAt` being
+ * cleared, which happens on every successful check whether or not one was
+ * ever sent.
  */
 async function runFailureAlert(
   product: Product,
+  listing: Listing,
   channels: readonly AlertChannel[],
   settings: Settings,
   context: AlertContext,
   now: Date
 ): Promise<void> {
   if (context.outcome.status === "ok") {
-    await forgetAlert(product.id, WATCH_BROKEN);
+    if (listing.brokenReportedAt !== null) {
+      await clearBrokenReported(listing.id);
+    }
     return;
   }
 
   const runs = await db
     .select({ status: checkRuns.status })
     .from(checkRuns)
-    .where(eq(checkRuns.productId, product.id))
+    .where(eq(checkRuns.listingId, listing.id))
     .orderBy(desc(checkRuns.startedAt), desc(checkRuns.id))
     .limit(settings.failureThreshold);
 
   const failures = countLeadingFailures(runs);
-  const memory = await loadMemory(product.id);
-  if (!shouldReportBroken(failures, memory.has(WATCH_BROKEN), settings.failureThreshold)) {
+  if (!shouldReportBroken(failures, listing.brokenReportedAt !== null, settings.failureThreshold)) {
     return;
   }
 
   const sent = await deliver(
     channels,
-    brokenPayload(product, failures, context.outcome),
+    brokenPayload(product, listing, failures, context.outcome),
     `${failures} consecutive failed checks`
   );
   if (sent) {
-    await rememberAlert(product.id, WATCH_BROKEN, null, now);
+    await markBrokenReported(listing.id, now);
   }
 }
 
@@ -278,21 +300,22 @@ export async function runAlerting(context: AlertContext): Promise<void> {
       // Not an error — alerting is off, or no destination has ever been
       // configured. Recovery state is still cleared so a later configuration
       // does not inherit a stale "broken" flag.
-      if (context.outcome.status === "ok") {
-        await forgetAlert(context.product.id, WATCH_BROKEN);
+      if (context.outcome.status === "ok" && context.listing.brokenReportedAt !== null) {
+        await clearBrokenReported(context.listing.id);
       }
       return;
     }
 
     const now = new Date();
     if (context.pricePointWritten) {
-      await runPriceAlerts(context.product, channels, settings, now);
+      await runPriceAlerts(context.product, context.listing, channels, settings, now);
     }
-    await runFailureAlert(context.product, channels, settings, context, now);
+    await runFailureAlert(context.product, context.listing, channels, settings, context, now);
   } catch (error) {
     const log = createLogger({
       action: "alerting_failed",
       error: error instanceof Error ? error.message : String(error),
+      listingId: context.listing.id,
       productId: context.product.id,
     });
     log.error("alerting failed, check is unaffected");

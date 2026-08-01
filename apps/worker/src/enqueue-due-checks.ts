@@ -1,24 +1,24 @@
 /**
  * The minutely dispatcher.
  *
- * It does one indexed read (`products(active, next_check_at)`) and turns every
- * due product into a `check-product` job. It does no fetching itself — a slow
- * site must never hold up the tick that would have enqueued the other
- * nineteen products.
+ * It does one indexed read (`listings(active, next_check_at)`, joined to
+ * `products` for the pause flag) and turns every due listing into a
+ * `check-listing` job. It does no fetching itself — a slow site must never
+ * hold up the tick that would have enqueued the other nineteen listings.
  *
- * Enqueueing is idempotent: the queue's `exclusive` policy plus a per-product
- * `singletonKey` means a product that stays due (worker restarting, check
+ * Enqueueing is idempotent: the queue's `exclusive` policy plus a per-listing
+ * `singletonKey` means a listing that stays due (worker restarting, check
  * still running) ends up with exactly one job, not one per minute.
  */
 
 import { db } from "@drop-watch/db";
 import {
-  CHECK_PRODUCT_QUEUE,
-  type CheckProductJob,
-  checkProductSendOptions,
+  CHECK_LISTING_QUEUE,
+  type CheckListingJob,
+  checkListingSendOptions,
   type PgBoss,
 } from "@drop-watch/db/queue";
-import { products } from "@drop-watch/db/schema/products";
+import { listings, products } from "@drop-watch/db/schema/products";
 import { and, eq, lte } from "drizzle-orm";
 import { createLogger } from "evlog";
 
@@ -27,15 +27,22 @@ export async function enqueueDueChecks(boss: PgBoss): Promise<void> {
   const startedAt = Date.now();
 
   const due = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(and(eq(products.active, true), lte(products.nextCheckAt, new Date())));
+    .select({ id: listings.id })
+    .from(listings)
+    .innerJoin(products, eq(listings.productId, products.id))
+    .where(
+      and(
+        eq(products.active, true),
+        eq(listings.active, true),
+        lte(listings.nextCheckAt, new Date())
+      )
+    );
 
   let enqueued = 0;
-  for (const product of due) {
-    const job: CheckProductJob = { productId: product.id };
+  for (const listing of due) {
+    const job: CheckListingJob = { listingId: listing.id };
     // biome-ignore lint/performance/noAwaitInLoops: pg-boss has no batch send that honours per-job singleton keys.
-    const jobId = await boss.send(CHECK_PRODUCT_QUEUE, job, checkProductSendOptions(product.id));
+    const jobId = await boss.send(CHECK_LISTING_QUEUE, job, checkListingSendOptions(listing.id));
     if (jobId) {
       enqueued += 1;
     }

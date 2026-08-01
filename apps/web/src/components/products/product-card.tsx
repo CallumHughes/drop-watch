@@ -63,8 +63,9 @@ function PriceChange({ changePercent }: { changePercent: string | null }) {
  * is still working.
  */
 export function ProductCard({ summary }: { summary: ProductSummary }) {
-  const { history, lastCheck, latest, product } = summary;
-  const title = product.title ?? productHost(product.url);
+  const { history, lastCheck, latest, listings, nextCheckAt, product } = summary;
+  const primaryListing = listings[0]?.listing;
+  const title = product.title ?? (primaryListing ? productHost(primaryListing.url) : "—");
 
   return (
     <Card className="relative transition-colors hover:ring-foreground/25">
@@ -89,7 +90,11 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
                 {title}
               </Link>
             </CardTitle>
-            <p className="truncate text-muted-foreground text-xs">{productHost(product.url)}</p>
+            {primaryListing ? (
+              <p className="truncate text-muted-foreground text-xs">
+                {productHost(primaryListing.url)}
+              </p>
+            ) : null}
           </div>
           <StatusBadge
             active={product.active}
@@ -126,7 +131,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
           <span>
             {lastCheck ? `checked ${formatRelative(lastCheck.startedAt)}` : "never checked"}
           </span>
-          <span>next {formatRelative(product.nextCheckAt)}</span>
+          <span>next {nextCheckAt ? formatRelative(nextCheckAt) : "never"}</span>
         </div>
       </CardContent>
     </Card>

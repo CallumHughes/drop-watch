@@ -1,6 +1,6 @@
 "use client";
 
-import type { Product } from "@drop-watch/api/routers/products";
+import type { Listing, Product } from "@drop-watch/api/routers/products";
 import {
   MAX_DROP_PERCENT,
   MAX_INTERVAL_MINUTES,
@@ -79,15 +79,15 @@ function Field({
  * the worker reads the new interval on the product's next reschedule, so there
  * is nothing to notify — Postgres is the interface.
  */
-export function WatchSettingsForm({ product }: { product: Product }) {
+export function WatchSettingsForm({ listing, product }: { listing: Listing; product: Product }) {
   const queryClient = useQueryClient();
   const intervalId = useId();
   const jitterId = useId();
   const targetId = useId();
   const dropId = useId();
   const [active, setActive] = useState(product.active);
-  const [intervalMinutes, setIntervalMinutes] = useState(String(product.intervalMinutes));
-  const [jitterPercent, setJitterPercent] = useState(String(product.jitterPercent));
+  const [intervalMinutes, setIntervalMinutes] = useState(String(listing.intervalMinutes));
+  const [jitterPercent, setJitterPercent] = useState(String(listing.jitterPercent));
   const [targetPrice, setTargetPrice] = useState(product.targetPrice ?? "");
   const [dropPercent, setDropPercent] = useState(product.dropPercent?.toString() ?? "");
   const [rules, setRules] = useState<AlertRule[]>(product.rules);

@@ -45,6 +45,8 @@ export interface NotificationPayload {
   error: string | null;
   imageUrl: string | null;
   inStock: boolean | null;
+  /** Null only for the settings page's test notification, which has no listing. */
+  listingId: string | null;
   /** Signed change from `previousPrice` to `price`, one decimal place. */
   pctChange: string | null;
   previousPrice: string | null;
