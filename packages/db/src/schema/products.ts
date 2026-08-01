@@ -149,7 +149,8 @@ export const pricePoints = pgTable(
 
 /**
  * One row per attempt, including failures. This table is what makes "why did
- * this silently stop working" answerable. Retain ~30 days.
+ * this silently stop working" answerable. Retain ~30 days, enforced by the
+ * worker's daily purge job (`apps/worker/src/purge-check-runs.ts`).
  */
 export const checkRuns = pgTable(
   "check_runs",

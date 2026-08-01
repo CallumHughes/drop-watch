@@ -36,7 +36,7 @@ function fakeEmailFactory(): {
 }
 
 function targets(overrides: Partial<AlertTargets> = {}): AlertTargets {
-  return { recipients: [], webhook: null, ...overrides };
+  return { discord: null, ntfy: null, recipients: [], telegram: null, webhook: null, ...overrides };
 }
 
 describe("alertChannels", () => {
@@ -88,5 +88,42 @@ describe("alertChannels", () => {
 
     expect(channels.map((channel) => channel.name)).toEqual(["webhook"]);
     expect(channels[0]?.target).toBe("not a url");
+  });
+
+  it("builds ntfy, discord and telegram only when each is configured", () => {
+    const email = fakeEmailFactory();
+    const channels = alertChannels(
+      targets({
+        discord: "https://discord.com/api/webhooks/1/a",
+        ntfy: { token: null, url: "https://ntfy.sh/my-topic" },
+        telegram: { botToken: "tk", chatId: "42" },
+      }),
+      email.build
+    );
+
+    expect(channels.map((channel) => channel.name)).toEqual(["ntfy", "discord", "telegram"]);
+    expect(channels[2]?.target).toBe("telegram:42");
+  });
+
+  it("orders every channel webhook, ntfy, discord, telegram, email", () => {
+    const email = fakeEmailFactory();
+    const channels = alertChannels(
+      targets({
+        discord: "https://discord.com/api/webhooks/1/a",
+        ntfy: { token: null, url: "https://ntfy.sh/my-topic" },
+        recipients: ["a@example.com"],
+        telegram: { botToken: "tk", chatId: "42" },
+        webhook,
+      }),
+      email.build
+    );
+
+    expect(channels.map((channel) => channel.name)).toEqual([
+      "webhook",
+      "ntfy",
+      "discord",
+      "telegram",
+      "email",
+    ]);
   });
 });

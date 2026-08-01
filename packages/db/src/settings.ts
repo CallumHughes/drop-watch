@@ -20,7 +20,16 @@ import { type NewSettings, SETTINGS_ID, type Settings, settings } from "./schema
 export type SettingsPatch = Partial<
   Pick<
     NewSettings,
-    "alertsEnabled" | "cooldownMinutes" | "failureThreshold" | "haUrl" | "haWebhookId"
+    | "alertsEnabled"
+    | "cooldownMinutes"
+    | "discordWebhookUrl"
+    | "failureThreshold"
+    | "haUrl"
+    | "haWebhookId"
+    | "ntfyToken"
+    | "ntfyUrl"
+    | "telegramBotToken"
+    | "telegramChatId"
   >
 >;
 
@@ -129,10 +138,24 @@ export async function alertTargets({
   const owner = await productOwner(ownerId);
   const emailWanted =
     current.alertsEnabled && emailConfigured && owner?.emailAlertsEnabled && owner.emailVerified;
+  // The instance-wide channels are the admin's: they fire only for products
+  // the admin owns, and only once `alertsEnabled` and the channel's own
+  // columns are all set. Checked per send, so plural admins each get their own.
+  const isAdmin = owner?.role === "admin";
   return {
+    discord:
+      isAdmin && current.alertsEnabled && current.discordWebhookUrl
+        ? current.discordWebhookUrl
+        : null,
+    ntfy:
+      isAdmin && current.alertsEnabled && current.ntfyUrl
+        ? { token: current.ntfyToken, url: current.ntfyUrl }
+        : null,
     recipients: emailWanted && owner ? [owner.email] : [],
-    // The webhook is the admin's channel: it fires only for products the
-    // admin owns. Checked per send, so plural admins each get their own.
-    webhook: owner?.role === "admin" ? notifyConfig(current) : null,
+    telegram:
+      isAdmin && current.alertsEnabled && current.telegramBotToken && current.telegramChatId
+        ? { botToken: current.telegramBotToken, chatId: current.telegramChatId }
+        : null,
+    webhook: isAdmin ? notifyConfig(current) : null,
   };
 }

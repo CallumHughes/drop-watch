@@ -156,6 +156,9 @@ importers:
       '@drop-watch/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@drop-watch/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@drop-watch/email':
         specifier: workspace:*
         version: link:../../packages/email

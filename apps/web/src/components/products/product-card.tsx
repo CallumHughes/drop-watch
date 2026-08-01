@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/compone
 import Image from "next/image";
 import Link from "next/link";
 
-import { formatPrice, formatRelative, formatStock, productHost } from "@/lib/format";
+import { formatAvailability, formatPrice, formatRelative, productHost } from "@/lib/format";
 
 import { Sparkline } from "./sparkline";
 import { StatusBadge } from "./status-badge";
@@ -114,7 +114,9 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
             targetPrice={product.targetPrice}
           />
           {latest ? (
-            <span className="text-muted-foreground">{formatStock(latest.inStock)}</span>
+            <span className="text-muted-foreground">
+              {formatAvailability(latest.availability, latest.inStock)}
+            </span>
           ) : null}
         </div>
 

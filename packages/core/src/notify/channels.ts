@@ -26,7 +26,7 @@ import type { NotificationPayload, NotifyConfig } from "./index";
 import { sendNotification, webhookUrl } from "./index";
 
 /** The channels an alert can go out on. */
-export type ChannelName = "email" | "webhook";
+export type ChannelName = "discord" | "email" | "ntfy" | "telegram" | "webhook";
 
 /**
  * One configured destination.
@@ -58,8 +58,14 @@ export type ChannelSendResult =
  * has one definition both the worker and the settings page read.
  */
 export interface AlertTargets {
+  /** Webhook URL, or `null` when alerting is off or Discord isn't set up. */
+  discord: string | null;
+  /** `null` when alerting is off or ntfy is half-configured. */
+  ntfy: { token: string | null; url: string } | null;
   /** Verified account addresses, or empty when email alerting is off. */
   recipients: string[];
+  /** `null` when alerting is off or Telegram is half-configured. */
+  telegram: { botToken: string; chatId: string } | null;
   /** `null` when alerting is off or Home Assistant is half-configured. */
   webhook: NotifyConfig | null;
 }

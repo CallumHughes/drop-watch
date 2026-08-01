@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatDateTime, formatPrice, formatStock } from "@/lib/format";
+import { formatAvailability, formatDateTime, formatPrice } from "@/lib/format";
 
 /** Headroom above and below the observed range so the line is not on an edge. */
 const AXIS_PADDING_RATIO = 0.05;
@@ -48,7 +48,7 @@ function toChartPoints(samples: readonly PriceSample[], currency: string | null)
     inStock: sample.inStock,
     label: formatPrice(sample.price, sample.currency ?? currency),
     price: Number(sample.price),
-    stock: formatStock(sample.inStock),
+    stock: formatAvailability(sample.availability, sample.inStock),
     timestamp: sample.observedAt.getTime(),
   }));
 }

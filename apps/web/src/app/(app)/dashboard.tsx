@@ -16,6 +16,8 @@ import { ProductCard } from "@/components/products/product-card";
 import { LIVE_REFETCH_MS } from "@/lib/format";
 import { orpc } from "@/utils/orpc";
 
+import { groupIntoSections } from "./dashboard-sections";
+
 const SKELETON_CARDS = ["a", "b", "c"] as const;
 
 /**
@@ -53,10 +55,23 @@ export default function Dashboard() {
     );
   }
 
+  const sections = groupIntoSections(products.data);
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {products.data.map((summary) => (
-        <ProductCard key={summary.product.id} summary={summary} />
+    <div className="flex flex-col gap-6">
+      {sections.map((section) => (
+        <div key={section.title ?? "all"}>
+          {section.title ? (
+            <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+              {section.title} ({section.products.length})
+            </h2>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {section.products.map((summary) => (
+              <ProductCard key={summary.product.id} summary={summary} />
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );

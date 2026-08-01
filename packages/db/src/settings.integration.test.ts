@@ -144,7 +144,13 @@ describe("alertTargets", () => {
     });
 
     const targets = await alertTargets({ emailConfigured: true, ownerId, settings: current });
-    expect(targets).toEqual({ recipients: [], webhook: null });
+    expect(targets).toEqual({
+      discord: null,
+      ntfy: null,
+      recipients: [],
+      telegram: null,
+      webhook: null,
+    });
   });
 
   it("builds the webhook half for an admin owner from the two HA columns", async () => {
@@ -189,6 +195,12 @@ describe("alertTargets", () => {
       ownerId: crypto.randomUUID(),
       settings: current,
     });
-    expect(targets).toEqual({ recipients: [], webhook: null });
+    expect(targets).toEqual({
+      discord: null,
+      ntfy: null,
+      recipients: [],
+      telegram: null,
+      webhook: null,
+    });
   });
 });

@@ -18,14 +18,16 @@ export const MIN_FAILURE_THRESHOLD = 2;
 export const MAX_FAILURE_THRESHOLD = 50;
 export const MAX_WEBHOOK_ID_LENGTH = 200;
 export const MAX_URL_LENGTH = 2048;
+export const MAX_TOKEN_LENGTH = 500;
 
 /**
- * Both Home Assistant fields are nullable so the page can clear them, which is
- * how you turn alerting off without also losing the cooldown you tuned.
+ * All channel fields are nullable so the page can clear them, which is
+ * how you turn a channel off without also losing the cooldown you tuned.
  */
 export const settingsUpdateInput = z.object({
   alertsEnabled: z.boolean().optional(),
   cooldownMinutes: z.number().int().min(MIN_COOLDOWN_MINUTES).max(MAX_COOLDOWN_MINUTES).optional(),
+  discordWebhookUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
   failureThreshold: z
     .number()
     .int()
@@ -34,6 +36,10 @@ export const settingsUpdateInput = z.object({
     .optional(),
   haUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
   haWebhookId: z.string().min(1).max(MAX_WEBHOOK_ID_LENGTH).nullable().optional(),
+  ntfyToken: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
+  ntfyUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
+  telegramBotToken: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
+  telegramChatId: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
 });
 
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateInput>;

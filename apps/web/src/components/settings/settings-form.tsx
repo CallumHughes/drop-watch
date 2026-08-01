@@ -61,12 +61,22 @@ function Editor({ settings }: { settings: Settings }) {
   const webhookId = useId();
   const cooldownId = useId();
   const thresholdId = useId();
+  const ntfyUrlId = useId();
+  const ntfyTokenId = useId();
+  const discordUrlId = useId();
+  const telegramBotTokenId = useId();
+  const telegramChatIdId = useId();
 
   const [haUrl, setHaUrl] = useState(settings.haUrl ?? "");
   const [haWebhookId, setHaWebhookId] = useState(settings.haWebhookId ?? "");
   const [alertsEnabled, setAlertsEnabled] = useState(settings.alertsEnabled);
   const [cooldownMinutes, setCooldownMinutes] = useState(String(settings.cooldownMinutes));
   const [failureThreshold, setFailureThreshold] = useState(String(settings.failureThreshold));
+  const [ntfyUrl, setNtfyUrl] = useState(settings.ntfyUrl ?? "");
+  const [ntfyToken, setNtfyToken] = useState(settings.ntfyToken ?? "");
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState(settings.discordWebhookUrl ?? "");
+  const [telegramBotToken, setTelegramBotToken] = useState(settings.telegramBotToken ?? "");
+  const [telegramChatId, setTelegramChatId] = useState(settings.telegramChatId ?? "");
 
   const update = useMutation(
     orpc.settings.update.mutationOptions({
@@ -92,6 +102,21 @@ function Editor({ settings }: { settings: Settings }) {
   const onThresholdChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setFailureThreshold(event.target.value);
   }, []);
+  const onNtfyUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setNtfyUrl(event.target.value);
+  }, []);
+  const onNtfyTokenChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setNtfyToken(event.target.value);
+  }, []);
+  const onDiscordWebhookUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setDiscordWebhookUrl(event.target.value);
+  }, []);
+  const onTelegramBotTokenChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setTelegramBotToken(event.target.value);
+  }, []);
+  const onTelegramChatIdChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setTelegramChatId(event.target.value);
+  }, []);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -99,14 +124,31 @@ function Editor({ settings }: { settings: Settings }) {
       update.mutate({
         alertsEnabled,
         cooldownMinutes: Number(cooldownMinutes),
-        failureThreshold: Number(failureThreshold),
-        // Empty means "clear it", which is how alerting is switched off
+        // Empty means "clear it", which is how each channel is switched off
         // without losing the thresholds you tuned.
+        discordWebhookUrl: discordWebhookUrl.trim() === "" ? null : discordWebhookUrl.trim(),
+        failureThreshold: Number(failureThreshold),
         haUrl: haUrl.trim() === "" ? null : haUrl.trim(),
         haWebhookId: haWebhookId.trim() === "" ? null : haWebhookId.trim(),
+        ntfyToken: ntfyToken.trim() === "" ? null : ntfyToken.trim(),
+        ntfyUrl: ntfyUrl.trim() === "" ? null : ntfyUrl.trim(),
+        telegramBotToken: telegramBotToken.trim() === "" ? null : telegramBotToken.trim(),
+        telegramChatId: telegramChatId.trim() === "" ? null : telegramChatId.trim(),
       });
     },
-    [alertsEnabled, cooldownMinutes, failureThreshold, haUrl, haWebhookId, update]
+    [
+      alertsEnabled,
+      cooldownMinutes,
+      discordWebhookUrl,
+      failureThreshold,
+      haUrl,
+      haWebhookId,
+      ntfyToken,
+      ntfyUrl,
+      telegramBotToken,
+      telegramChatId,
+      update,
+    ]
   );
 
   return (
@@ -195,6 +237,81 @@ function Editor({ settings }: { settings: Settings }) {
             The webhook is the admin's channel: it fires only for products on your own account.
             Leave both fields empty to switch it off without losing anything else.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ntfy</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <Field
+            hint="The full topic URL, including the topic name."
+            htmlFor={ntfyUrlId}
+            label="Topic URL"
+          >
+            <Input
+              id={ntfyUrlId}
+              onChange={onNtfyUrlChange}
+              placeholder="https://ntfy.sh/my-topic"
+              type="url"
+              value={ntfyUrl}
+            />
+          </Field>
+          <Field
+            hint="Only needed for a protected topic."
+            htmlFor={ntfyTokenId}
+            label="Access token (optional)"
+          >
+            <Input id={ntfyTokenId} onChange={onNtfyTokenChange} value={ntfyToken} />
+          </Field>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Discord</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <Field
+            hint="Channel Settings → Integrations → Webhooks in Discord."
+            htmlFor={discordUrlId}
+            label="Webhook URL"
+          >
+            <Input
+              id={discordUrlId}
+              onChange={onDiscordWebhookUrlChange}
+              placeholder="https://discord.com/api/webhooks/…"
+              type="url"
+              value={discordWebhookUrl}
+            />
+          </Field>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Telegram</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <Field
+            hint="From @BotFather. Treat it as a secret."
+            htmlFor={telegramBotTokenId}
+            label="Bot token"
+          >
+            <Input
+              id={telegramBotTokenId}
+              onChange={onTelegramBotTokenChange}
+              value={telegramBotToken}
+            />
+          </Field>
+          <Field
+            hint="The bot must already be in this chat."
+            htmlFor={telegramChatIdId}
+            label="Chat id"
+          >
+            <Input id={telegramChatIdId} onChange={onTelegramChatIdChange} value={telegramChatId} />
+          </Field>
         </CardContent>
       </Card>
 

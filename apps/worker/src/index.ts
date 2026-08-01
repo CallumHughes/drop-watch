@@ -21,12 +21,15 @@ import {
   ENQUEUE_DUE_CHECKS_QUEUE,
   ensureQueues,
   type PgBoss,
+  PURGE_CHECK_RUNS_CRON,
+  PURGE_CHECK_RUNS_QUEUE,
 } from "@drop-watch/db/queue";
 import { env } from "@drop-watch/env/worker";
 import { initLogger, log } from "evlog";
 import type { Job } from "pg-boss";
 import { type CheckSource, checkProduct } from "./check-product";
 import { enqueueDueChecks } from "./enqueue-due-checks";
+import { purgeCheckRuns } from "./purge-check-runs";
 
 /** Checks pulled per fetch. Each is processed in turn, not in parallel. */
 const CHECK_BATCH_SIZE = 5;
@@ -47,6 +50,7 @@ async function registerWorkers(boss: PgBoss): Promise<void> {
   await boss.work(ENQUEUE_DUE_CHECKS_QUEUE, () => enqueueDueChecks(boss));
   await boss.work(CHECK_PRODUCT_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("scheduled"));
   await boss.work(CHECK_PRODUCT_NOW_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("manual"));
+  await boss.work(PURGE_CHECK_RUNS_QUEUE, () => purgeCheckRuns());
 }
 
 function installShutdown(boss: PgBoss): void {
@@ -93,6 +97,7 @@ async function main(): Promise<void> {
   await ensureQueues(boss);
   await registerWorkers(boss);
   await boss.schedule(ENQUEUE_DUE_CHECKS_QUEUE, ENQUEUE_DUE_CHECKS_CRON);
+  await boss.schedule(PURGE_CHECK_RUNS_QUEUE, PURGE_CHECK_RUNS_CRON);
 
   installShutdown(boss);
 
@@ -100,7 +105,12 @@ async function main(): Promise<void> {
     action: "worker_started",
     cron: ENQUEUE_DUE_CHECKS_CRON,
     environment: env.NODE_ENV,
-    queues: [ENQUEUE_DUE_CHECKS_QUEUE, CHECK_PRODUCT_QUEUE, CHECK_PRODUCT_NOW_QUEUE],
+    queues: [
+      ENQUEUE_DUE_CHECKS_QUEUE,
+      CHECK_PRODUCT_QUEUE,
+      CHECK_PRODUCT_NOW_QUEUE,
+      PURGE_CHECK_RUNS_QUEUE,
+    ],
   });
 }
 

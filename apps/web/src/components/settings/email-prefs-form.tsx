@@ -16,7 +16,10 @@ import { orpc } from "@/utils/orpc";
 
 /** Channel names as a person would read them in a result row. */
 const CHANNEL_LABELS: Record<TestResult["name"], string> = {
+  discord: "Discord",
   email: "Email",
+  ntfy: "ntfy",
+  telegram: "Telegram",
   webhook: "Home Assistant",
 };
 

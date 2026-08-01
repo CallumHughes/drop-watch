@@ -10,7 +10,7 @@ function minutesAgo(minutes: number): Date {
 }
 
 function sample(price: string, minutes: number, inStock: boolean | null = true): PriceSample {
-  return { currency: "GBP", inStock, observedAt: minutesAgo(minutes), price };
+  return { availability: null, currency: "GBP", inStock, observedAt: minutesAgo(minutes), price };
 }
 
 function run(status: CheckRun["status"], minutes: number): CheckRun {
