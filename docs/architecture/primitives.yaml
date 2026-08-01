@@ -1,0 +1,213 @@
+# The system primitives of DropWatch, as used by the `visual-recap` skill to
+# classify a change. `id` values are stable and quoted verbatim in recap
+# blocks. `code` globs map changed paths to a primitive; first match wins,
+# most specific glob first.
+#
+# Keep this current: a PR that adds, removes, or reshapes a primitive updates
+# this file in the same PR.
+
+groups:
+  surfaces: Entry points a human or a schedule can trigger.
+  domain: Pure logic — no database, no clock, no network of its own.
+  storage: Postgres and everything that owns a row or a job.
+  platform: Cross-cutting services the surfaces build on.
+
+primitives:
+  - id: web-dashboard
+    group: surfaces
+    summary: >
+      Next.js App Router UI — product list, settings, invites, auth screens.
+      Server Components call the API router in-process; client components go
+      through the oRPC client.
+    code:
+      - apps/web/src/app/**
+      - apps/web/src/components/**
+      - apps/web/src/lib/**
+      - apps/web/src/utils/**
+    depends_on: [api-router, auth, ui-kit, env-config]
+
+  - id: api-router
+    group: surfaces
+    summary: >
+      oRPC procedures (products, settings, invites, preview) plus the context
+      that carries the session. `protectedProcedure` is the only door to
+      user-owned data.
+    code:
+      - packages/api/**
+    depends_on: [app-db, job-queue, auth, extractor, email, alert-rules]
+
+  - id: worker-process
+    group: surfaces
+    summary: >
+      Standalone Node process. Owns the pgboss schema, runs the minutely
+      dispatcher cron, consumes check jobs, evaluates rules, sends alerts.
+      Deliberately not booted from inside Next.js.
+    code:
+      - apps/worker/**
+    depends_on:
+      [job-queue, app-db, fetcher, extractor, alert-rules, notifier, email]
+
+  - id: url-cli
+    group: surfaces
+    summary: One-off `test-url` command for checking extraction against a live URL.
+    code:
+      - packages/core/src/bin/**
+    depends_on: [fetcher, extractor]
+
+  - id: fetcher
+    group: domain
+    summary: HTTP retrieval of a product page — timeouts, headers, retry budget.
+    code:
+      - packages/core/src/fetch/**
+
+  - id: extractor
+    group: domain
+    summary: >
+      Price and availability extraction: JSON-LD, microdata, OpenGraph, and
+      user-supplied CSS selectors, in precedence order.
+    code:
+      - packages/core/src/extract/**
+    depends_on: [money]
+
+  - id: alert-rules
+    group: domain
+    summary: >
+      Pure rule evaluation and alert dedupe — fires only on a new low or after
+      the cooldown, keyed by (productId, rule). No database, no clock.
+    code:
+      - packages/core/src/rules/**
+    depends_on: [money]
+
+  - id: notifier
+    group: domain
+    summary: >
+      Home Assistant webhook client and channel/target resolution. Never
+      throws: a notification failure must not fail a check.
+    code:
+      - packages/core/src/notify/**
+
+  - id: money
+    group: domain
+    summary: Decimal money handling. Prices are never floats.
+    code:
+      - packages/core/src/decimal.ts
+
+  - id: app-db
+    group: storage
+    summary: >
+      Drizzle schema and the queries over it — products, observations,
+      settings, invites, recipients, alert state.
+    code:
+      - packages/db/src/schema/**
+      - packages/db/src/*.ts
+    excludes:
+      - packages/db/src/queue.ts
+      - packages/db/src/migrate.ts
+    depends_on: [env-config]
+
+  - id: job-queue
+    group: storage
+    summary: >
+      pg-boss wiring — queue names, job payload types, and the two ways to get
+      a boss. Postgres is the only interface between web and worker.
+    code:
+      - packages/db/src/queue.ts
+
+  - id: migrations
+    group: storage
+    summary: >
+      Generated SQL migrations and the runner. The parity integration test
+      pins the schema to the migration history.
+    code:
+      - packages/db/src/migrations/**
+      - packages/db/src/migrate.ts
+      - packages/db/drizzle.config.ts
+
+  - id: auth
+    group: platform
+    summary: >
+      Better Auth server and client config, session handling, and the auth
+      tables. Invite-gated signup lives here.
+    code:
+      - packages/auth/**
+      - packages/db/src/schema/auth.ts
+    depends_on: [app-db, email, env-config]
+
+  - id: email
+    group: platform
+    summary: >
+      Resend client plus React Email templates — price alert, invite, verify,
+      reset, change-email, watch-broken.
+    code:
+      - packages/email/**
+    depends_on: [env-config, money]
+
+  - id: env-config
+    group: platform
+    summary: >
+      Validated environment schemas per entry point (web, worker, db).
+      SKIP_ENV_VALIDATION is the build-time escape hatch.
+    code:
+      - packages/env/**
+
+  - id: ui-kit
+    group: platform
+    summary: shadcn/ui components and Tailwind theme shared by the dashboard.
+    code:
+      - packages/ui/**
+
+  - id: build-config
+    group: platform
+    summary: Shared tsconfig, turbo pipeline, lint preset, Docker images, CI.
+    code:
+      - packages/config/**
+      - turbo.json
+      - .github/workflows/**
+      - "**/Dockerfile"
+      - docker-compose*.yml
+      - biome.jsonc
+
+  - id: e2e-harness
+    group: platform
+    summary: >
+      Playwright suite, fixtures, and page objects. Runs against a dedicated
+      build (NEXT_DIST_DIR=.next-e2e) and its own database.
+    code:
+      - apps/e2e/**
+
+invariants:
+  - id: per-user-isolation
+    statement: >
+      Every product, observation, setting, and recipient is scoped to a user.
+      Uniqueness is per `(userId, url)`. No query may read or write another
+      user's rows.
+    guarded_by: [api-router, app-db]
+
+  - id: single-scheduler
+    statement: >
+      Only the worker migrates and supervises the pgboss schema and registers
+      the cron. Every other process is a sender only — a second cron worker
+      double-fires the dispatcher.
+    guarded_by: [worker-process, job-queue]
+
+  - id: notification-never-fails-a-check
+    statement: >
+      A failing webhook or email must not fail a check, lose a price point, or
+      burn a pg-boss retry.
+    guarded_by: [notifier, worker-process]
+
+  - id: alert-dedupe
+    statement: >
+      A rule fires only when the condition holds AND (never alerted OR a new
+      low OR past cooldown). Losing this makes the app cry wolf.
+    guarded_by: [alert-rules]
+
+  - id: invite-gated-signup
+    statement: Signup requires a valid unused invite; there is no open registration.
+    guarded_by: [auth, app-db]
+
+  - id: migration-parity
+    statement: >
+      The Drizzle schema and the migration history must produce identical
+      databases — enforced by the parity integration test.
+    guarded_by: [migrations, app-db]

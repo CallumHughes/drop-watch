@@ -33,6 +33,9 @@ find it; `gh pr create --fill` if it doesn't exist yet.
    behind or conflicted.
 6. Green and no valid feedback left → done. Otherwise push and repeat.
 
+After a round that meaningfully changed the diff, refresh the PR's system recap
+block with the `visual-recap` skill so reviewers aren't reading a stale map.
+
 CI runs six jobs in parallel (Lint, Types, Unit tests, Build, Integration
 tests, E2E tests), so expect several failures per round rather than one.
 
