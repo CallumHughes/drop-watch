@@ -1,0 +1,1 @@
+CREATE INDEX "check_runs_started_at_idx" ON "check_runs" USING btree ("started_at");

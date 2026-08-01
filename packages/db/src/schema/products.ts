@@ -172,6 +172,8 @@ export const checkRuns = pgTable(
   (table) => [
     // Detail-page log, and the consecutive-failure window Epic 7 reads.
     index("check_runs_product_id_started_at_idx").on(table.productId, table.startedAt.desc()),
+    // The retention sweep's predicate; the composite above cannot serve it.
+    index("check_runs_started_at_idx").on(table.startedAt),
   ]
 );
 

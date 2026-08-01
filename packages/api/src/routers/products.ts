@@ -189,8 +189,12 @@ export interface PriceStats {
   min: string;
 }
 
-/** One aggregate query; null when the product has no price points yet. */
-async function loadStats(productId: string): Promise<PriceStats | null> {
+/**
+ * One aggregate query; null when the product has no price points yet.
+ * Filtered to the product's current currency — a retailer that geo-flips
+ * GBP→USD must not fold both into one average.
+ */
+async function loadStats(product: Product): Promise<PriceStats | null> {
   const [row] = await db
     .select({
       avg: sql<string | null>`avg(${pricePoints.price})::numeric(12,2)`,
@@ -199,7 +203,12 @@ async function loadStats(productId: string): Promise<PriceStats | null> {
       min: sql<string | null>`min(${pricePoints.price})`,
     })
     .from(pricePoints)
-    .where(eq(pricePoints.productId, productId));
+    .where(
+      and(
+        eq(pricePoints.productId, product.id),
+        product.currency ? eq(pricePoints.currency, product.currency) : undefined
+      )
+    );
   if (!row || row.count === 0 || row.avg === null || row.max === null || row.min === null) {
     return null;
   }
@@ -363,8 +372,8 @@ export const productsRouter = {
   stats: protectedProcedure
     .input(productIdInput)
     .handler(async ({ context, input }): Promise<PriceStats | null> => {
-      await loadProduct(input.id, context.session.user.id);
-      return await loadStats(input.id);
+      const product = await loadProduct(input.id, context.session.user.id);
+      return await loadStats(product);
     }),
 
   /** Tracking settings: interval, jitter, alert rules, target, active. */

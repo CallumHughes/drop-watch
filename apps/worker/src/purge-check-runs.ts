@@ -5,27 +5,36 @@
 
 import { db } from "@drop-watch/db";
 import { checkRuns } from "@drop-watch/db/schema/products";
-import { lt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { createLogger } from "evlog";
 
 /** Matches the schema comment on `checkRuns`. */
 export const RETENTION_DAYS = 30;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-/** Rows with `startedAt` before this instant are eligible for deletion. */
-export function retentionCutoff(now: Date): Date {
-  return new Date(now.getTime() - RETENTION_DAYS * MS_PER_DAY);
-}
+/** Bounded batches, so the first sweep of an old deployment is many short
+ * transactions rather than one long lock the job expiry then misreads. */
+const BATCH_SIZE = 5000;
 
 export async function purgeCheckRuns(): Promise<void> {
   const log = createLogger({ action: "purge_check_runs" });
   const startedAt = Date.now();
 
-  const result = await db
-    .delete(checkRuns)
-    .where(lt(checkRuns.startedAt, retentionCutoff(new Date())));
+  let deleted = 0;
+  let batch: number;
+  do {
+    // `now()` is the database's clock — the cutoff of an irreversible delete
+    // must not move with container clock skew.
+    // biome-ignore lint/performance/noAwaitInLoops: batches are sequential on purpose.
+    const result = await db.execute(sql`
+      delete from ${checkRuns} where ${checkRuns.id} in (
+        select ${checkRuns.id} from ${checkRuns}
+        where ${checkRuns.startedAt} < now() - make_interval(days => ${RETENTION_DAYS})
+        limit ${BATCH_SIZE}
+      )`);
+    batch = result.rowCount ?? 0;
+    deleted += batch;
+  } while (batch === BATCH_SIZE);
 
-  log.set({ deleted: result.rowCount ?? 0, durationMs: Date.now() - startedAt });
+  log.set({ deleted, durationMs: Date.now() - startedAt });
   log.emit();
 }

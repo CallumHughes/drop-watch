@@ -21,6 +21,12 @@ export const MAX_URL_LENGTH = 2048;
 export const MAX_TOKEN_LENGTH = 500;
 
 /**
+ * BotFather's shape: numeric bot id, colon, base64ish secret. Anything else
+ * would be interpolated into the Bot API URL path, so it is rejected here.
+ */
+export const TELEGRAM_BOT_TOKEN_PATTERN = /^\d+:[\w-]+$/;
+
+/**
  * All channel fields are nullable so the page can clear them, which is
  * how you turn a channel off without also losing the cooldown you tuned.
  */
@@ -38,7 +44,13 @@ export const settingsUpdateInput = z.object({
   haWebhookId: z.string().min(1).max(MAX_WEBHOOK_ID_LENGTH).nullable().optional(),
   ntfyToken: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
   ntfyUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
-  telegramBotToken: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
+  telegramBotToken: z
+    .string()
+    .trim()
+    .max(MAX_TOKEN_LENGTH)
+    .regex(TELEGRAM_BOT_TOKEN_PATTERN, "Not a Telegram bot token")
+    .nullable()
+    .optional(),
   telegramChatId: z.string().trim().min(1).max(MAX_TOKEN_LENGTH).nullable().optional(),
 });
 

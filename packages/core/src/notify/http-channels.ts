@@ -77,9 +77,13 @@ export function discordChannel(webhookUrl: string): AlertChannel {
     name: "discord",
     send: (payload) => {
       const { body, title } = alertMessage(payload);
+      // Titles are scraped from remote pages; never let one ping @everyone.
       return post(
         webhookUrl,
-        JSON.stringify({ content: `**${title}**\n${body}` }),
+        JSON.stringify({
+          allowed_mentions: { parse: [] },
+          content: `**${title}**\n${body}`,
+        }),
         { "content-type": "application/json" },
         "Discord"
       );

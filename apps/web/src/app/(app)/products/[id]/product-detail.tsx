@@ -57,9 +57,9 @@ export default function ProductDetail({ productId }: { productId: string }) {
       refetchInterval: LIVE_REFETCH_MS,
     })
   );
-  const stats = useQuery(
-    orpc.products.stats.queryOptions({ input, refetchInterval: LIVE_REFETCH_MS })
-  );
+  // No live polling: a whole-history aggregate is too heavy to re-run every
+  // 15s for numbers that move once per check.
+  const stats = useQuery(orpc.products.stats.queryOptions({ input, staleTime: LIVE_REFETCH_MS }));
 
   if (detail.isPending) {
     return <Skeleton className="h-96 w-full" />;
