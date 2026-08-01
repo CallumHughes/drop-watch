@@ -54,6 +54,20 @@ export function subtract(a: string, b: string): string {
 }
 
 /**
+ * The cheapest of a set of rows by minor units of price, first row wins ties.
+ * Shared between the API's product summary (which listing's price a product
+ * card shows) and the worker's alert rules (which listing's price the
+ * `target` rule fires against) — the two must always agree on "the" price for
+ * a product with more than one listing.
+ */
+export function cheapestByMinorUnits<T extends { price: string }>(rows: readonly T[]): T | null {
+  return rows.reduce<T | null>(
+    (min, row) => (min === null || toMinorUnits(row.price) < toMinorUnits(min.price) ? row : min),
+    null
+  );
+}
+
+/**
  * Signed percentage change from `from` to `to`, one decimal place. `null` when
  * `from` is zero, because the change from nothing is not a percentage.
  */

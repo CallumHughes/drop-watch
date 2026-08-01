@@ -33,7 +33,7 @@
  * alongside the checked listing's own `latest`/`previous`.
  */
 
-import { percentChange, toMinorUnits } from "@drop-watch/core/decimal";
+import { cheapestByMinorUnits, percentChange } from "@drop-watch/core/decimal";
 import type { NotificationPayload } from "@drop-watch/core/notify";
 import type { AlertChannel } from "@drop-watch/core/notify/channels";
 import { deliverAlert } from "@drop-watch/core/notify/channels";
@@ -122,19 +122,6 @@ async function latestSampleByListing(product: Product): Promise<ListingSample[]>
     .innerJoin(listings, eq(pricePoints.listingId, listings.id))
     .where(and(...conditions))
     .orderBy(pricePoints.listingId, desc(pricePoints.observedAt), desc(pricePoints.id));
-}
-
-/**
- * The cheapest of a set of samples by minor units of price. Pure, and
- * exported for unit testing: this is the one piece of `cheapestCurrentSample`
- * worth testing without a Postgres connection, since the query itself is not
- * something a unit test can usefully exercise.
- */
-export function cheapestByMinorUnits<T extends { price: string }>(rows: readonly T[]): T | null {
-  return rows.reduce<T | null>(
-    (min, row) => (min === null || toMinorUnits(row.price) < toMinorUnits(min.price) ? row : min),
-    null
-  );
 }
 
 /**
