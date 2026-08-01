@@ -114,6 +114,24 @@ describe("PriceAlert", () => {
     expect(html).toContain("scrapeme.live");
   });
 
+  it("names the store near the shop link even when a title is present", async () => {
+    const html = await render(<PriceAlert payload={alert} watchUrl={null} />);
+
+    expect(html).toContain("Seen at");
+    expect(html).toContain("scrapeme.live");
+  });
+
+  it("strips a leading www. from the store name", async () => {
+    const html = await render(
+      <PriceAlert
+        payload={{ ...alert, url: "https://www.scrapeme.live/shop/Bulbasaur/" }}
+        watchUrl={null}
+      />
+    );
+
+    expect(html).toContain(">scrapeme.live<");
+  });
+
   it("renders to plain text as well as HTML", async () => {
     const text = await render(<PriceAlert payload={alert} watchUrl={WATCH_URL} />, {
       plainText: true,
@@ -155,6 +173,13 @@ describe("WatchBroken", () => {
 
   it("names the product in the subject", () => {
     expect(watchBrokenSubject(broken)).toBe("Watch broken: Bulbasaur");
+  });
+
+  it("names the store near the shop link", async () => {
+    const html = await render(<WatchBroken payload={broken} watchUrl={null} />);
+
+    expect(html).toContain("checking is at");
+    expect(html).toContain("scrapeme.live");
   });
 });
 

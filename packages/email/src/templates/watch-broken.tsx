@@ -15,10 +15,11 @@
 /** @jsxImportSource react */
 
 import type { NotificationPayload } from "@drop-watch/core/notify";
+import { productHost } from "@drop-watch/core/notify/message";
 import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
 
-import { productHost, productLabel } from "../format";
+import { productLabel } from "../format";
 import {
   APP_NAME,
   buttonStyle,

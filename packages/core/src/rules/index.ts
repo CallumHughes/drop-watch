@@ -7,6 +7,22 @@
  * part which is genuinely easy to get wrong — the dedupe — testable without a
  * Postgres connection.
  *
+ * A product can be watched at more than one store, and the three rules do not
+ * share a subject:
+ *
+ * - `target` fires on the product's *cheapest current listing* — a shopper
+ *   watching a target price does not care which store hits it, only that one
+ *   does. `cheapest` is the caller's job to compute (latest observation per
+ *   active listing, minimum price, same currency); this module never fires
+ *   `target` without one.
+ * - `drop_percent` and `restock` fire on the listing that was actually
+ *   checked this run, against its own previous observation — a per-store
+ *   price history, not a cross-store one.
+ *
+ * Dedupe stays keyed by `(productId, rule)` regardless: stores share one
+ * cooldown per rule, so a target alert about store A does not let store B
+ * re-notify a minute later at the same price.
+ *
  * The dedupe is the whole game. A naive implementation notifies every three
  * hours forever about a product sitting a pound under target, and a watcher
  * that cries wolf gets muted and then deleted. So a rule fires only when
@@ -16,7 +32,9 @@
  *          OR price < lastAlertedPrice
  *          OR now - lastAlertedAt > cooldown)
  *
- * keyed by `(productId, rule)` with a 12h default cooldown.
+ * keyed by `(productId, rule)` with a 12h default cooldown, gated on the
+ * trigger's subject price (the cheapest listing's for `target`, the checked
+ * listing's for `drop_percent`/`restock`).
  */
 
 import { toMinorUnits } from "../decimal";
@@ -66,18 +84,33 @@ export interface AlertMemory {
   lastAlertedPrice: string | null;
 }
 
-/** A rule whose condition held, and why — the reason is logged with the send. */
+/**
+ * A rule whose condition held, and why — the reason is logged with the send.
+ *
+ * `subject` is the observation the trigger is *about*: the cheapest listing's
+ * for `target`, the checked listing's `latest` for `drop_percent`/`restock`.
+ * The caller uses it both to build the right payload (which store, which
+ * price) and to gate the dedupe on the right price.
+ */
 export interface RuleTrigger {
   reason: string;
   rule: AlertRule;
+  subject: Observation;
 }
 
 /** Everything the evaluation needs, gathered by the caller. */
 export interface EvaluationInput {
+  /**
+   * The cheapest current listing's latest observation, across the product's
+   * active listings, in the product's currency. `null` when there is no such
+   * observation (e.g. no listing has ever recorded a price) — `target` never
+   * fires in that case, however low `latest` is.
+   */
+  cheapest: Observation | null;
   config: AlertConfig;
   /** Cooldown in milliseconds. Defaults to {@link DEFAULT_COOLDOWN_MINUTES}. */
   cooldownMs?: number;
-  /** The observation just recorded. */
+  /** The observation just recorded, for the listing that was checked. */
   latest: Observation;
   /** Dedupe state, keyed by rule. Absent means never alerted. */
   memory: ReadonlyMap<AlertStateKey, AlertMemory>;
@@ -90,17 +123,22 @@ export function cooldownMs(minutes: number = DEFAULT_COOLDOWN_MINUTES): number {
   return minutes * MS_PER_MINUTE;
 }
 
-/** Price at or below the configured target. */
-function targetMet(config: AlertConfig, latest: Observation): RuleTrigger | null {
-  if (!config.targetPrice) {
+/**
+ * The cheapest current listing's price is at or below the configured target.
+ * Evaluated against `cheapest`, not the checked listing — never fires without
+ * one, since there is then nothing to be the subject of the alert.
+ */
+function targetMet(config: AlertConfig, cheapest: Observation | null): RuleTrigger | null {
+  if (!(config.targetPrice && cheapest)) {
     return null;
   }
-  if (toMinorUnits(latest.price) > toMinorUnits(config.targetPrice)) {
+  if (toMinorUnits(cheapest.price) > toMinorUnits(config.targetPrice)) {
     return null;
   }
   return {
-    reason: `price ${latest.price} is at or below target ${config.targetPrice}`,
+    reason: `price ${cheapest.price} is at or below target ${config.targetPrice}`,
     rule: "target",
+    subject: cheapest,
   };
 }
 
@@ -130,6 +168,7 @@ function dropMet(
   return {
     reason: `price fell from ${previous.price} to ${latest.price}, at least ${config.dropPercent}%`,
     rule: "drop_percent",
+    subject: latest,
   };
 }
 
@@ -142,7 +181,7 @@ function restockMet(latest: Observation, previous: Observation | null): RuleTrig
   if (previous?.inStock !== false || latest.inStock !== true) {
     return null;
   }
-  return { reason: "back in stock", rule: "restock" };
+  return { reason: "back in stock", rule: "restock", subject: latest };
 }
 
 /**
@@ -153,11 +192,12 @@ function restockMet(latest: Observation, previous: Observation | null): RuleTrig
 export function conditionsMet(
   config: AlertConfig,
   latest: Observation,
-  previous: Observation | null
+  previous: Observation | null,
+  cheapest: Observation | null
 ): RuleTrigger[] {
   const enabled = new Set(config.rules);
   const candidates = [
-    targetMet(config, latest),
+    targetMet(config, cheapest),
     dropMet(config, latest, previous),
     restockMet(latest, previous),
   ];
@@ -185,11 +225,19 @@ export function shouldFire(
   return now.getTime() - memory.lastAlertedAt.getTime() > cooldown;
 }
 
-/** The rules that should actually notify: condition held *and* not deduped. */
+/**
+ * The rules that should actually notify: condition held *and* not deduped.
+ *
+ * The dedupe gate runs on each trigger's own `subject.price` rather than
+ * uniformly on `input.latest.price` — a `target` trigger is about the
+ * cheapest listing, so it is the cheapest listing's price that must be a new
+ * low (or past cooldown) for it to fire again.
+ */
 export function evaluateAlerts(input: EvaluationInput): RuleTrigger[] {
   const cooldown = input.cooldownMs ?? cooldownMs();
-  return conditionsMet(input.config, input.latest, input.previous).filter((trigger) =>
-    shouldFire(input.latest.price, input.memory.get(trigger.rule), input.now, cooldown)
+  return conditionsMet(input.config, input.latest, input.previous, input.cheapest).filter(
+    (trigger) =>
+      shouldFire(trigger.subject.price, input.memory.get(trigger.rule), input.now, cooldown)
   );
 }
 

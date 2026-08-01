@@ -6,14 +6,23 @@
  * Duplicates a few lines of `@drop-watch/email`'s format.ts rather than
  * sharing them, for the same reason that file gives for duplicating
  * `apps/web`: this lives in core, which the mailer depends on, not the other
- * way round. Prices stay decimal strings throughout — never `Number`.
+ * way round. `productHost` is the one exception — it is exported so the email
+ * templates can import it directly instead of keeping a third copy, since
+ * that dependency runs the allowed way (email already depends on core).
+ * Prices stay decimal strings throughout — never `Number`.
  */
 
 import type { NotificationKind, NotificationPayload } from "./index";
 
 const WWW_PREFIX = /^www\./;
 
-function productHost(url: string): string {
+/**
+ * The store a listing's URL belongs to, `www.` stripped. Exported: a product
+ * can now be watched at more than one store, so naming the store is what
+ * makes an alert actionable, and both this module and the email templates
+ * need the same derivation.
+ */
+export function productHost(url: string): string {
   try {
     return new URL(url).hostname.replace(WWW_PREFIX, "");
   } catch {
@@ -23,6 +32,16 @@ function productHost(url: string): string {
 
 function productLabel(payload: NotificationPayload): string {
   return payload.title ?? productHost(payload.url);
+}
+
+/**
+ * `label` with its store appended, e.g. "Bulbasaur at scrapeme.live". Skipped
+ * when `label` is already the hostname (extraction never found a title) —
+ * "scrapeme.live at scrapeme.live" says nothing twice.
+ */
+function withStore(label: string, url: string): string {
+  const host = productHost(url);
+  return label === host ? label : `${label} at ${host}`;
 }
 
 /** Exact currency rendering of a decimal string; falls back to bare digits. */
@@ -102,7 +121,7 @@ function bodyLines(payload: NotificationPayload): string[] {
 
 /** Builds the title + body a push channel sends. Never throws. */
 export function alertMessage(payload: NotificationPayload): AlertMessage {
-  const label = productLabel(payload);
+  const label = withStore(productLabel(payload), payload.url);
   const title = TITLES[payload.rule](label);
   const lines = bodyLines(payload);
   lines.push(payload.url);
