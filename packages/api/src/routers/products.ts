@@ -1,22 +1,23 @@
 /**
- * Everything the dashboard and the product detail page read, plus the two
- * things they write: tracking settings and "check now".
+ * Everything the dashboard and the product detail page read, plus what they
+ * write at the product level: identity, alert configuration, and "check now".
+ * Schedule and extraction settings are listing-level and live in
+ * `./listings` instead — a product can have several listings, each on its own
+ * schedule, so there is no longer a single interval to patch from here.
  *
  * Every read and write is scoped to the signed-in owner — products are private
  * per account, and an id that belongs to someone else answers NOT_FOUND, never
  * FORBIDDEN, so "not yours" is indistinguishable from "doesn't exist".
  *
- * A product's scrape-shaped detail — url, extractor, schedule, cache
- * validators — lives on its `listings`, not on the product itself. This PR
- * keeps the external surface unchanged (every product still has exactly one
- * listing, created alongside it), so every query here resolves through that
- * listing rather than exposing it as its own procedure yet.
- *
- * Two shapes matter here. `summary` is what a product card needs — latest
- * price, a short sparkline, distance from target, and whether recent checks
- * have been failing — assembled for every product in a handful of queries
- * rather than several per product. `history` and `checkRuns` are the detail
- * page's deeper reads, paged by an explicit limit.
+ * Two shapes matter here. `detail` and `list` return a product-card summary
+ * each — latest price, a short sparkline, distance from target, and whether
+ * recent checks have been failing — assembled for every product in a handful
+ * of queries rather than several per product. `history` and `checkRuns` are
+ * the detail page's deeper reads, paged by an explicit limit. `history` is
+ * windowed per listing (a chatty store must not evict a quiet one's line
+ * from the chart); `checkRuns` stays a single merged, newest-first log capped
+ * at `limit` overall — a chronological log reads correctly interleaved, a
+ * chart does not.
  *
  * Prices stay decimal strings from `numeric(12,2)` all the way to the UI, and
  * the derived numbers (target distance, percentage change) are computed in
@@ -41,19 +42,27 @@ import { z } from "zod";
 import { protectedProcedure } from "../index";
 import { getSenderBoss } from "../queue";
 import { productCreateInput, productUpdateInput } from "../schemas/products";
-import { type PriceSample, type ProductSummary, pulledInNextCheckAt, summarise } from "../summary";
+import { type PriceSample, type ProductSummary, summarise } from "../summary";
 
-/** Points behind each dashboard sparkline. Enough shape, one small query. */
+/** Points behind each dashboard sparkline, *per listing*. Enough shape, one small query. */
 const SPARKLINE_POINTS = 24;
 
 /**
- * Check runs pulled per product for the failure badge. Only the leading
+ * Check runs pulled *per listing* for the failure badge. Only the leading
  * non-`ok` streak is used, so this is a ceiling on "how broken", not a window
- * that can hide a failure.
+ * that can hide a failure — and windowing per listing is what stops a chatty
+ * store from pushing a quiet one's own streak out of view.
  */
 const FAILURE_WINDOW = 20;
 
-/** Detail-page defaults. Both are capped so a crafted input cannot pull the table. */
+/**
+ * Detail-page defaults for `history` (per listing — a product with several
+ * listings can return up to `limit` points from each, so the true ceiling is
+ * `limit * listing count`, not `limit` alone) and `checkRuns` (capped overall,
+ * merged across listings). Both bounded so a crafted input cannot pull the
+ * table; a caller only has as many listings as they created, so the
+ * per-listing multiplier stays small in practice.
+ */
 const DEFAULT_HISTORY_POINTS = 200;
 const MAX_HISTORY_POINTS = 2000;
 const DEFAULT_CHECK_RUNS = 50;
@@ -72,8 +81,12 @@ const productIdInput = z.object({ id: z.uuid() });
  * A product *belonging to the requester*, or NOT_FOUND. Deliberately the same
  * NOT_FOUND whether the id does not exist or exists under another account — a
  * FORBIDDEN would confirm the id is real and leak what other users track.
+ *
+ * Exported for `./listings`, which owns a listing's own record but still
+ * needs to confirm the *parent product* is the caller's before adding to it,
+ * and needs the row back to build the returned `ProductSummary`.
  */
-async function loadProduct(id: string, ownerId: string): Promise<Product> {
+export async function loadProduct(id: string, ownerId: string): Promise<Product> {
   const [product] = await db
     .select()
     .from(products)
@@ -205,26 +218,48 @@ async function recentRuns(limit: number, ownerId: string): Promise<Map<string, C
   return byProduct;
 }
 
-/** The most recent `limit` price points for one product, oldest first. */
+/**
+ * The most recent `limit` price points for *each* of a product's listings,
+ * oldest first overall. Windowed per listing — like {@link recentSamples} but
+ * scoped to one product instead of one owner, and returned flat instead of
+ * grouped, since a single product's rows need no further grouping. A chatty
+ * store must not evict a quiet one's line from the chart or the sparkline, so
+ * this is what both the `history` procedure and {@link summariseOne} use.
+ */
 async function loadSamples(productId: string, limit: number): Promise<PriceSample[]> {
+  const ranked = db.$with("ranked_price_points").as(
+    db
+      .select({
+        availability: pricePoints.availability,
+        currency: pricePoints.currency,
+        inStock: pricePoints.inStock,
+        listingId: pricePoints.listingId,
+        observedAt: pricePoints.observedAt,
+        price: pricePoints.price,
+        rank: sql<number>`row_number() over (partition by ${pricePoints.listingId} order by ${pricePoints.observedAt} desc)`.as(
+          "rank"
+        ),
+      })
+      .from(pricePoints)
+      .innerJoin(listings, eq(pricePoints.listingId, listings.id))
+      .where(eq(listings.productId, productId))
+  );
   const rows = await db
-    .select({
-      availability: pricePoints.availability,
-      currency: pricePoints.currency,
-      inStock: pricePoints.inStock,
-      listingId: pricePoints.listingId,
-      observedAt: pricePoints.observedAt,
-      price: pricePoints.price,
-    })
-    .from(pricePoints)
-    .innerJoin(listings, eq(pricePoints.listingId, listings.id))
-    .where(eq(listings.productId, productId))
-    .orderBy(desc(pricePoints.observedAt))
-    .limit(limit);
-  return rows.reverse();
+    .with(ranked)
+    .select()
+    .from(ranked)
+    .where(lte(ranked.rank, limit))
+    .orderBy(asc(ranked.observedAt));
+  return rows.map(({ rank: _rank, ...sample }) => sample);
 }
 
-/** The most recent `limit` check runs for one product, newest first. */
+/**
+ * The most recent `limit` check runs for one product, newest first, capped
+ * overall rather than per listing — this is the detail page's merged log,
+ * where a chronological read matters more than guaranteeing every listing a
+ * slice. Used by the `checkRuns` procedure only; {@link summariseOne}'s
+ * failure-streak input is {@link loadFailureWindowRuns} instead.
+ */
 async function loadRuns(productId: string, limit: number): Promise<CheckRun[]> {
   return await db
     .select({
@@ -242,6 +277,43 @@ async function loadRuns(productId: string, limit: number): Promise<CheckRun[]> {
     .where(eq(listings.productId, productId))
     .orderBy(desc(checkRuns.startedAt))
     .limit(limit);
+}
+
+/**
+ * The most recent `limit` check runs for *each* of a product's listings,
+ * newest first overall. Windowed per listing, like {@link loadSamples} —
+ * without this, a listing checked every five minutes would push a listing
+ * checked daily out of the failure-streak window entirely, understating (or
+ * hiding) its own streak. Feeds {@link summarise}'s `consecutiveFailures` and
+ * `lastCheck`, not the `checkRuns` procedure.
+ */
+async function loadFailureWindowRuns(productId: string, limit: number): Promise<CheckRun[]> {
+  const ranked = db.$with("ranked_check_runs").as(
+    db
+      .select({
+        durationMs: checkRuns.durationMs,
+        error: checkRuns.error,
+        extractorUsed: checkRuns.extractorUsed,
+        httpStatus: checkRuns.httpStatus,
+        id: checkRuns.id,
+        listingId: checkRuns.listingId,
+        rank: sql<number>`row_number() over (partition by ${checkRuns.listingId} order by ${checkRuns.startedAt} desc)`.as(
+          "rank"
+        ),
+        startedAt: checkRuns.startedAt,
+        status: checkRuns.status,
+      })
+      .from(checkRuns)
+      .innerJoin(listings, eq(checkRuns.listingId, listings.id))
+      .where(eq(listings.productId, productId))
+  );
+  const rows = await db
+    .with(ranked)
+    .select()
+    .from(ranked)
+    .where(lte(ranked.rank, limit))
+    .orderBy(desc(ranked.startedAt));
+  return rows.map(({ rank: _rank, ...run }) => run);
 }
 
 /** Min/max/avg over one product's whole price history. Prices stay decimal strings. */
@@ -279,12 +351,16 @@ async function loadStats(product: Product): Promise<PriceStats | null> {
   return { avg: row.avg, count: row.count, max: row.max, min: row.min };
 }
 
-/** The single-product path. Plain indexed reads — no window function needed. */
-async function summariseOne(product: Product): Promise<ProductSummary> {
+/**
+ * The single-product path, shared by `products.detail`/`update` and by
+ * `./listings`' mutations, which all return the parent product's refreshed
+ * summary.
+ */
+export async function summariseOne(product: Product): Promise<ProductSummary> {
   const [productListings, samples, runs] = await Promise.all([
     loadListings(product.id),
     loadSamples(product.id, SPARKLINE_POINTS),
-    loadRuns(product.id, FAILURE_WINDOW),
+    loadFailureWindowRuns(product.id, FAILURE_WINDOW),
   ]);
   return summarise(product, productListings, samples, runs);
 }
@@ -293,7 +369,7 @@ type UpdateInput = z.infer<typeof productUpdateInput>;
 
 /** Only the keys actually supplied, routed onto the product row. */
 function buildProductPatch(input: UpdateInput): Partial<Product> {
-  const { active, dropPercent, rules, targetPrice } = input;
+  const { active, dropPercent, rules, targetPrice, title } = input;
   const patch: Partial<Product> = {};
   if (active !== undefined) {
     patch.active = active;
@@ -307,50 +383,10 @@ function buildProductPatch(input: UpdateInput): Partial<Product> {
   if (targetPrice !== undefined) {
     patch.targetPrice = targetPrice;
   }
-  return patch;
-}
-
-/** Only the keys actually supplied, routed onto every one of the product's listings. */
-function buildListingPatch(input: UpdateInput): Partial<Listing> {
-  const { intervalMinutes, jitterPercent } = input;
-  const patch: Partial<Listing> = {};
-  if (intervalMinutes !== undefined) {
-    patch.intervalMinutes = intervalMinutes;
-  }
-  if (jitterPercent !== undefined) {
-    patch.jitterPercent = jitterPercent;
+  if (title !== undefined) {
+    patch.title = title;
   }
   return patch;
-}
-
-/** The transaction client `db.transaction` hands its callback. */
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/**
- * Applies a shortened interval's pull-in to each of the product's listings
- * individually — {@link pulledInNextCheckAt} decides per listing, against that
- * listing's own `nextCheckAt`, whether the new interval moves its next check
- * sooner. A listing whose next check is already sooner than the new interval
- * implies is left alone.
- */
-async function pullInNextCheckAt(
-  tx: Tx,
-  productId: string,
-  intervalMinutes: number,
-  now: Date
-): Promise<void> {
-  const productListings = await tx.select().from(listings).where(eq(listings.productId, productId));
-  const pulls = productListings
-    .map((listing) => ({
-      id: listing.id,
-      nextCheckAt: pulledInNextCheckAt(listing, intervalMinutes, now),
-    }))
-    .filter((entry): entry is { id: string; nextCheckAt: Date } => entry.nextCheckAt !== undefined);
-  await Promise.all(
-    pulls.map((entry) =>
-      tx.update(listings).set({ nextCheckAt: entry.nextCheckAt }).where(eq(listings.id, entry.id))
-    )
-  );
 }
 
 type CreateInput = z.infer<typeof productCreateInput>;
@@ -535,6 +571,20 @@ export const productsRouter = {
     );
   }),
 
+  /**
+   * Deletes a product and, by cascade, every one of its listings — and their
+   * price points, check runs and alert state. Unlike `listings.remove`, this
+   * needs no "last one" guard: deleting the product *is* how you strand
+   * nothing, since nothing is left watching.
+   */
+  remove: protectedProcedure
+    .input(productIdInput)
+    .handler(async ({ context, input }): Promise<{ deleted: true }> => {
+      const product = await loadProduct(input.id, context.session.user.id);
+      await db.delete(products).where(eq(products.id, product.id));
+      return { deleted: true };
+    }),
+
   /** Min/max/avg price and observation count over the whole recorded history. */
   stats: protectedProcedure
     .input(productIdInput)
@@ -543,41 +593,18 @@ export const productsRouter = {
       return await loadStats(product);
     }),
 
-  /**
-   * Tracking settings: rules, target and drop-percent land on the product;
-   * interval and jitter land on every one of its listings.
-   */
+  /** Identity and alert configuration: title, rules, target and drop-percent. */
   update: protectedProcedure
     .input(productUpdateInput)
     .handler(async ({ context, input }): Promise<ProductSummary> => {
       const product = await loadProduct(input.id, context.session.user.id);
-      const now = new Date();
-
-      const productPatch = buildProductPatch(input);
-      const listingPatch = buildListingPatch(input);
-
-      // One transaction: a crash between the interval patch and the pull-in
-      // must not leave a shortened interval whose next check is still hours out.
-      const updated = await db.transaction(async (tx) => {
-        const patched =
-          Object.keys(productPatch).length > 0
-            ? ((
-                await tx
-                  .update(products)
-                  .set(productPatch)
-                  .where(eq(products.id, product.id))
-                  .returning()
-              )[0] ?? product)
-            : product;
-        if (Object.keys(listingPatch).length > 0) {
-          await tx.update(listings).set(listingPatch).where(eq(listings.productId, product.id));
-        }
-        if (input.intervalMinutes !== undefined) {
-          await pullInNextCheckAt(tx, product.id, input.intervalMinutes, now);
-        }
-        return patched;
-      });
-
+      const patch = buildProductPatch(input);
+      const updated =
+        Object.keys(patch).length > 0
+          ? ((
+              await db.update(products).set(patch).where(eq(products.id, product.id)).returning()
+            )[0] ?? product)
+          : product;
       return await summariseOne(updated);
     }),
 };

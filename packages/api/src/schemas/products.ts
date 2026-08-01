@@ -32,15 +32,24 @@ export const MAX_URL_LENGTH = 2048;
 export const MAX_TITLE_LENGTH = 500;
 export const MAX_SELECTOR_LENGTH = 500;
 
-/** What `products.update` accepts: tracking settings, all optional. */
+/**
+ * What `products.update` accepts: identity and alert configuration, all
+ * optional. Schedule and extraction (`intervalMinutes`, `jitterPercent`,
+ * `extractor`, `selector`, ...) are listing-level now and go through
+ * `listings.update` instead — a product can have several listings, each on
+ * its own schedule, so there is no longer one interval to patch here.
+ *
+ * `title` has no `null` case: clearing it back to "derive from the URL"
+ * is not a thing the settings form does, so `undefined` (not supplied) is
+ * the only way to leave it alone and an empty edit is simply not sent.
+ */
 export const productUpdateInput = z.object({
   active: z.boolean().optional(),
   dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
   id: z.uuid(),
-  intervalMinutes: z.number().int().min(MIN_INTERVAL_MINUTES).max(MAX_INTERVAL_MINUTES).optional(),
-  jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
   rules: z.array(z.enum(ALERT_RULES)).optional(),
   targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),
+  title: z.string().max(MAX_TITLE_LENGTH).optional(),
 });
 
 export type ProductUpdateInput = z.infer<typeof productUpdateInput>;

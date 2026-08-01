@@ -92,17 +92,10 @@ export function WatchSettingsForm({ listing, product }: { listing: Listing; prod
   const [dropPercent, setDropPercent] = useState(product.dropPercent?.toString() ?? "");
   const [rules, setRules] = useState<AlertRule[]>(product.rules);
 
-  const update = useMutation(
-    orpc.products.update.mutationOptions({
-      onError: (error) => {
-        toast.error(`Could not save: ${error.message}`);
-      },
-      onSuccess: () => {
-        toast.success("Watch settings saved.");
-        queryClient.invalidateQueries({ queryKey: orpc.products.key() });
-      },
-    })
-  );
+  const updateProduct = useMutation(orpc.products.update.mutationOptions());
+  const updateListing = useMutation(orpc.listings.update.mutationOptions());
+
+  const isPending = updateProduct.isPending || updateListing.isPending;
 
   const onIntervalChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setIntervalMinutes(event.target.value);
@@ -126,17 +119,42 @@ export function WatchSettingsForm({ listing, product }: { listing: Listing; prod
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      update.mutate({
-        active,
-        dropPercent: dropPercent === "" ? null : Number(dropPercent),
-        id: product.id,
-        intervalMinutes: Number(intervalMinutes),
-        jitterPercent: Number(jitterPercent),
-        rules,
-        targetPrice: targetPrice === "" ? null : targetPrice,
-      });
+      Promise.all([
+        updateProduct.mutateAsync({
+          active,
+          dropPercent: dropPercent === "" ? null : Number(dropPercent),
+          id: product.id,
+          rules,
+          targetPrice: targetPrice === "" ? null : targetPrice,
+        }),
+        updateListing.mutateAsync({
+          id: listing.id,
+          intervalMinutes: Number(intervalMinutes),
+          jitterPercent: Number(jitterPercent),
+        }),
+      ])
+        .then(() => {
+          toast.success("Watch settings saved.");
+          queryClient.invalidateQueries({ queryKey: orpc.products.key() });
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          toast.error(`Could not save: ${message}`);
+        });
     },
-    [active, dropPercent, intervalMinutes, jitterPercent, product.id, rules, targetPrice, update]
+    [
+      active,
+      dropPercent,
+      intervalMinutes,
+      jitterPercent,
+      listing.id,
+      product.id,
+      queryClient,
+      rules,
+      targetPrice,
+      updateListing,
+      updateProduct,
+    ]
   );
 
   return (
@@ -207,8 +225,8 @@ export function WatchSettingsForm({ listing, product }: { listing: Listing; prod
       </Label>
 
       <div>
-        <Button disabled={update.isPending} type="submit">
-          {update.isPending ? "Saving…" : "Save settings"}
+        <Button disabled={isPending} type="submit">
+          {isPending ? "Saving…" : "Save settings"}
         </Button>
       </div>
     </form>

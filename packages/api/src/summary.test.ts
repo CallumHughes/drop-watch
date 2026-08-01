@@ -174,6 +174,97 @@ describe("summarise", () => {
   });
 });
 
+describe("summarise with two listings", () => {
+  it("takes the cheapest active listing's current sample as latest, in minor units not lexically", () => {
+    // Lexical comparison would put "9.99" above "10.00".
+    const cheap = listing({ id: "cheap" });
+    const dear = listing({ id: "dear" });
+    const result = summarise(
+      product(),
+      [dear, cheap],
+      [sample("10.00", 5, true, "dear"), sample("9.99", 5, true, "cheap")],
+      []
+    );
+    expect(result.latest?.price).toBe("9.99");
+    expect(result.cheapestListingId).toBe("cheap");
+  });
+
+  it("excludes a listing quoted in a different currency than the product", () => {
+    const gbp = listing({ id: "gbp" });
+    const usd = listing({ id: "usd" });
+    const cheaperButWrongCurrency: PriceSample = {
+      availability: null,
+      currency: "USD",
+      inStock: true,
+      listingId: "usd",
+      observedAt: minutesAgo(5),
+      price: "1.00",
+    };
+    const result = summarise(
+      product({ currency: "GBP" }),
+      [gbp, usd],
+      [sample("50.00", 5, true, "gbp"), cheaperButWrongCurrency],
+      []
+    );
+    expect(result.latest?.price).toBe("50.00");
+    expect(result.cheapestListingId).toBe("gbp");
+  });
+
+  it("takes changePercent and previous from the cheapest listing's own series, not another store's", () => {
+    const cheap = listing({ id: "cheap" });
+    const dear = listing({ id: "dear" });
+    const result = summarise(
+      product(),
+      [dear, cheap],
+      [
+        sample("100.00", 30, true, "dear"),
+        sample("90.00", 5, true, "dear"),
+        sample("40.00", 30, true, "cheap"),
+        sample("30.00", 5, true, "cheap"),
+      ],
+      []
+    );
+    expect(result.cheapestListingId).toBe("cheap");
+    expect(result.previous?.price).toBe("40.00");
+    expect(result.changePercent).toBe("-25.0");
+  });
+
+  it("takes the worst failure streak across active listings, ignoring an inactive listing's failures", () => {
+    const healthy = listing({ active: true, id: "healthy" });
+    const broken = listing({ active: true, id: "broken" });
+    const inactiveButWorse = listing({ active: false, id: "paused" });
+    const result = summarise(
+      product(),
+      [healthy, broken, inactiveButWorse],
+      [],
+      [
+        run("ok", 1, "healthy"),
+        run("timeout", 1, "broken"),
+        run("timeout", 2, "broken"),
+        run("timeout", 3, "broken"),
+        run("http_error", 1, "paused"),
+        run("http_error", 2, "paused"),
+        run("http_error", 3, "paused"),
+        run("http_error", 4, "paused"),
+        run("http_error", 5, "paused"),
+      ]
+    );
+    expect(result.consecutiveFailures).toBe(3);
+  });
+
+  it("has no cheapest listing, and zero failures, when no listing is active", () => {
+    const result = summarise(
+      product(),
+      [listing({ active: false })],
+      [sample("10.00", 5)],
+      [run("timeout", 1)]
+    );
+    expect(result.latest).toBeNull();
+    expect(result.cheapestListingId).toBeNull();
+    expect(result.consecutiveFailures).toBe(0);
+  });
+});
+
 describe("pulledInNextCheckAt", () => {
   it("pulls the next check in when the interval is shortened", () => {
     // Scheduled for 15:00; five minutes from noon is sooner, so it wins.

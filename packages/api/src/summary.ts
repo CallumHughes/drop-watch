@@ -12,9 +12,30 @@
  * again here: the dashboard's badge and the worker's "tracker broken" alarm
  * have to mean the same thing by "failing", and one implementation is how that
  * stays true.
+ *
+ * A product can have several listings, so every product-level field below is
+ * derived, not copied from a single row:
+ *
+ * - `latest`/`previous`/`changePercent`/`history`/`cheapestListingId` all come
+ *   from the cheapest *active* listing's current sample, in the product's own
+ *   currency — `core/decimal`'s `cheapestByMinorUnits`, the same helper the
+ *   worker uses to pick the `target` rule's subject, so the dashboard and the
+ *   alert that fires never disagree about which listing "the" price is. A
+ *   listing quoted in a different currency than the product (a retailer that
+ *   has not re-extracted since a geo-flip) is excluded rather than compared on
+ *   raw numbers. `previous`/`changePercent`/`history` are that one listing's
+ *   own series — there is no cross-store "previous price".
+ * - `consecutiveFailures` is the *worst* streak across active listings, not a
+ *   sum or an average: one broken store is enough to say the tracker needs
+ *   attention, and a healthy second store must not hide that.
+ * - `lastCheck` is the most recent check run across every listing, active or
+ *   not, so a paused listing's last attempt still explains "why did this stop
+ *   moving".
+ * - `nextCheckAt` is unchanged from before: the soonest scheduled check across
+ *   active listings.
  */
 
-import { percentChange, subtract } from "@drop-watch/core/decimal";
+import { cheapestByMinorUnits, percentChange, subtract } from "@drop-watch/core/decimal";
 import { countLeadingFailures } from "@drop-watch/core/rules";
 import type { CheckRun, Listing, Product } from "@drop-watch/db/schema/products";
 
@@ -52,6 +73,12 @@ export interface ListingSummary {
 export interface ProductSummary {
   /** Signed percentage from the previous point to the latest, one decimal place. */
   changePercent: string | null;
+  /**
+   * The listing `latest` was drawn from — the id a card should highlight as
+   * "the" store. `null` when no active listing has a current sample in the
+   * product's own currency.
+   */
+  cheapestListingId: string | null;
   /** Length of the current run of non-`ok` checks. Zero means healthy. */
   consecutiveFailures: number;
   /** Oldest first, so a sparkline can be drawn straight from it. */
@@ -94,10 +121,10 @@ function summariseListing(
  * must be oldest-first and `runs` newest-first — the orderings the queries
  * already produce. `listingRows` is the product's own listings, oldest first.
  *
- * With exactly one listing per product (true for every product until listings
- * become independently manageable), the product-level fields below equal that
- * one listing's — which is what keeps this behaviour-identical to the
- * pre-split shape.
+ * The per-listing breakdown is built first; every product-level field other
+ * than `nextCheckAt` and `lastCheck` is then derived from it rather than from
+ * `samples`/`runs` directly — see the module doc for what each one means with
+ * more than one listing.
  */
 export function summarise(
   product: Product,
@@ -105,23 +132,42 @@ export function summarise(
   samples: PriceSample[],
   runs: CheckRun[]
 ): ProductSummary {
-  const latest = samples.at(-1) ?? null;
-  const previous = samples.at(-2) ?? null;
+  const listingSummaries = listingRows.map((listing) => summariseListing(listing, samples, runs));
+
+  // The `target` rule's subject, mirrored here: cheapest current sample among
+  // active listings, restricted to the product's own currency so a listing
+  // that has geo-flipped currency and not yet re-extracted is not compared on
+  // raw numbers against one that has.
+  const currentSamples = listingSummaries
+    .filter((summary) => summary.listing.active && summary.latest !== null)
+    .map((summary) => summary.latest as PriceSample)
+    .filter((sample) => !product.currency || sample.currency === product.currency);
+  const cheapest = cheapestByMinorUnits(currentSamples);
+  const cheapestListing = cheapest
+    ? listingSummaries.find((summary) => summary.listing.id === cheapest.listingId)
+    : undefined;
+
   const activeNextCheckTimes = listingRows
     .filter((listing) => listing.active)
     .map((listing) => listing.nextCheckAt.getTime());
+  const activeFailureStreaks = listingSummaries
+    .filter((summary) => summary.listing.active)
+    .map((summary) => summary.consecutiveFailures);
+
   return {
-    changePercent: latest && previous ? percentChange(previous.price, latest.price) : null,
-    consecutiveFailures: countLeadingFailures(runs),
-    history: samples,
+    changePercent: cheapestListing?.changePercent ?? null,
+    cheapestListingId: cheapest?.listingId ?? null,
+    consecutiveFailures: activeFailureStreaks.length > 0 ? Math.max(...activeFailureStreaks) : 0,
+    history: cheapestListing?.history ?? [],
     lastCheck: runs[0] ?? null,
-    latest,
-    listings: listingRows.map((listing) => summariseListing(listing, samples, runs)),
+    latest: cheapest,
+    listings: listingSummaries,
     nextCheckAt:
       activeNextCheckTimes.length > 0 ? new Date(Math.min(...activeNextCheckTimes)) : null,
-    previous,
+    previous: cheapestListing?.previous ?? null,
     product,
-    targetDelta: latest && product.targetPrice ? subtract(latest.price, product.targetPrice) : null,
+    targetDelta:
+      cheapest && product.targetPrice ? subtract(cheapest.price, product.targetPrice) : null,
   };
 }
 
