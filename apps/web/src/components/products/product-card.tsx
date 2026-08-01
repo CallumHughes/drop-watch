@@ -1,4 +1,4 @@
-import type { ProductSummary } from "@drop-watch/api/routers/products";
+import type { Listing, ListingSummary, ProductSummary } from "@drop-watch/api/routers/products";
 import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import Image from "next/image";
 import Link from "next/link";
@@ -45,6 +45,31 @@ function TargetDistance({
   );
 }
 
+/** Beneath the title: which store, or how many when there is more than one. */
+function StoreLine({
+  cheapestListing,
+  listingCount,
+  primaryListing,
+}: {
+  cheapestListing: ListingSummary | undefined;
+  listingCount: number;
+  primaryListing: Listing | undefined;
+}) {
+  if (listingCount > 1 && cheapestListing) {
+    return (
+      <p className="truncate text-muted-foreground text-xs">
+        cheapest of {listingCount} stores · {productHost(cheapestListing.listing.url)}
+      </p>
+    );
+  }
+  if (!primaryListing) {
+    return null;
+  }
+  return (
+    <p className="truncate text-muted-foreground text-xs">{productHost(primaryListing.url)}</p>
+  );
+}
+
 function PriceChange({ changePercent }: { changePercent: string | null }) {
   if (!changePercent || changePercent === "0.0") {
     return null;
@@ -63,9 +88,10 @@ function PriceChange({ changePercent }: { changePercent: string | null }) {
  * is still working.
  */
 export function ProductCard({ summary }: { summary: ProductSummary }) {
-  const { history, lastCheck, latest, listings, nextCheckAt, product } = summary;
+  const { cheapestListingId, history, lastCheck, latest, listings, nextCheckAt, product } = summary;
   const primaryListing = listings[0]?.listing;
   const title = product.title ?? (primaryListing ? productHost(primaryListing.url) : "—");
+  const cheapestListing = listings.find((listing) => listing.listing.id === cheapestListingId);
 
   return (
     <Card className="relative transition-colors hover:ring-foreground/25">
@@ -90,11 +116,11 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
                 {title}
               </Link>
             </CardTitle>
-            {primaryListing ? (
-              <p className="truncate text-muted-foreground text-xs">
-                {productHost(primaryListing.url)}
-              </p>
-            ) : null}
+            <StoreLine
+              cheapestListing={cheapestListing}
+              listingCount={listings.length}
+              primaryListing={primaryListing}
+            />
           </div>
           <StatusBadge
             active={product.active}

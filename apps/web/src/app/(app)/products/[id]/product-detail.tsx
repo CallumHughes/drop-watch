@@ -1,5 +1,6 @@
 "use client";
 
+import type { Listing, ListingSummary, PriceSample } from "@drop-watch/api/routers/products";
 import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +9,7 @@ import Image from "next/image";
 
 import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
+import { ListingsCard } from "@/components/products/listings-card";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { StatusBadge } from "@/components/products/status-badge";
 import { WatchSettingsForm } from "@/components/products/watch-settings-form";
@@ -24,21 +26,102 @@ const THUMBNAIL_SIZE = 72;
 const HISTORY_POINTS = 200;
 const LOG_ROWS = 50;
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ hint, label, value }: { hint?: string; label: string; value: string }) {
   return (
     <div>
       <div className="text-muted-foreground text-xs">{label}</div>
       <div className="text-sm tabular-nums">{value}</div>
+      {hint ? <div className="text-muted-foreground text-xs">{hint}</div> : null}
     </div>
   );
 }
 
+const TRAILING_SLASHES = /\/+$/;
+
+/** The last path segment, for telling apart two listings that share a host. */
+function pathTail(url: string): string {
+  try {
+    const path = new URL(url).pathname.replace(TRAILING_SLASHES, "");
+    const segment = path.split("/").filter(Boolean).at(-1);
+    return segment ? decodeURIComponent(segment) : path;
+  } catch {
+    return url;
+  }
+}
+
 /**
- * One product in full: current state, the whole recorded history, every check
- * attempt, and the two controls — force a check, change how it is tracked.
+ * One chart label per listing: the host, disambiguated with the URL's last
+ * path segment when two listings share a hostname.
+ */
+function listingLabels(listingSummaries: readonly ListingSummary[]): Map<string, string> {
+  const hosts = listingSummaries.map((summary) => productHost(summary.listing.url));
+  const hostCounts = new Map<string, number>();
+  for (const host of hosts) {
+    hostCounts.set(host, (hostCounts.get(host) ?? 0) + 1);
+  }
+  const labels = new Map<string, string>();
+  listingSummaries.forEach((summary, index) => {
+    const host = hosts[index] ?? productHost(summary.listing.url);
+    const label =
+      (hostCounts.get(host) ?? 0) > 1 ? `${host} · ${pathTail(summary.listing.url)}` : host;
+    labels.set(summary.listing.id, label);
+  });
+  return labels;
+}
+
+/** Groups the flat `PriceSample[]` history back into one series per listing. */
+function toSeries(
+  listingSummaries: readonly ListingSummary[],
+  samples: readonly PriceSample[]
+): { label: string; listingId: string; samples: PriceSample[] }[] {
+  const labels = listingLabels(listingSummaries);
+  const byListing = new Map<string, PriceSample[]>();
+  for (const sample of samples) {
+    const group = byListing.get(sample.listingId) ?? [];
+    group.push(sample);
+    byListing.set(sample.listingId, group);
+  }
+  return listingSummaries.map((summary) => ({
+    label: labels.get(summary.listing.id) ?? productHost(summary.listing.url),
+    listingId: summary.listing.id,
+    samples: byListing.get(summary.listing.id) ?? [],
+  }));
+}
+
+/** The header's location line: a store count once there is more than one, else the host link. */
+function StoreLocation({
+  listingCount,
+  primaryListing,
+}: {
+  listingCount: number;
+  primaryListing: Listing | undefined;
+}) {
+  if (listingCount > 1) {
+    return <p className="text-muted-foreground text-xs">{listingCount} stores</p>;
+  }
+  if (!primaryListing) {
+    return null;
+  }
+  return (
+    <a
+      className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:underline"
+      href={primaryListing.url}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {productHost(primaryListing.url)}
+      <ExternalLink className="size-3" />
+    </a>
+  );
+}
+
+/**
+ * One product in full: current state, every store tracking it, the whole
+ * recorded history, every check attempt, and the controls to change how it is
+ * tracked.
  *
- * All three queries poll on the same interval, so pressing "check now" shows
- * up here within a tick without any invalidation gymnastics.
+ * All three live queries poll on the same interval, so pressing "check now"
+ * shows up here within a tick without any invalidation gymnastics.
  */
 export default function ProductDetail({ productId }: { productId: string }) {
   const input = { id: productId };
@@ -69,9 +152,11 @@ export default function ProductDetail({ productId }: { productId: string }) {
     return <p className="text-muted-foreground text-sm">This product could not be loaded.</p>;
   }
 
-  const { lastCheck, latest, listings, nextCheckAt, product } = detail.data;
+  const { cheapestListingId, lastCheck, latest, listings, nextCheckAt, product } = detail.data;
   const primaryListing = listings[0]?.listing;
   const title = product.title ?? (primaryListing ? productHost(primaryListing.url) : "—");
+  const multiStore = listings.length > 1;
+  const cheapestListing = listings.find((summary) => summary.listing.id === cheapestListingId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -95,23 +180,21 @@ export default function ProductDetail({ productId }: { productId: string }) {
               lastStatus={lastCheck?.status ?? null}
             />
           </div>
-          {primaryListing ? (
-            <a
-              className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:underline"
-              href={primaryListing.url}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              {productHost(primaryListing.url)}
-              <ExternalLink className="size-3" />
-            </a>
-          ) : null}
+          <StoreLocation listingCount={listings.length} primaryListing={primaryListing} />
         </div>
-        <CheckNowButton productId={product.id} />
+        <CheckNowButton
+          label={multiStore ? "Check all" : undefined}
+          target={{ kind: "product", productId: product.id }}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat
+          hint={
+            multiStore && cheapestListing
+              ? `at ${productHost(cheapestListing.listing.url)}`
+              : undefined
+          }
           label="Current price"
           value={latest ? formatPrice(latest.price, latest.currency) : "—"}
         />
@@ -144,12 +227,14 @@ export default function ProductDetail({ productId }: { productId: string }) {
           ) : (
             <PriceHistoryChart
               currency={product.currency}
-              samples={history.data ?? []}
+              series={toSeries(listings, history.data ?? [])}
               targetPrice={product.targetPrice}
             />
           )}
         </CardContent>
       </Card>
+
+      <ListingsCard listings={listings} productId={product.id} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -157,15 +242,7 @@ export default function ProductDetail({ productId }: { productId: string }) {
             <CardTitle>Watch settings</CardTitle>
           </CardHeader>
           <CardContent>
-            {primaryListing ? (
-              <WatchSettingsForm
-                key={product.updatedAt.toISOString()}
-                listing={primaryListing}
-                product={product}
-              />
-            ) : (
-              <p className="text-muted-foreground text-sm">No listing to configure.</p>
-            )}
+            <WatchSettingsForm key={product.updatedAt.toISOString()} product={product} />
           </CardContent>
         </Card>
 
