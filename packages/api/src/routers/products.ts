@@ -323,6 +323,9 @@ function buildListingPatch(input: UpdateInput): Partial<Listing> {
   return patch;
 }
 
+/** The transaction client `db.transaction` hands its callback. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /**
  * Applies a shortened interval's pull-in to each of the product's listings
  * individually — {@link pulledInNextCheckAt} decides per listing, against that
@@ -331,11 +334,12 @@ function buildListingPatch(input: UpdateInput): Partial<Listing> {
  * implies is left alone.
  */
 async function pullInNextCheckAt(
+  tx: Tx,
   productId: string,
   intervalMinutes: number,
   now: Date
 ): Promise<void> {
-  const productListings = await loadListings(productId);
+  const productListings = await tx.select().from(listings).where(eq(listings.productId, productId));
   const pulls = productListings
     .map((listing) => ({
       id: listing.id,
@@ -344,7 +348,7 @@ async function pullInNextCheckAt(
     .filter((entry): entry is { id: string; nextCheckAt: Date } => entry.nextCheckAt !== undefined);
   await Promise.all(
     pulls.map((entry) =>
-      db.update(listings).set({ nextCheckAt: entry.nextCheckAt }).where(eq(listings.id, entry.id))
+      tx.update(listings).set({ nextCheckAt: entry.nextCheckAt }).where(eq(listings.id, entry.id))
     )
   );
 }
@@ -550,24 +554,29 @@ export const productsRouter = {
       const now = new Date();
 
       const productPatch = buildProductPatch(input);
-      const updated =
-        Object.keys(productPatch).length > 0
-          ? ((
-              await db
-                .update(products)
-                .set(productPatch)
-                .where(eq(products.id, product.id))
-                .returning()
-            )[0] ?? product)
-          : product;
-
       const listingPatch = buildListingPatch(input);
-      if (Object.keys(listingPatch).length > 0) {
-        await db.update(listings).set(listingPatch).where(eq(listings.productId, product.id));
-      }
-      if (input.intervalMinutes !== undefined) {
-        await pullInNextCheckAt(product.id, input.intervalMinutes, now);
-      }
+
+      // One transaction: a crash between the interval patch and the pull-in
+      // must not leave a shortened interval whose next check is still hours out.
+      const updated = await db.transaction(async (tx) => {
+        const patched =
+          Object.keys(productPatch).length > 0
+            ? ((
+                await tx
+                  .update(products)
+                  .set(productPatch)
+                  .where(eq(products.id, product.id))
+                  .returning()
+              )[0] ?? product)
+            : product;
+        if (Object.keys(listingPatch).length > 0) {
+          await tx.update(listings).set(listingPatch).where(eq(listings.productId, product.id));
+        }
+        if (input.intervalMinutes !== undefined) {
+          await pullInNextCheckAt(tx, product.id, input.intervalMinutes, now);
+        }
+        return patched;
+      });
 
       return await summariseOne(updated);
     }),
