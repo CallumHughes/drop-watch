@@ -24,9 +24,18 @@ if (!block.startsWith(startMarker) || !block.endsWith(endMarker)) {
   process.exit(1)
 }
 
+// Read and write via the REST API: `gh pr edit` queries the deprecated
+// projectCards GraphQL field and fails on repos where Projects (classic)
+// is disabled.
+const repo = execFileSync(
+  'gh',
+  ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+  { encoding: 'utf8' },
+).trim()
+
 const body = execFileSync(
   'gh',
-  ['pr', 'view', prNumber, '--json', 'body', '--jq', '.body'],
+  ['api', `repos/${repo}/pulls/${prNumber}`, '--jq', '.body // ""'],
   { encoding: 'utf8' },
 )
 
@@ -39,9 +48,11 @@ const nextBody = hasExistingBlock
   ? body.slice(0, startIndex) + block + body.slice(endIndex + endMarker.length)
   : `${body.trimEnd()}\n\n${block}\n`
 
-execFileSync('gh', ['pr', 'edit', prNumber, '--body-file', '-'], {
-  input: nextBody,
-})
+execFileSync(
+  'gh',
+  ['api', `repos/${repo}/pulls/${prNumber}`, '-X', 'PATCH', '-F', 'body=@-'],
+  { input: nextBody, stdio: ['pipe', 'ignore', 'inherit'] },
+)
 
 console.log(
   hasExistingBlock
