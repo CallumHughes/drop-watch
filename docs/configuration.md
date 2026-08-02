@@ -75,6 +75,7 @@ Postgres is the interface between the web app and the worker:
   2 to 50, 5 by default.
 - **Email alerts** — per user, on their own account.
 
-Per-product settings (check interval, jitter, target price, which rules are
-armed, the extractor and selector, active/paused) live on the product and are
-edited from its detail page.
+Per-product settings (title, target price, which rules are armed, active/paused)
+live on the product. Per-listing settings (check interval, jitter, the extractor
+and selector, active/paused for that store alone) live on each store you add to
+it. Both are edited from the product's detail page.

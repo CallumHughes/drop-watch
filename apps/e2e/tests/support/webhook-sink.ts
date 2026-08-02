@@ -8,6 +8,8 @@ import { FIXTURE_URL, SINK_WEBHOOK_ID } from "../../constants";
  * fields the specs assert on.
  */
 export interface AlertPayload {
+  /** Null only for the settings page's test notification, which has no listing. */
+  listingId: string | null;
   pctChange: string | null;
   previousPrice: string | null;
   price: string | null;
