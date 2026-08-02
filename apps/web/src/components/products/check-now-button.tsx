@@ -68,7 +68,15 @@ export function CheckNowButton({
   }, [checkListing, checkProduct, target]);
 
   return (
-    <Button disabled={isPending} onClick={onClick} size={size} variant={variant}>
+    <Button
+      // The product-level button sits on a page full of per-listing "Check
+      // now" buttons; a distinct accessible name says which scope this one is.
+      aria-label={target.kind === "product" ? "Check every store now" : undefined}
+      disabled={isPending}
+      onClick={onClick}
+      size={size}
+      variant={variant}
+    >
       <RefreshCw className={isPending ? "animate-spin" : undefined} />
       {isPending ? "Queueing…" : (label ?? "Check now")}
     </Button>

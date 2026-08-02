@@ -21,7 +21,9 @@ export class ProductDetailPage {
   constructor(page: Page) {
     this.page = page;
     this.notFoundMessage = page.getByText("This product could not be loaded.");
-    this.checkNowButton = page.getByRole("button", { name: "Check now" });
+    // The product-level button's aria-label — the visible "Check now" text is
+    // shared with every per-listing row button and would be ambiguous.
+    this.checkNowButton = page.getByRole("button", { name: "Check every store now" });
     this.targetPriceInput = page.getByLabel("Target price");
     this.dropPercentInput = page.getByLabel("Drop alert threshold");
     this.targetRuleCheckbox = page.getByRole("checkbox", { name: "Target" });
