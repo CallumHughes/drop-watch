@@ -65,7 +65,7 @@ function startWorker(): ChildProcess {
     cwd: WORKER_DIR,
     detached: true,
     env: { ...process.env, ...appEnv },
-    stdio: ["ignore", "ignore", "inherit"],
+    stdio: ["ignore", "inherit", "inherit"],
   });
 }
 
