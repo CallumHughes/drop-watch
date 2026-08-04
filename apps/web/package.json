@@ -23,7 +23,7 @@
     "@drop-watch/env": "workspace:*",
     "@drop-watch/ui": "workspace:*",
     "@swc/helpers": "^0.5.23",
-    "@tanstack/react-form": "^1.33.0",
+    "@tanstack/react-form": "^1.33.3",
     "@tanstack/react-query": "^5.101.2",
     "babel-plugin-react-compiler": "^1.0.0",
     "better-auth": "catalog:",
