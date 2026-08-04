@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RENDER_UNCONFIGURED_ERROR, renderTarget, unconfiguredRenderResult } from "./check-listing";
+import { RENDER_UNCONFIGURED_ERROR, renderTarget, unconfiguredRenderResult } from "./retrieve";
 
 describe("renderTarget", () => {
   it("goes over http for an http listing with no RENDER_URL", () => {

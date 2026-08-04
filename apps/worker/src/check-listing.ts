@@ -25,6 +25,7 @@ import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
 import { type CheckOutcome, toCheckOutcome } from "./outcome";
+import { renderTarget, unconfiguredRenderResult } from "./retrieve";
 import { nextCheckAt } from "./schedule";
 
 /** Where a check came from. Recorded on the log line, not in the database. */
@@ -56,34 +57,6 @@ function conditionalRequest(listing: Listing): { etag?: string; lastModified?: s
     options.lastModified = listing.lastModified;
   }
   return options;
-}
-
-/** Extracted so the test can assert on it without duplicating the string. */
-export const RENDER_UNCONFIGURED_ERROR =
-  "browser rendering is not configured (RENDER_URL is unset)";
-
-/**
- * Decides how a listing's page should be retrieved. Pure and directly
- * testable, unlike `retrievePage` itself, which needs a live sidecar.
- */
-export function renderTarget(
-  listing: Pick<Listing, "render">,
-  renderUrl: string | undefined
-): "http" | "browser" | "unconfigured" {
-  if (listing.render !== "browser") {
-    return "http";
-  }
-  return renderUrl ? "browser" : "unconfigured";
-}
-
-/**
- * Synthesised result for a browser-mode listing with no sidecar configured.
- * Flows through the untouched `toCheckOutcome` into a real `check_runs` row —
- * visible in the check-run log and able to trip the watch-broken alarm — the
- * same as any other target-side failure, rather than crashing the worker.
- */
-export function unconfiguredRenderResult(): FetchPageResult {
-  return { durationMs: 0, error: RENDER_UNCONFIGURED_ERROR, status: "network_error" };
 }
 
 /**
