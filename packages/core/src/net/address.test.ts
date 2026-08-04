@@ -62,6 +62,12 @@ describe("isGloballyRoutable", () => {
     }
   });
 
+  it("defaults reserved IPv6 address space to non-routable", () => {
+    expect(isGloballyRoutable("4000::1")).toBe(false);
+    expect(isGloballyRoutable("6000::1")).toBe(false);
+    expect(isGloballyRoutable("2606:4700:4700::1111")).toBe(true);
+  });
+
   it("rejects every non-routable IPv6 block", () => {
     const blocked = [
       "::", // unspecified
@@ -95,9 +101,14 @@ describe("isGloballyRoutable", () => {
       expect(isGloballyRoutable(ip), ip).toBe(false);
     }
 
-    const outside = ["64:ff9a:ffff::1", "100:0:0:2::1", "3fff:1000::1", "5f01::1"];
-    for (const ip of outside) {
+    const globallyRoutable = ["3fff:1000::1"];
+    for (const ip of globallyRoutable) {
       expect(isGloballyRoutable(ip), ip).toBe(true);
+    }
+
+    const reserved = ["64:ff9a:ffff::1", "100:0:0:2::1", "5f01::1"];
+    for (const ip of reserved) {
+      expect(isGloballyRoutable(ip), ip).toBe(false);
     }
   });
 
@@ -123,14 +134,14 @@ describe("isGloballyRoutable", () => {
     expect(isGloballyRoutable("2001:200::1")).toBe(true);
   });
 
-  it("unwraps IPv4-mapped, NAT64 and 6to4 addresses before judging them", () => {
+  it("rejects IPv4-mapped and 6to4 ranges while filtering NAT64 destinations", () => {
     expect(isGloballyRoutable("::ffff:169.254.169.254")).toBe(false);
-    expect(isGloballyRoutable("::ffff:127.0.0.1")).toBe(false);
-    expect(isGloballyRoutable("::ffff:a9fe:a9fe")).toBe(false); // the same, in hex
-    expect(isGloballyRoutable("::ffff:8.8.8.8")).toBe(true);
-    expect(isGloballyRoutable("64:ff9b::10.0.0.1")).toBe(false); // NAT64
-    expect(isGloballyRoutable("2002:7f00:0001::")).toBe(false); // 6to4 over 127.0.0.1
-    expect(isGloballyRoutable("2002:0808:0808::")).toBe(true); // 6to4 over 8.8.8.8
+    expect(isGloballyRoutable("::ffff:a9fe:a9fe")).toBe(false);
+    expect(isGloballyRoutable("::ffff:8.8.8.8")).toBe(false);
+    expect(isGloballyRoutable("2002:7f00:0001::")).toBe(false);
+    expect(isGloballyRoutable("2002:0808:0808::")).toBe(false);
+    expect(isGloballyRoutable("64:ff9b::10.0.0.1")).toBe(false);
+    expect(isGloballyRoutable("64:ff9b::8.8.8.8")).toBe(true);
   });
 
   it("ignores a zone id", () => {

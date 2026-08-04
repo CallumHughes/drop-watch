@@ -8,7 +8,7 @@
  * spoofing, no UA games beyond Chromium's default, no CAPTCHA anything.
  */
 
-import { checkPeerAddress, checkUrl, type UrlVerdict } from "@drop-watch/core/net/guard";
+import { checkUrlScheme } from "@drop-watch/core/net/guard";
 import type { RenderRequest, RenderResponse } from "@drop-watch/core/render/contract";
 import {
   DEFAULT_RENDER_MAX_BYTES,
@@ -16,8 +16,19 @@ import {
   MAX_RENDER_TIMEOUT_MS,
 } from "@drop-watch/core/render/contract";
 import { log } from "evlog";
-import type { Browser, BrowserContext, Page, Response as PlaywrightResponse } from "playwright";
+import type {
+  Browser,
+  BrowserContext,
+  BrowserServer,
+  Page,
+  Response as PlaywrightResponse,
+} from "playwright";
 import { chromium } from "playwright";
+import {
+  type BrowserGeneration,
+  BrowserGenerationManager,
+  withDeadline,
+} from "./browser-generation";
 import {
   classifyError,
   exceedsByteCap,
@@ -25,6 +36,7 @@ import {
   shouldBlockResource,
   stalledFor,
 } from "./classify";
+import { type GuardedSocksProxy, startGuardedSocksProxy } from "./guarded-socks-proxy";
 
 /**
  * Best-effort settle after `goto` resolves, to catch SPA hydration that keeps
@@ -37,7 +49,45 @@ import {
 const NETWORK_IDLE_MS = 3000;
 
 /** Budget for tearing a context down; a healthy close is tens of milliseconds. */
-const CONTEXT_CLOSE_TIMEOUT_MS = 5000;
+const CONTEXT_CLOSE_TIMEOUT_MS = 2000;
+const BROWSER_LAUNCH_TIMEOUT_MS = 15_000;
+const BROWSER_SERVER_LAUNCH_TIMEOUT_MS = 10_000;
+const BROWSER_CLOSE_TIMEOUT_MS = 2000;
+const BROWSER_KILL_TIMEOUT_MS = 2000;
+const BROWSER_CONNECT_TIMEOUT_MS = 3000;
+const CONTEXT_SETUP_TIMEOUT_MS = 5000;
+
+interface ManagedBrowser {
+  browser: Browser;
+  server: BrowserServer;
+}
+
+async function launchBrowser(): Promise<ManagedBrowser> {
+  let server: BrowserServer | null = null;
+  try {
+    server = await chromium.launchServer({
+      args: [
+        "--disable-quic",
+        "--dns-prefetch-disable",
+        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+      ],
+      timeout: BROWSER_SERVER_LAUNCH_TIMEOUT_MS,
+    });
+    const browser = await chromium.connect(server.wsEndpoint(), {
+      timeout: BROWSER_CONNECT_TIMEOUT_MS,
+    });
+    return { browser, server };
+  } catch (error) {
+    if (server) {
+      await withDeadline(
+        server.kill(),
+        BROWSER_KILL_TIMEOUT_MS,
+        "failed browser launch cleanup"
+      ).catch(() => undefined);
+    }
+    throw error;
+  }
+}
 
 /**
  * One long-lived browser process, a fresh `BrowserContext` per request rather
@@ -48,38 +98,22 @@ const CONTEXT_CLOSE_TIMEOUT_MS = 5000;
  * and a page a caller forgets to close is structurally unable to pin memory,
  * because the whole context it lives in is closed in `finally`.
  */
-let browser: Browser | null = null;
-/**
- * Single in-flight launch promise so N concurrent requests arriving while
- * nothing has launched yet cannot each start their own `chromium.launch()`.
- * The check-then-set below has no `await` in between, so it is atomic with
- * respect to other calls on the same event loop.
- */
-let launching: Promise<Browser> | null = null;
-
-async function ensureBrowser(): Promise<Browser> {
-  if (browser?.isConnected()) {
-    return browser;
-  }
-  if (!launching) {
-    launching = chromium.launch().then(
-      (launched) => {
-        browser = launched;
-        launching = null;
-        return launched;
-      },
-      (error: unknown) => {
-        launching = null;
-        throw error;
-      }
-    );
-  }
-  return await launching;
-}
+const browserManager = new BrowserGenerationManager<ManagedBrowser>({
+  close: ({ server }) => server.close(),
+  closeTimeoutMs: BROWSER_CLOSE_TIMEOUT_MS,
+  forceClose: ({ server }) => server.kill(),
+  forceCloseTimeoutMs: BROWSER_KILL_TIMEOUT_MS,
+  isUsable: ({ browser, server }) =>
+    browser.isConnected() &&
+    server.process().exitCode === null &&
+    server.process().signalCode === null,
+  launch: launchBrowser,
+  launchTimeoutMs: BROWSER_LAUNCH_TIMEOUT_MS,
+});
 
 /** For `/healthz`: whether a browser process is currently up. */
 export function browserStatus(): "connected" | "idle" {
-  return browser?.isConnected() ? "connected" : "idle";
+  return browserManager.isConnected() ? "connected" : "idle";
 }
 
 /**
@@ -102,27 +136,8 @@ export function stalledRenderMs(now: number = Date.now()): number | null {
 }
 
 /** Closes the browser, if one was ever launched. Called on shutdown. */
-export async function closeBrowser(): Promise<void> {
-  if (launching) {
-    await launching.catch(() => undefined);
-  }
-  if (browser) {
-    await browser.close().catch(() => undefined);
-    browser = null;
-  }
-}
-
-/** Rejects with a Playwright-shaped `TimeoutError` after `ms`, whichever finishes first wins the race. */
-function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: NodeJS.Timeout;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      const error = new Error(`render exceeded its ${ms}ms budget`);
-      error.name = "TimeoutError";
-      reject(error);
-    }, ms);
-  });
-  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+export async function closeBrowser(deadlineAt?: number): Promise<void> {
+  await browserManager.close(deadlineAt);
 }
 
 /**
@@ -132,37 +147,16 @@ function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
  */
 interface GuardState {
   refusal: string | null;
-  /** Peer-address verifications still in flight, awaited before the HTML is trusted. */
-  settling: Promise<void>[];
 }
 
 /**
- * Blocks requests to non-public addresses, and verifies afterwards that the
- * responses that did arrive came from where the check said they would.
- *
- * Chromium resolves DNS in its own process, leaving a gap between our
- * resolution and the browser's; reading the peer address back closes it.
- * Subresources are covered as well as the document — a script fetching an
- * internal endpoint and writing the reply into JSON-LD is why browser mode
- * raises the stakes.
+ * Keeps the normal route focused on cheap browser-side policy. Address policy
+ * is enforced by the per-render SOCKS proxy at the socket connection, where
+ * Chromium cannot resolve a different address between the check and connect.
  */
 async function installAddressGuard(context: BrowserContext, state: GuardState): Promise<void> {
-  // One verdict per origin per render, so a page pulling forty assets off one
-  // CDN does not resolve it forty times.
-  const verdicts = new Map<string, Promise<UrlVerdict>>();
-  const verdictFor = (url: string): Promise<UrlVerdict> => {
-    const { origin } = new URL(url);
-    const cached = verdicts.get(origin);
-    if (cached) {
-      return cached;
-    }
-    const verdict = checkUrl(url);
-    verdicts.set(origin, verdict);
-    return verdict;
-  };
-
-  context.on("response", (response) => {
-    state.settling.push(verifyPeerAddress(response, state));
+  await context.routeWebSocket("**/*", async (webSocket) => {
+    await webSocket.close({ code: 1008, reason: "WebSockets disabled" });
   });
 
   await context.route("**/*", async (route) => {
@@ -176,7 +170,7 @@ async function installAddressGuard(context: BrowserContext, state: GuardState): 
       await route.continue();
       return;
     }
-    const verdict = await verdictFor(url);
+    const verdict = checkUrlScheme(url);
     if (verdict.ok) {
       await route.continue();
       return;
@@ -184,27 +178,6 @@ async function installAddressGuard(context: BrowserContext, state: GuardState): 
     state.refusal ??= verdict.reason;
     await route.abort("blockedbyclient");
   });
-}
-
-/** Reads back the address a response came from. Not every response has one. */
-async function verifyPeerAddress(response: PlaywrightResponse, state: GuardState): Promise<void> {
-  try {
-    const url = new URL(response.url());
-    if (isInertScheme(response.url())) {
-      return;
-    }
-    const peer = await response.serverAddr();
-    if (!peer) {
-      return;
-    }
-    const verdict = checkPeerAddress(peer.ipAddress, url.hostname);
-    if (!verdict.ok) {
-      state.refusal ??= verdict.reason;
-    }
-  } catch {
-    // A response served from cache or a worker has no peer to read, which is
-    // not a signal either way.
-  }
 }
 
 interface Navigated {
@@ -233,21 +206,28 @@ function httpError(durationMs: number, error: string, httpStatus: number): Rende
  * rather than the page, so the browser is dropped and the next render launches
  * a clean one.
  */
-async function closeContext(context: BrowserContext | null): Promise<void> {
+async function closeContext(
+  context: BrowserContext | null,
+  generation: BrowserGeneration<ManagedBrowser> | null
+): Promise<void> {
   if (!context) {
     return;
   }
   try {
-    await withDeadline(context.close(), CONTEXT_CLOSE_TIMEOUT_MS);
+    await withDeadline(context.close(), CONTEXT_CLOSE_TIMEOUT_MS, "context close");
   } catch {
-    log.warn("renderer", "context close timed out; dropping the browser");
-    await closeBrowser();
+    log.warn("renderer", "context close timed out; retiring the browser generation");
+    if (generation) {
+      browserManager.retire(generation);
+    }
   }
 }
 
 /**
- * Renders one page and returns a contract-shaped result. Never throws —
- * every Playwright failure is caught and mapped by {@link classifyError}.
+ * Renders one page and returns a contract-shaped target result. Renderer
+ * setup failures deliberately escape so the sidecar can return 5xx and the
+ * worker records `renderer_error`; navigation failures retain the contract's
+ * target-facing error variants.
  */
 export async function renderPage(request: RenderRequest): Promise<RenderResponse> {
   const startedAt = Date.now();
@@ -255,58 +235,101 @@ export async function renderPage(request: RenderRequest): Promise<RenderResponse
   const maxBytes = request.maxBytes ?? DEFAULT_RENDER_MAX_BYTES;
   const elapsed = () => Date.now() - startedAt;
 
-  const guard: GuardState = { refusal: null, settling: [] };
+  const guard: GuardState = { refusal: null };
   const inFlight = { startedAt };
   inFlightRenders.add(inFlight);
   let context: BrowserContext | null = null;
+  let generation: BrowserGeneration<ManagedBrowser> | null = null;
+  let proxy: GuardedSocksProxy | null = null;
   try {
-    const activeBrowser = await ensureBrowser();
-    context = await activeBrowser.newContext({
+    proxy = await startGuardedSocksProxy();
+    const acquired = await browserManager.acquire();
+    ({ generation } = acquired);
+    const contextPromise = acquired.handle.browser.newContext({
+      proxy: { bypass: "<-loopback>", server: proxy.server },
+      serviceWorkers: "block",
       ...(request.locale ? { locale: request.locale } : {}),
       ...(request.userAgent ? { userAgent: request.userAgent } : {}),
     });
-    await installAddressGuard(context, guard);
-    const page = await context.newPage();
-
-    const { html, response } = await withDeadline(navigate(page, request, budgetMs), budgetMs);
-
-    // Let the peer-address checks land before `html` is trusted.
-    await Promise.allSettled(guard.settling);
-    if (guard.refusal) {
-      return { durationMs: elapsed(), error: guard.refusal, status: "network_error" };
-    }
-
-    if (!response) {
-      return { durationMs: elapsed(), error: "no response", status: "network_error" };
-    }
-    if (!response.ok()) {
-      return httpError(
-        elapsed(),
-        `HTTP ${response.status()} ${response.statusText()}`.trim(),
-        response.status()
+    try {
+      context = await withDeadline(
+        contextPromise,
+        CONTEXT_SETUP_TIMEOUT_MS,
+        "browser context setup"
       );
-    }
-    const overBy = exceedsByteCap(html, maxBytes);
-    if (overBy !== null) {
-      return httpError(elapsed(), `response too large (${overBy} bytes)`, response.status());
+    } catch (error) {
+      // A timed-out protocol call can still resolve later. Close that late
+      // context explicitly while retiring its browser generation below.
+      contextPromise.then((lateContext) => lateContext.close()).catch(() => undefined);
+      browserManager.retire(generation);
+      throw error;
     }
 
-    return {
-      durationMs: elapsed(),
-      html,
-      httpStatus: response.status(),
-      status: "ok",
-      url: page.url(),
-    };
-  } catch (error) {
-    // A blocked main document surfaces as `net::ERR_BLOCKED_BY_CLIENT`, which
-    // says nothing useful.
-    if (guard.refusal) {
-      return { durationMs: elapsed(), error: guard.refusal, status: "network_error" };
+    let page: Page;
+    try {
+      await withDeadline(
+        installAddressGuard(context, guard),
+        CONTEXT_SETUP_TIMEOUT_MS,
+        "browser route setup"
+      );
+      page = await withDeadline(context.newPage(), CONTEXT_SETUP_TIMEOUT_MS, "page setup");
+    } catch (error) {
+      browserManager.retire(generation);
+      throw error;
     }
-    return classifyError(error, elapsed());
+
+    try {
+      const { html, response } = await withDeadline(
+        navigate(page, request, budgetMs),
+        budgetMs,
+        "render"
+      );
+
+      const refusal = guard.refusal ?? proxy.refusal();
+      if (refusal) {
+        return { durationMs: elapsed(), error: refusal, status: "network_error" };
+      }
+
+      if (!response) {
+        return { durationMs: elapsed(), error: "no response", status: "network_error" };
+      }
+      if (!response.ok()) {
+        return httpError(
+          elapsed(),
+          `HTTP ${response.status()} ${response.statusText()}`.trim(),
+          response.status()
+        );
+      }
+      const overBy = exceedsByteCap(html, maxBytes);
+      if (overBy !== null) {
+        return httpError(elapsed(), `response too large (${overBy} bytes)`, response.status());
+      }
+
+      return {
+        durationMs: elapsed(),
+        html,
+        httpStatus: response.status(),
+        status: "ok",
+        url: page.url(),
+      };
+    } catch (error) {
+      // A blocked main document surfaces as `net::ERR_BLOCKED_BY_CLIENT`,
+      // which says nothing useful.
+      const refusal = guard.refusal ?? proxy.refusal();
+      if (refusal) {
+        return { durationMs: elapsed(), error: refusal, status: "network_error" };
+      }
+      return classifyError(error, elapsed());
+    }
   } finally {
-    await closeContext(context);
-    inFlightRenders.delete(inFlight);
+    proxy?.abort();
+    try {
+      await closeContext(context, generation);
+    } finally {
+      if (!context && generation) {
+        browserManager.retire(generation);
+      }
+      inFlightRenders.delete(inFlight);
+    }
   }
 }

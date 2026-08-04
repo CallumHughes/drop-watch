@@ -7,7 +7,7 @@
 import type { RenderResponse } from "@drop-watch/core/render/contract";
 
 /** Resource types blocked before they reach the network. */
-const BLOCKED_RESOURCE_TYPES = new Set(["font", "image", "media", "stylesheet"]);
+const BLOCKED_RESOURCE_TYPES = new Set(["font", "image", "media"]);
 
 const TIMEOUT_ERROR_NAME = "TimeoutError";
 
@@ -53,12 +53,9 @@ export function classifyError(error: unknown, durationMs: number): RenderRespons
 }
 
 /**
- * `image`, `media` and `font` are the obvious cut — cheerio never renders
- * them. `stylesheet` joins them for the same reason: the extractor
- * (`packages/core/src/extract`) works over the parsed DOM and never computes
- * layout or style, so CSS is pure download weight. Blocking it is normally a
- * risky move (it can change layout-dependent visibility), but nothing here
- * ever looks at layout — it is the single biggest latency win available.
+ * `image`, `media` and `font` do not participate in DOM construction. Keep
+ * stylesheets: page JavaScript can wait for their load event or inspect the
+ * CSSOM before composing the product data that this renderer exists to expose.
  */
 export function shouldBlockResource(resourceType: string): boolean {
   return BLOCKED_RESOURCE_TYPES.has(resourceType);

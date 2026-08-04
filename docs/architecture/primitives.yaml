@@ -77,8 +77,9 @@ primitives:
     group: domain
     summary: >
       Shared SSRF boundary for plain HTTP and browser retrieval. Restricts
-      schemes and non-public addresses, re-checks DNS at connection time where
-      possible, and supports an explicit private-host deployment allowlist.
+      schemes and non-public addresses, validates and pins DNS answers at socket
+      connection time (including browser egress through a guarded proxy), and
+      supports an explicit private-host deployment allowlist.
     code:
       - packages/core/src/net/**
 

@@ -45,11 +45,11 @@ describe("classifyError", () => {
 });
 
 describe("shouldBlockResource", () => {
-  it.each(["image", "media", "font", "stylesheet"])("blocks %s", (resourceType) => {
+  it.each(["image", "media", "font"])("blocks %s", (resourceType) => {
     expect(shouldBlockResource(resourceType)).toBe(true);
   });
 
-  it.each(["document", "script", "xhr", "fetch"])("allows %s", (resourceType) => {
+  it.each(["document", "script", "stylesheet", "xhr", "fetch"])("allows %s", (resourceType) => {
     expect(shouldBlockResource(resourceType)).toBe(false);
   });
 });

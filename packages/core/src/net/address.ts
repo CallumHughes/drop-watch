@@ -60,8 +60,10 @@ const IPV4_BLOCKED: readonly Prefix[] = [
  * assignments inside 2001::/23 override its non-reachable parent block.
  */
 const IPV6_POLICY: readonly Ipv6Policy[] = [
+  { base: [0x20_00, 0, 0, 0, 0, 0, 0, 0], bits: 3, globallyReachable: true }, // global unicast
   { base: [0, 0, 0, 0, 0, 0, 0, 1], bits: 128, globallyReachable: false }, // loopback
   { base: [0, 0, 0, 0, 0, 0, 0, 0], bits: 128, globallyReachable: false }, // unspecified
+  { base: [0, 0, 0, 0, 0, MAX_GROUP, 0, 0], bits: 96, globallyReachable: false }, // IPv4-mapped
   { base: [0x20_01, 1, 0, 0, 0, 0, 0, 1], bits: 128, globallyReachable: true }, // PCP anycast
   { base: [0x20_01, 1, 0, 0, 0, 0, 0, 2], bits: 128, globallyReachable: true }, // TURN anycast
   { base: [0x20_01, 1, 0, 0, 0, 0, 0, 3], bits: 128, globallyReachable: true }, // DNS-SD anycast
@@ -72,6 +74,7 @@ const IPV6_POLICY: readonly Ipv6Policy[] = [
   { base: [0x20_01, 2, 0, 0, 0, 0, 0, 0], bits: 48, globallyReachable: false }, // benchmarking
   { base: [0x20_01, 0x0d_b8, 0, 0, 0, 0, 0, 0], bits: 32, globallyReachable: false }, // documentation
   { base: [0x20_01, 0, 0, 0, 0, 0, 0, 0], bits: 23, globallyReachable: false }, // IETF protocol assignments
+  { base: [0x20_02, 0, 0, 0, 0, 0, 0, 0], bits: 16, globallyReachable: false }, // 6to4
   { base: [0x64, 0xff_9b, 1, 0, 0, 0, 0, 0], bits: 48, globallyReachable: false }, // NAT64
   { base: [0x64, 0xff_9b, 0, 0, 0, 0, 0, 0], bits: 96, globallyReachable: true }, // NAT64
   { base: [0x1_00, 0, 0, 0, 0, 0, 0, 0], bits: 64, globallyReachable: false }, // discard-only
@@ -205,19 +208,14 @@ function ipv6PrefixMatches(groups: readonly number[], prefix: Ipv6Policy): boole
 }
 
 /**
- * An embedded IPv4 address, if there is one. `::ffff:169.254.169.254` reaches
- * the metadata service exactly as the bare v4 form does, so it is judged as v4.
+ * The IPv4 destination embedded in the globally reachable NAT64 prefix, if
+ * present. It is still judged as IPv4 so translations to private destinations
+ * remain blocked.
  */
-function embeddedIpv4(groups: readonly number[]): number[] | null {
-  // ::ffff:0:0/96 (IPv4-mapped) and 64:ff9b::/96 (NAT64).
-  const mapped = groupsMatch(groups, [0, 0, 0, 0, 0, MAX_GROUP]);
+function nat64EmbeddedIpv4(groups: readonly number[]): number[] | null {
   const nat64 = groupsMatch(groups, [0x00_64, 0xff_9b, 0, 0, 0, 0]);
-  if (mapped || nat64) {
+  if (nat64) {
     return toOctets(groups[6] ?? 0, groups[7] ?? 0);
-  }
-  // 2002::/16 (6to4) carries the v4 address in the next 32 bits.
-  if (groups[0] === 0x20_02) {
-    return toOctets(groups[1] ?? 0, groups[2] ?? 0);
   }
   return null;
 }
@@ -227,17 +225,23 @@ function toOctets(high: number, low: number): number[] {
 }
 
 function isIpv6Routable(groups: readonly number[]): boolean {
-  const embedded = embeddedIpv4(groups);
-  if (embedded) {
-    return isIpv4Routable(embedded);
-  }
   let mostSpecific: Ipv6Policy | undefined;
   for (const policy of IPV6_POLICY) {
     if (ipv6PrefixMatches(groups, policy) && (!mostSpecific || policy.bits > mostSpecific.bits)) {
       mostSpecific = policy;
     }
   }
-  return mostSpecific?.globallyReachable ?? true;
+
+  // Reject complete non-global ranges before considering embedded addresses.
+  if (mostSpecific?.globallyReachable === false) {
+    return false;
+  }
+
+  const embedded = nat64EmbeddedIpv4(groups);
+  if (embedded) {
+    return isIpv4Routable(embedded);
+  }
+  return mostSpecific?.globallyReachable ?? false;
 }
 
 /**

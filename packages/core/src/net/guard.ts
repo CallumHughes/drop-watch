@@ -132,9 +132,8 @@ export function guardedLookup(
 
 /**
  * Resolves `hostname` and reports whether every address it answers with is
- * public. For callers that cannot supply their own lookup — Chromium resolves
- * in its own process, so `apps/renderer` pairs this with {@link checkPeerAddress}
- * to cover the gap between the two resolutions.
+ * public. Useful for preflight diagnostics; connection-capable callers should
+ * prefer {@link guardedLookup} so the checked answer is also the one connected.
  */
 export function checkHostAddresses(hostname: string): Promise<UrlVerdict> {
   const bare = hostname.replace(/^\[|]$/g, "");
@@ -167,8 +166,8 @@ export async function checkUrl(url: string): Promise<UrlVerdict> {
 }
 
 /**
- * Whether a connection that already happened went somewhere public. A rebind
- * that beat {@link checkHostAddresses} is visible here and nowhere else.
+ * Whether an observed peer address is public. Kept for callers that can inspect
+ * a connected socket but cannot inject {@link guardedLookup}.
  */
 export function checkPeerAddress(address: string, hostname: string): UrlVerdict {
   if (isAllowedPrivateHost(hostname)) {
