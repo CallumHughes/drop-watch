@@ -31,11 +31,15 @@ interface SeedEntry {
 const SEED_ENTRIES: SeedEntry[] = [
   {
     listings: [
-      // A second store joins once product-level series are windowed per
-      // listing — until then two stores interleave into one nonsense series.
+      // Two stores for the one product now that price series are windowed
+      // per listing, so the chart and sparkline give each its own line.
       {
         intervalMinutes: 180,
         url: "https://scrapeme.live/shop/Bulbasaur/",
+      },
+      {
+        intervalMinutes: 180,
+        url: "https://www.pokemoncenter.com/product/pokemon-bulbasaur",
       },
     ],
     product: {
