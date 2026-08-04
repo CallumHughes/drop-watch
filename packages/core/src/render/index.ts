@@ -17,6 +17,24 @@ import { DEFAULT_RENDER_TIMEOUT_MS, RENDER_PATH, renderResponseSchema } from "./
 const HTTP_OK = 200;
 
 /**
+ * A fault in our renderer rather than in the page it was asked for. Kept apart
+ * from `network_error` because they point at different things to go and fix,
+ * and only one of them is the retailer's problem.
+ */
+export interface RendererFault {
+  durationMs: number;
+  error: string;
+  status: "renderer_error";
+}
+
+/** Everything `fetchPage` can produce, plus the outcome only browser mode has. */
+export type RetrieveResult = FetchPageResult | RendererFault;
+
+function rendererFault(durationMs: number, error: string): RendererFault {
+  return { durationMs, error, status: "renderer_error" };
+}
+
+/**
  * Extra time given to the client deadline beyond the budget handed to the
  * sidecar, so a sidecar that answers its own `timeout` variant properly wins
  * the race. Without this slack, the client and the sidecar would abort at
@@ -108,7 +126,7 @@ export async function renderPage(
   baseUrl: string,
   url: string,
   options: RenderPageOptions = {}
-): Promise<FetchPageResult> {
+): Promise<RetrieveResult> {
   const startedAt = Date.now();
   const elapsed = () => Date.now() - startedAt;
 
@@ -116,11 +134,7 @@ export async function renderPage(
   try {
     endpoint = new URL(RENDER_PATH, baseUrl);
   } catch (error) {
-    return {
-      durationMs: elapsed(),
-      error: `invalid renderer base URL: ${errorMessage(error)}`,
-      status: "network_error",
-    };
+    return rendererFault(elapsed(), `invalid renderer base URL: ${errorMessage(error)}`);
   }
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_RENDER_TIMEOUT_MS;
@@ -147,49 +161,34 @@ export async function renderPage(
     });
 
     // Non-200 is always the sidecar's own fault (malformed request, at
-    // capacity, shutting down) — never the store's — so it is reported the
-    // same way regardless of which status it is.
+    // capacity, shutting down) — never the store's. The status stays in the
+    // message so 429 and 503 remain distinguishable to a reader.
     if (response.status !== HTTP_OK) {
-      return {
-        durationMs: elapsed(),
-        error: `renderer responded ${response.status}`,
-        status: "network_error",
-      };
+      return rendererFault(elapsed(), `renderer responded ${response.status}`);
     }
 
     let payload: unknown;
     try {
       payload = await response.json();
     } catch (error) {
-      return {
-        durationMs: elapsed(),
-        error: `renderer returned invalid JSON: ${errorMessage(error)}`,
-        status: "network_error",
-      };
+      return rendererFault(elapsed(), `renderer returned invalid JSON: ${errorMessage(error)}`);
     }
 
     const parsed = renderResponseSchema.safeParse(payload);
     if (!parsed.success) {
-      return {
-        durationMs: elapsed(),
-        error: `renderer returned a malformed response: ${parsed.error.message}`,
-        status: "network_error",
-      };
+      return rendererFault(
+        elapsed(),
+        `renderer returned a malformed response: ${parsed.error.message}`
+      );
     }
 
     return toFetchResult(parsed.data);
   } catch (error) {
+    // A timeout here is the sidecar failing to answer within its budget plus
+    // slack. A slow store comes back as the `timeout` variant inside a 200.
     if (isTimeout(error)) {
-      return {
-        durationMs: elapsed(),
-        error: `timed out after ${timeoutMs}ms`,
-        status: "timeout",
-      };
+      return rendererFault(elapsed(), `renderer did not answer within ${timeoutMs}ms`);
     }
-    return {
-      durationMs: elapsed(),
-      error: `renderer unreachable: ${errorMessage(error)}`,
-      status: "network_error",
-    };
+    return rendererFault(elapsed(), `renderer unreachable: ${errorMessage(error)}`);
   }
 }

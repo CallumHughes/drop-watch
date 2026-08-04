@@ -10,7 +10,7 @@
  */
 
 import type { ExtractionResult } from "@drop-watch/core/extract";
-import type { FetchPageResult } from "@drop-watch/core/fetch";
+import type { RetrieveResult } from "@drop-watch/core/render";
 import type { checkRunStatus, ExtractorUsed } from "@drop-watch/db/schema/products";
 
 export type CheckRunStatus = (typeof checkRunStatus.enumValues)[number];
@@ -31,7 +31,7 @@ export interface CheckOutcome {
  *   number with no unit is not a price.
  */
 export function toCheckOutcome(
-  fetched: FetchPageResult,
+  fetched: RetrieveResult,
   extraction: ExtractionResult | null,
   currency: string | null
 ): CheckOutcome {
@@ -50,6 +50,9 @@ export function toCheckOutcome(
       };
     case "network_error":
       return { error: fetched.error, recordPricePoint: false, status: "network_error" };
+    // The sidecar's own fault, not the store's — see the enum's doc comment.
+    case "renderer_error":
+      return { error: fetched.error, recordPricePoint: false, status: "renderer_error" };
     case "timeout":
       return { error: fetched.error, recordPricePoint: false, status: "timeout" };
     default:

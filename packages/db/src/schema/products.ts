@@ -30,7 +30,7 @@ import { user } from "./auth";
 /** `auto` runs the full fallback chain; `selector` forces the configured CSS selector. */
 export const extractorMode = pgEnum("extractor_mode", ["auto", "selector"]);
 
-/** Plain HTTP today. `browser` is reserved for a headless renderer we have not built. */
+/** `browser` routes the check through the Playwright sidecar in `apps/renderer`. */
 export const renderMode = pgEnum("render_mode", ["http", "browser"]);
 
 /**
@@ -46,6 +46,7 @@ export const renderMode = pgEnum("render_mode", ["http", "browser"]);
  * | `http_error`    | `http_error`                                          |
  * | `network_error` | `network_error`                                       |
  * | `timeout`       | `timeout`                                             |
+ * | `renderer_error`| `renderer_error`                                      |
  *
  * `network_error` is deliberately its own value rather than folded into
  * `http_error`: an origin answering 503 and a hostname that no longer resolves
@@ -53,12 +54,19 @@ export const renderMode = pgEnum("render_mode", ["http", "browser"]);
  * point of keeping this table. `not_modified` is not a status of its own because
  * a 304 is a *successful* check — giving it its own value would make the
  * consecutive-failure alarm in Epic 7 fire on a perfectly healthy product.
+ *
+ * `renderer_error` extends that argument to browser mode: a sidecar at
+ * capacity, shutting down, unreachable or unconfigured is a fault in this
+ * deployment, and points the reader at their own container rather than at the
+ * retailer. It still counts as a failed check — `countLeadingFailures` treats
+ * everything that is not `ok` as one.
  */
 export const checkRunStatus = pgEnum("check_run_status", [
   "ok",
   "extract_failed",
   "http_error",
   "network_error",
+  "renderer_error",
   "timeout",
 ]);
 

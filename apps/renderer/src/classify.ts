@@ -65,6 +65,35 @@ export function shouldBlockResource(resourceType: string): boolean {
 }
 
 /**
+ * How long the oldest in-flight render has been running past `thresholdMs`, or
+ * `null` when nothing is overdue. `isConnected()` stays true of a Chromium that
+ * has stopped completing anything, so liveness is measured this way instead.
+ */
+export function stalledFor(
+  oldestStartedAt: number | null,
+  now: number,
+  thresholdMs: number
+): number | null {
+  if (oldestStartedAt === null) {
+    return null;
+  }
+  const age = now - oldestStartedAt;
+  return age > thresholdMs ? age : null;
+}
+
+/**
+ * Schemes that resolve inside the browser and never open a socket, so the
+ * address guard has nothing to say about them. Everything else non-http(s) is
+ * refused.
+ */
+const INERT_SCHEMES = new Set(["about:", "blob:", "data:"]);
+
+export function isInertScheme(url: string): boolean {
+  const separator = url.indexOf(":");
+  return separator === -1 ? false : INERT_SCHEMES.has(url.slice(0, separator + 1).toLowerCase());
+}
+
+/**
  * Byte count when `html` exceeds `maxBytes`, else `null`. Counts UTF-8 bytes,
  * not UTF-16 code units, so a multibyte-heavy page is measured the way it
  * will actually be sent.

@@ -11,7 +11,8 @@
  */
 
 import PQueue from "p-queue";
-import { Agent, fetch as undiciFetch } from "undici";
+import { Agent, buildConnector, fetch as undiciFetch } from "undici";
+import { BlockedAddressError, checkLiteralHost, checkUrlScheme, guardedLookup } from "../net/guard";
 
 const LEADING_WWW = /^www\./;
 
@@ -246,6 +247,27 @@ async function readBodyWithCap(
   return { body: new TextDecoder().decode(merged), ok: true };
 }
 
+/**
+ * undici's connector with the address guard wrapped around it. Every connection
+ * the agent opens goes through here, so a redirect to `169.254.169.254` is
+ * refused exactly as a first hop to it would be.
+ *
+ * Two checks because there are two ways to name a host: `checkLiteralHost` for
+ * an IP written into the URL, which `net.connect` never resolves, and
+ * `guardedLookup` for a name, as it resolves.
+ */
+function guardedConnector(timeoutMs: number): buildConnector.connector {
+  const connect = buildConnector({ lookup: guardedLookup, timeout: timeoutMs });
+  return (options, callback) => {
+    const verdict = checkLiteralHost(options.hostname);
+    if (verdict.ok) {
+      connect(options, callback);
+      return;
+    }
+    callback(new BlockedAddressError(options.hostname, options.hostname), null);
+  };
+}
+
 async function attemptFetch(
   url: string,
   options: FetchPageOptions,
@@ -255,7 +277,7 @@ async function attemptFetch(
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
   const agent = new Agent({
     bodyTimeout: timeoutMs,
-    connect: { timeout: timeoutMs },
+    connect: guardedConnector(timeoutMs),
     headersTimeout: timeoutMs,
   });
   const elapsed = () => Date.now() - startedAt;
@@ -388,15 +410,19 @@ export async function withDomainQueue<T>(url: string, fn: () => Promise<T>): Pro
 /**
  * Fetches a product page, queued behind any other in-flight request to the same
  * domain. Never throws — every failure mode comes back as a result variant.
+ *
+ * Non-http(s) schemes are refused here; non-routable addresses are refused in
+ * the connector, which covers redirects too.
  */
 export async function fetchPage(
   url: string,
   options: FetchPageOptions = {}
 ): Promise<FetchPageResult> {
-  if (!URL.canParse(url)) {
+  const scheme = checkUrlScheme(url);
+  if (!scheme.ok) {
     return {
       durationMs: 0,
-      error: `invalid URL: ${url}`,
+      error: scheme.reason,
       status: "network_error",
     };
   }

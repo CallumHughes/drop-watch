@@ -6,6 +6,11 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
   runtimeEnv: process.env,
   server: {
+    // Hostnames the SSRF guard in `@drop-watch/core/net/guard` exempts from its
+    // private-address block, comma-separated. Declared here for validation and
+    // discoverability; the guard reads `process.env` itself, because it is also
+    // loaded by the renderer, which has no env package.
+    ALLOWED_PRIVATE_HOSTS: z.string().optional(),
     // Unset means Better Auth's own default: on in production, off in
     // development. The e2e suite turns it off explicitly, because it drives a
     // production build from one address and sign-in allows 3 requests per 10s.

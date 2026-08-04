@@ -1,6 +1,12 @@
 import { MAX_RENDER_TIMEOUT_MS, renderRequestSchema } from "@drop-watch/core/render/contract";
 import { describe, expect, it } from "vitest";
-import { classifyError, exceedsByteCap, shouldBlockResource } from "./classify";
+import {
+  classifyError,
+  exceedsByteCap,
+  isInertScheme,
+  shouldBlockResource,
+  stalledFor,
+} from "./classify";
 
 describe("classifyError", () => {
   it("classifies a Playwright TimeoutError by name", () => {
@@ -101,5 +107,37 @@ describe("renderRequestSchema", () => {
 
   it("accepts plain http as well as https", () => {
     expect(renderRequestSchema.safeParse({ url: "http://shop.example.com/x" }).success).toBe(true);
+  });
+});
+
+describe("isInertScheme", () => {
+  it("recognises the schemes that never open a socket", () => {
+    for (const url of ["data:text/html,<p>x", "blob:https://x/1", "about:blank", "ABOUT:BLANK"]) {
+      expect(isInertScheme(url), url).toBe(true);
+    }
+  });
+
+  it("does not exempt anything that reaches the network", () => {
+    for (const url of ["http://example.com", "https://example.com", "ftp://x", "file:///etc"]) {
+      expect(isInertScheme(url), url).toBe(false);
+    }
+  });
+});
+
+describe("stalledFor", () => {
+  const THRESHOLD = 1000;
+
+  it("reports nothing when no render is running", () => {
+    expect(stalledFor(null, 5000, THRESHOLD)).toBeNull();
+  });
+
+  it("reports nothing for a render still inside the threshold", () => {
+    expect(stalledFor(4500, 5000, THRESHOLD)).toBeNull();
+    // Exactly at the threshold is late, not stuck.
+    expect(stalledFor(4000, 5000, THRESHOLD)).toBeNull();
+  });
+
+  it("reports the age once a render is past the threshold", () => {
+    expect(stalledFor(3000, 5000, THRESHOLD)).toBe(2000);
   });
 });

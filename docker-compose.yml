@@ -35,7 +35,7 @@ x-app-environment: &app-environment
   # BETTER_AUTH_URL of its own — knows what to link to.
   #
   # RENDER_URL is the browser-render switch, on the same footing: unset means
-  # a browser-mode listing records a `network_error` check run rather than the
+  # a browser-mode listing records a `renderer_error` check run rather than the
   # worker crashing (see the `renderer` service and packages/env/src/worker.ts).
   #
   # Listed with no value, so compose takes them from the shell or from the root
@@ -43,6 +43,9 @@ x-app-environment: &app-environment
   # an `environment` key overrides `env_file` even when it resolves to nothing,
   # so for containers these belong in the root `.env` (which compose
   # interpolates) rather than only in `apps/web/.env` (which it does not).
+  # ALLOWED_PRIVATE_HOSTS rides along for the same reason: the SSRF guard reads
+  # it in whichever process is doing the fetching, and both of these do.
+  ALLOWED_PRIVATE_HOSTS:
   APP_URL:
   EMAIL_FROM:
   RENDER_URL:
@@ -138,6 +141,10 @@ services:
     # disk I/O. Give it real shared memory instead.
     shm_size: "1gb"
     environment:
+      # The sidecar applies the same address guard the worker does, so it needs
+      # the same exemptions — Chromium resolves names itself and would
+      # otherwise be the one path around the policy.
+      ALLOWED_PRIVATE_HOSTS:
       NODE_ENV: production
       TZ: ${TZ:-Europe/London}
     healthcheck:

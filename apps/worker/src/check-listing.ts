@@ -16,6 +16,7 @@ import type { ExtractionResult, ExtractorStrategy } from "@drop-watch/core/extra
 import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
+import type { RetrieveResult } from "@drop-watch/core/render";
 import { renderPage } from "@drop-watch/core/render";
 import { db } from "@drop-watch/db";
 import type { Listing, NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
@@ -64,7 +65,7 @@ function conditionalRequest(listing: Listing): { etag?: string; lastModified?: s
  * depending on `listing.render`. Never throws — both paths already return a
  * `FetchPageResult` variant for every failure mode.
  */
-function retrievePage(listing: Listing): Promise<FetchPageResult> {
+function retrievePage(listing: Listing): Promise<RetrieveResult> {
   const renderUrl = env.RENDER_URL;
   const target = renderTarget(listing, renderUrl);
 
@@ -171,7 +172,7 @@ export async function checkListing(listingId: string, source: CheckSource): Prom
   }
 }
 
-function extractFrom(listing: Listing, fetched: FetchPageResult): ExtractionResult | null {
+function extractFrom(listing: Listing, fetched: RetrieveResult): ExtractionResult | null {
   if (fetched.status !== "ok") {
     return null;
   }

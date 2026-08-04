@@ -53,6 +53,10 @@ export const SINK_WEBHOOK_ID = "e2e-sink";
  * verification from the captured mail before any other test can run.
  */
 export const appEnv: Record<string, string> = {
+  // The fixture server *is* the retailer here, and it lives on loopback, which
+  // the SSRF guard blocks by default. This is the same exemption a self-hosted
+  // instance scraping something on its own network would set.
+  ALLOWED_PRIVATE_HOSTS: "localhost",
   APP_URL: BASE_URL,
   // `next start` runs in production mode, where Better Auth rate-limits
   // sign-in to 3 requests per 10s per address — and every worker here shares

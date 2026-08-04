@@ -1,0 +1,1 @@
+ALTER TYPE "public"."check_run_status" ADD VALUE 'renderer_error' BEFORE 'timeout';

@@ -21,7 +21,7 @@ import { serve } from "@hono/node-server";
 import { createLogger, initLogger, log } from "evlog";
 import { Hono } from "hono";
 import PQueue from "p-queue";
-import { browserStatus, closeBrowser, renderPage } from "./render";
+import { browserStatus, closeBrowser, renderPage, stalledRenderMs } from "./render";
 
 const SERVICE_NAME = "drop-watch-renderer";
 
@@ -77,17 +77,28 @@ app.post(RENDER_PATH, async (c) => {
   return c.json(result, 200);
 });
 
-app.get(HEALTH_PATH, (c) =>
-  c.json(
+/**
+ * Reports unhealthy for a stuck browser as well as a shutting-down one: a
+ * Chromium that has stopped completing renders keeps `isConnected()` true while
+ * holding its concurrency slots.
+ */
+app.get(HEALTH_PATH, (c) => {
+  const stalledMs = stalledRenderMs();
+  const ok = !(shuttingDown || stalledMs !== null);
+  if (stalledMs !== null) {
+    log.warn("renderer", `render stalled for ${stalledMs}ms; reporting unhealthy`);
+  }
+  return c.json(
     {
       browser: browserStatus(),
       inFlight: queue.pending,
-      ok: !shuttingDown,
+      ok,
       queued: queue.size,
+      ...(stalledMs === null ? {} : { stalledMs }),
     },
-    shuttingDown ? 503 : 200
-  )
-);
+    ok ? 200 : 503
+  );
+});
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
