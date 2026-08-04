@@ -67,7 +67,8 @@ address `trigger.json.previousPrice` without guarding first:
 
 | Field | Notes |
 |---|---|
-| `productId`, `url` | Always set. |
+| `productId`, `url` | Always set. `url` is the *cheapest* tracked store's, not necessarily the one that was just checked — a product can track more than one. |
+| `listingId` | Which store `url` belongs to. `null` only for the settings page's test notification, which has no listing. |
 | `title`, `imageUrl`, `currency` | `null` until a check has extracted them. |
 | `price`, `previousPrice`, `pctChange` | Decimal **strings**, never floats. `pctChange` is signed, one decimal place. |
 | `inStock` | `null` when the page did not say. |

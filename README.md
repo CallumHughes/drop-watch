@@ -4,9 +4,11 @@ DropWatch keeps an eye on product pages and tells you if the price drops. You
 give it a URL, it checks the page on a schedule and records what it finds.
 Self-hosted: your machine, your Postgres.
 
-It is early software with a deliberately narrow scope — one URL per product, no
-shopping around across retailers. It copes with shops that publish structured
-data, which is most of them, and gives up politely on the ones that do not.
+It is early software with a deliberately narrow scope. A product can track more
+than one store's URL — alerts and history follow whichever one is cheapest right
+now — but there is still no browsing for deals across retailers you have not
+already pointed it at. It copes with shops that publish structured data, which
+is most of them, and gives up politely on the ones that do not.
 
 Alerts go to a Home Assistant webhook or to email. Neither is required.
 
@@ -23,6 +25,11 @@ lets you type a CSS selector and shows the match count and a few matched
 elements as you type, with the page source to hand. It works off a single cached
 fetch, so trying selectors does not hammer the shop.
 
+**Multiple stores.** A product can track more than one retailer's URL for the
+same item. The detail page draws one line per store on the price chart, and the
+current price and target alerts follow whichever tracked store is cheapest
+right now; drop and restock alerts watch each store's own history.
+
 **History.** Every successful check writes a price point, not only the ones that
 changed. Product cards get a sparkline, and the detail page draws the series with
 your target marked on it. No averages or all-time lows.
@@ -31,18 +38,20 @@ your target marked on it. No averages or all-time lows.
 out, or unknown. Mainly this exists so the restock rule has something to go on.
 
 **Alerts.** Three rules per product, in any combination: target price, percentage
-drop, restock. Each fires once and then keeps quiet for a cooldown, on the theory
-that being told the same thing every three hours is how a notifier gets muted. A
-lower price reopens it.
+drop, restock. The target rule is evaluated against whichever tracked store is
+currently cheapest; drop and restock fire on the store that was just checked.
+Each fires once and then keeps quiet for a cooldown, on the theory that being
+told the same thing every three hours is how a notifier gets muted. A lower
+price reopens it.
 
 **Broken watches.** Selectors rot. A shop changes its markup, the tracker stops
 finding a price, and left alone it would sit there indefinitely saying nothing.
 After a few consecutive failures it sends a `watch_broken` alert, then shuts up
 until the product recovers.
 
-**Scheduling.** Interval is per product, five minutes to a week, with some jitter
-so a batch of products added in one sitting does not hit the same shop on the
-same minute. Products can be paused, or checked on demand.
+**Scheduling.** Interval is per store, five minutes to a week, with some jitter
+so a batch added in one sitting does not hit the same shop on the same minute.
+Each store can be paused, or checked on demand, independently of its siblings.
 
 **More than one person.** The first account created is the admin. After that
 sign-up closes and people join by invite — single-use links, good for 48 hours.
@@ -136,8 +145,9 @@ changed in the UI takes effect on the next check without restarting anything.
 - **Prices render in `en-GB` formatting.** The currency follows the shop; the
   number and date formatting does not yet follow you.
 
-There is also no cross-retailer comparison and no all-time-low or average
-statistics; a product is one URL and the history is the history.
+There is no browsing for alternatives you have not added yourself — DropWatch
+only ever compares the stores you are already tracking against each other,
+never against the wider market.
 
 ## Documentation
 

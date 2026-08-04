@@ -23,4 +23,16 @@ export class DashboardPage {
   productLink(title: string): Locator {
     return this.page.getByRole("link", { exact: true, name: title });
   }
+
+  /**
+   * The price shown on one product's card — for a multi-store product, the
+   * cheapest active listing's. Scoped up from the title link to the card,
+   * since the price carries no accessible name of its own.
+   */
+  productPrice(title: string): Locator {
+    const card = this.productLink(title).locator(
+      'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " relative ")][1]'
+    );
+    return card.locator(".tabular-nums");
+  }
 }
