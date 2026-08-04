@@ -58,6 +58,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The renderer unit suite includes a real-browser SSRF/side-channel trap.
+      - run: pnpm --filter @drop-watch/renderer exec playwright install --with-deps chromium
       - run: pnpm test
 
   build:
