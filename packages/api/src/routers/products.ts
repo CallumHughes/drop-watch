@@ -27,19 +27,14 @@
 
 import { db } from "@drop-watch/db";
 import { sendCheckNow } from "@drop-watch/db/queue";
-import type {
-  CheckRun,
-  Listing,
-  NewListing,
-  NewProduct,
-  Product,
-} from "@drop-watch/db/schema/products";
+import type { CheckRun, Listing, NewProduct, Product } from "@drop-watch/db/schema/products";
 import { checkRuns, listings, pricePoints, products } from "@drop-watch/db/schema/products";
 import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
+import { buildListingInsert } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { productCreateInput, productUpdateInput } from "../schemas/products";
 import { type PriceSample, type ProductSummary, summarise } from "../summary";
@@ -399,41 +394,11 @@ const PRODUCT_INSERT_KEYS = [
   "targetPrice",
   "title",
 ] as const;
-const LISTING_INSERT_KEYS = [
-  "currency",
-  "extractor",
-  "intervalMinutes",
-  "jitterPercent",
-  "locale",
-  "selector",
-] as const;
 
 /** Only the supplied create-input keys that belong on the product row. */
 function buildProductInsert(input: CreateInput, ownerId: string): NewProduct {
   const values: NewProduct = { userId: ownerId };
   for (const key of PRODUCT_INSERT_KEYS) {
-    const value = input[key];
-    if (value !== undefined) {
-      Object.assign(values, { [key]: value });
-    }
-  }
-  return values;
-}
-
-/**
- * Only the supplied create-input keys that belong on the listing row, plus
- * `nextCheckAt` pinned to now so the minutely dispatcher picks the listing up
- * on its next tick rather than after a first full interval — adding something
- * and watching nothing happen for three hours reads as a bug.
- */
-function buildListingInsert(
-  input: CreateInput,
-  productId: string,
-  ownerId: string,
-  now: Date
-): NewListing {
-  const values: NewListing = { nextCheckAt: now, productId, url: input.url, userId: ownerId };
-  for (const key of LISTING_INSERT_KEYS) {
     const value = input[key];
     if (value !== undefined) {
       Object.assign(values, { [key]: value });
