@@ -15,13 +15,14 @@
 
 import { db } from "@drop-watch/db";
 import { sendCheckNow } from "@drop-watch/db/queue";
-import type { Listing, NewListing } from "@drop-watch/db/schema/products";
+import type { Listing } from "@drop-watch/db/schema/products";
 import { listings } from "@drop-watch/db/schema/products";
 import { ORPCError } from "@orpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
+import { buildListingInsert } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { listingCreateInput, listingUpdateInput } from "../schemas/listings";
 import { type ProductSummary, pulledInNextCheckAt } from "../summary";
@@ -42,38 +43,6 @@ async function loadListing(id: string, ownerId: string): Promise<Listing> {
     throw new ORPCError("NOT_FOUND", { message: "Listing not found" });
   }
   return listing;
-}
-
-type CreateInput = z.infer<typeof listingCreateInput>;
-
-const LISTING_INSERT_KEYS = [
-  "currency",
-  "extractor",
-  "intervalMinutes",
-  "jitterPercent",
-  "locale",
-  "selector",
-] as const;
-
-/**
- * Only the supplied create-input keys, plus `nextCheckAt` pinned to now so
- * the minutely dispatcher picks the new listing up on its next tick — same
- * rationale as `products.ts`'s `buildListingInsert`.
- */
-function buildListingInsert(input: CreateInput, ownerId: string, now: Date): NewListing {
-  const values: NewListing = {
-    nextCheckAt: now,
-    productId: input.productId,
-    url: input.url,
-    userId: ownerId,
-  };
-  for (const key of LISTING_INSERT_KEYS) {
-    const value = input[key];
-    if (value !== undefined) {
-      Object.assign(values, { [key]: value });
-    }
-  }
-  return values;
 }
 
 type UpdateInput = z.infer<typeof listingUpdateInput>;
@@ -120,7 +89,7 @@ export const listingsRouter = {
       const now = new Date();
       const [inserted] = await db
         .insert(listings)
-        .values(buildListingInsert(input, ownerId, now))
+        .values(buildListingInsert(input, input.productId, ownerId, now))
         .onConflictDoNothing({ target: [listings.userId, listings.url] })
         .returning();
       if (!inserted) {
