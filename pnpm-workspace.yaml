@@ -19,7 +19,7 @@ catalog:
   "@orpc/openapi": ^1.14.13
   "@orpc/tanstack-query": ^1.14.13
   "@orpc/zod": ^1.14.13
-  "@types/node": ^24.13.3
+  "@types/node": ^26.1.2
   "@types/pg": ^8.20.1
   drizzle-orm: ^0.45.2
   evlog: ^2.22.4
