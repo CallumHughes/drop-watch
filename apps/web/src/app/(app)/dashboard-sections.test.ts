@@ -10,6 +10,8 @@ function summary(id: string, overrides: Partial<ProductSummary> = {}): ProductSu
     history: [],
     lastCheck: null,
     latest: null,
+    listings: [],
+    nextCheckAt: null,
     previous: null,
     product: { id } as ProductSummary["product"],
     targetDelta: null,

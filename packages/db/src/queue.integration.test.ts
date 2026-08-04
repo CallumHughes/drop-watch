@@ -4,9 +4,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeDb } from "../test/helpers";
 import { db } from "./index";
 import {
-  CHECK_PRODUCT_NOW_QUEUE,
-  CHECK_PRODUCT_QUEUE,
-  checkProductSendOptions,
+  CHECK_LISTING_NOW_QUEUE,
+  CHECK_LISTING_QUEUE,
+  checkListingSendOptions,
   createSenderBoss,
   createWorkerBoss,
   ENQUEUE_DUE_CHECKS_QUEUE,
@@ -87,14 +87,14 @@ describe("with a worker boss", () => {
     const ownQueues = queues.filter((queue) => !queue.name.startsWith("__pgboss__"));
     expect(ownQueues.map((queue) => queue.name).sort()).toEqual(
       [
-        CHECK_PRODUCT_NOW_QUEUE,
-        CHECK_PRODUCT_QUEUE,
+        CHECK_LISTING_NOW_QUEUE,
+        CHECK_LISTING_QUEUE,
         ENQUEUE_DUE_CHECKS_QUEUE,
         PURGE_CHECK_RUNS_QUEUE,
       ].sort()
     );
 
-    const checkQueue = await worker.getQueue(CHECK_PRODUCT_QUEUE);
+    const checkQueue = await worker.getQueue(CHECK_LISTING_QUEUE);
     expect(checkQueue).toMatchObject({
       expireInSeconds: 120,
       policy: "exclusive",
@@ -106,23 +106,23 @@ describe("with a worker boss", () => {
     expect(dispatchQueue).toMatchObject({ expireInSeconds: 60, policy: "short" });
   });
 
-  it("sendCheckNow dedupes per product while a job is queued", async () => {
-    const first = await sendCheckNow(worker, "product-1");
+  it("sendCheckNow dedupes per listing while a job is queued", async () => {
+    const first = await sendCheckNow(worker, "listing-1");
     expect(first).toEqual(expect.any(String));
 
     // Pressed twice: the exclusive policy keys on the singletonKey.
-    await expect(sendCheckNow(worker, "product-1")).resolves.toBeNull();
+    await expect(sendCheckNow(worker, "listing-1")).resolves.toBeNull();
 
-    // A different product is unaffected.
-    await expect(sendCheckNow(worker, "product-2")).resolves.toEqual(expect.any(String));
+    // A different listing is unaffected.
+    await expect(sendCheckNow(worker, "listing-2")).resolves.toEqual(expect.any(String));
 
-    const jobs = await worker.findJobs(CHECK_PRODUCT_NOW_QUEUE);
+    const jobs = await worker.findJobs(CHECK_LISTING_NOW_QUEUE);
     expect(jobs).toHaveLength(2);
-    expect(jobs.map((job) => job.singletonKey).sort()).toEqual(["product-1", "product-2"]);
+    expect(jobs.map((job) => job.singletonKey).sort()).toEqual(["listing-1", "listing-2"]);
   });
 
-  it("checkProductSendOptions keys the job on the product id", () => {
-    expect(checkProductSendOptions("product-1")).toEqual({ singletonKey: "product-1" });
+  it("checkListingSendOptions keys the job on the listing id", () => {
+    expect(checkListingSendOptions("listing-1")).toEqual({ singletonKey: "listing-1" });
   });
 
   it("a sender boss can enqueue once the schema exists", async () => {
@@ -132,11 +132,11 @@ describe("with a worker boss", () => {
     });
     try {
       await sender.start();
-      const jobId = await sendCheckNow(sender, "product-from-sender");
+      const jobId = await sendCheckNow(sender, "listing-from-sender");
       expect(jobId).toEqual(expect.any(String));
 
-      const jobs = await worker.findJobs(CHECK_PRODUCT_NOW_QUEUE);
-      expect(jobs.map((job) => job.singletonKey)).toEqual(["product-from-sender"]);
+      const jobs = await worker.findJobs(CHECK_LISTING_NOW_QUEUE);
+      expect(jobs.map((job) => job.singletonKey)).toEqual(["listing-from-sender"]);
     } finally {
       await stopBoss(sender);
     }

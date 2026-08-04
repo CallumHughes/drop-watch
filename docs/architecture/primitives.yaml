@@ -96,8 +96,8 @@ primitives:
   - id: app-db
     group: storage
     summary: >
-      Drizzle schema and the queries over it — products, observations,
-      settings, invites, recipients, alert state.
+      Drizzle schema and the queries over it — products, listings,
+      observations, settings, invites, recipients, alert state.
     code:
       - packages/db/src/schema/**
       - packages/db/src/*.ts
@@ -179,9 +179,10 @@ primitives:
 invariants:
   - id: per-user-isolation
     statement: >
-      Every product, observation, setting, and recipient is scoped to a user.
-      Uniqueness is per `(userId, url)`. No query may read or write another
-      user's rows.
+      Every product, listing, observation, setting, and recipient is scoped to
+      a user. Uniqueness is per `(userId, url)` on listings; a product groups
+      one user's listings of the same item. No query may read or write
+      another user's rows.
     guarded_by: [api-router, app-db]
 
   - id: single-scheduler

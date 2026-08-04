@@ -17,6 +17,7 @@ const payload: NotificationPayload = {
   error: null,
   imageUrl: null,
   inStock: true,
+  listingId: "9e6a1a3c-2f0e-4a9b-8c3d-1f2e3a4b5c6d",
   pctChange: "-12.0",
   previousPrice: "63.00",
   price: "55.44",

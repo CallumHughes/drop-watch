@@ -1,6 +1,6 @@
 /**
  * Seeds a fresh database: the single admin user Better Auth signs in, plus a
- * handful of products for the worker to chew on.
+ * handful of products (and their listings) for the worker to chew on.
  *
  * Idempotent — re-running it inserts nothing new and never overwrites a price
  * history. Run with `pnpm --filter @drop-watch/db db:seed`.
@@ -10,56 +10,87 @@ import { randomUUID } from "node:crypto";
 
 import { env } from "@drop-watch/env/seed";
 import { hashPassword } from "better-auth/crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { createDb } from "./index";
 import { account, user } from "./schema/auth";
-import { type NewProduct, products } from "./schema/products";
+import { listings, type NewListing, type NewProduct, products } from "./schema/products";
+
+interface SeedEntry {
+  listings: Omit<NewListing, "productId" | "userId">[];
+  product: Omit<NewProduct, "userId">;
+}
 
 /**
  * Stable, scraping-friendly product pages. The first three carry schema.org
  * JSON-LD; books.toscrape.com carries none, so it exercises the configured
  * selector path. All four were verified live against the Epic 2 extractor.
- * Ownerless here — every seed product is stamped with the admin's id at
- * insert time, since products are per-user.
+ * Ownerless here — every seed row is stamped with the admin's id at insert
+ * time, since products (and listings) are per-user.
  */
-const SEED_PRODUCTS: Omit<NewProduct, "userId">[] = [
+const SEED_ENTRIES: SeedEntry[] = [
   {
-    currency: "GBP",
-    dropPercent: 10,
-    intervalMinutes: 180,
-    rules: ["target", "drop_percent"],
-    targetPrice: "60.00",
-    title: "Bulbasaur",
-    url: "https://scrapeme.live/shop/Bulbasaur/",
+    listings: [
+      // A second store joins once product-level series are windowed per
+      // listing — until then two stores interleave into one nonsense series.
+      {
+        intervalMinutes: 180,
+        url: "https://scrapeme.live/shop/Bulbasaur/",
+      },
+    ],
+    product: {
+      currency: "GBP",
+      dropPercent: 10,
+      rules: ["target", "drop_percent"],
+      targetPrice: "60.00",
+      title: "Bulbasaur",
+    },
   },
   {
-    currency: "USD",
-    // Listed out of stock, which makes it the useful one for restock alerts.
-    intervalMinutes: 360,
-    rules: ["restock", "target"],
-    targetPrice: "50.00",
-    title: "Abominable Hoodie",
-    url: "https://www.scrapingcourse.com/ecommerce/product/abominable-hoodie/",
+    listings: [
+      {
+        intervalMinutes: 360,
+        url: "https://www.scrapingcourse.com/ecommerce/product/abominable-hoodie/",
+      },
+    ],
+    product: {
+      currency: "USD",
+      // Listed out of stock, which makes it the useful one for restock alerts.
+      rules: ["restock", "target"],
+      targetPrice: "50.00",
+      title: "Abominable Hoodie",
+    },
   },
   {
-    currency: "GBP",
-    dropPercent: 15,
-    intervalMinutes: 720,
-    rules: ["drop_percent"],
-    title: "BILLY Bookcase - white 80x28x202 cm",
-    url: "https://www.ikea.com/gb/en/p/billy-bookcase-white-00263850/",
+    listings: [
+      {
+        intervalMinutes: 720,
+        url: "https://www.ikea.com/gb/en/p/billy-bookcase-white-00263850/",
+      },
+    ],
+    product: {
+      currency: "GBP",
+      dropPercent: 15,
+      rules: ["drop_percent"],
+      title: "BILLY Bookcase - white 80x28x202 cm",
+    },
   },
   {
-    currency: "GBP",
-    // No structured data on this page at all — the selector chain is the point.
-    extractor: "selector",
-    intervalMinutes: 1440,
-    rules: ["target"],
-    selector: "p.price_color",
-    targetPrice: "45.00",
-    title: "A Light in the Attic",
-    url: "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+    listings: [
+      {
+        // No structured data on this page at all — the selector chain is the point.
+        extractor: "selector",
+        intervalMinutes: 1440,
+        selector: "p.price_color",
+        url: "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+      },
+    ],
+    product: {
+      currency: "GBP",
+      rules: ["target"],
+      targetPrice: "45.00",
+      title: "A Light in the Attic",
+    },
   },
 ];
 
@@ -98,17 +129,56 @@ async function seedAdmin(db: ReturnType<typeof createDb>): Promise<{ id: string;
   return { id, note: `admin ${email} created (${id})` };
 }
 
-async function seedProducts(db: ReturnType<typeof createDb>, adminId: string): Promise<string> {
-  const inserted = await db
+async function seedEntry(
+  db: ReturnType<typeof createDb>,
+  adminId: string,
+  entry: SeedEntry
+): Promise<boolean> {
+  const firstUrl = entry.listings[0]?.url;
+  if (!firstUrl) {
+    return false;
+  }
+
+  // Re-seeding must not duplicate a product: a listing at this URL for this
+  // user existing already means the whole entry was seeded before.
+  const [existing] = await db
+    .select({ id: listings.id })
+    .from(listings)
+    .where(and(eq(listings.userId, adminId), eq(listings.url, firstUrl)));
+  if (existing) {
+    return false;
+  }
+
+  const [product] = await db
     .insert(products)
-    .values(SEED_PRODUCTS.map((product) => ({ ...product, userId: adminId })))
-    // `(userId, url)` is unique; re-seeding must not disturb a product the
-    // admin already tracks.
-    .onConflictDoNothing({ target: [products.userId, products.url] })
-    .returning({ id: products.id, url: products.url });
+    .values({ ...entry.product, userId: adminId })
+    .returning({ id: products.id });
+  if (!product) {
+    return false;
+  }
+
+  await db
+    .insert(listings)
+    .values(
+      entry.listings.map((listing) => ({ ...listing, productId: product.id, userId: adminId }))
+    )
+    .onConflictDoNothing({ target: [listings.userId, listings.url] });
+
+  return true;
+}
+
+async function seedProducts(db: ReturnType<typeof createDb>, adminId: string): Promise<string> {
+  let insertedCount = 0;
+  for (const entry of SEED_ENTRIES) {
+    // biome-ignore lint/performance/noAwaitInLoops: each entry's skip check depends on the previous inserts.
+    const inserted = await seedEntry(db, adminId, entry);
+    if (inserted) {
+      insertedCount += 1;
+    }
+  }
 
   const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(products);
-  return `products: ${inserted.length} inserted, ${total?.count ?? 0} total`;
+  return `products: ${insertedCount} inserted, ${total?.count ?? 0} total`;
 }
 
 async function main() {

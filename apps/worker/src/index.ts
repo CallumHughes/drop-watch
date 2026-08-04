@@ -13,9 +13,9 @@
  */
 
 import {
-  CHECK_PRODUCT_NOW_QUEUE,
-  CHECK_PRODUCT_QUEUE,
-  type CheckProductJob,
+  CHECK_LISTING_NOW_QUEUE,
+  CHECK_LISTING_QUEUE,
+  type CheckListingJob,
   createWorkerBoss,
   ENQUEUE_DUE_CHECKS_CRON,
   ENQUEUE_DUE_CHECKS_QUEUE,
@@ -27,7 +27,7 @@ import {
 import { env } from "@drop-watch/env/worker";
 import { initLogger, log } from "evlog";
 import type { Job } from "pg-boss";
-import { type CheckSource, checkProduct } from "./check-product";
+import { type CheckSource, checkListing } from "./check-listing";
 import { enqueueDueChecks } from "./enqueue-due-checks";
 import { purgeCheckRuns } from "./purge-check-runs";
 
@@ -38,18 +38,18 @@ const CHECK_BATCH_SIZE = 5;
 const SHUTDOWN_TIMEOUT_MS = 30_000;
 
 function checkHandler(source: CheckSource) {
-  return async (jobs: Job<CheckProductJob>[]): Promise<void> => {
+  return async (jobs: Job<CheckListingJob>[]): Promise<void> => {
     for (const job of jobs) {
       // biome-ignore lint/performance/noAwaitInLoops: checks run in turn on purpose — parallel fetches would defeat the per-domain politeness queue in core.
-      await checkProduct(job.data.productId, source);
+      await checkListing(job.data.listingId, source);
     }
   };
 }
 
 async function registerWorkers(boss: PgBoss): Promise<void> {
   await boss.work(ENQUEUE_DUE_CHECKS_QUEUE, () => enqueueDueChecks(boss));
-  await boss.work(CHECK_PRODUCT_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("scheduled"));
-  await boss.work(CHECK_PRODUCT_NOW_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("manual"));
+  await boss.work(CHECK_LISTING_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("scheduled"));
+  await boss.work(CHECK_LISTING_NOW_QUEUE, { batchSize: CHECK_BATCH_SIZE }, checkHandler("manual"));
   await boss.work(PURGE_CHECK_RUNS_QUEUE, () => purgeCheckRuns());
 }
 
@@ -107,8 +107,8 @@ async function main(): Promise<void> {
     environment: env.NODE_ENV,
     queues: [
       ENQUEUE_DUE_CHECKS_QUEUE,
-      CHECK_PRODUCT_QUEUE,
-      CHECK_PRODUCT_NOW_QUEUE,
+      CHECK_LISTING_QUEUE,
+      CHECK_LISTING_NOW_QUEUE,
       PURGE_CHECK_RUNS_QUEUE,
     ],
   });
