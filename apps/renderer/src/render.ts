@@ -71,6 +71,10 @@ async function launchBrowser(): Promise<ManagedBrowser> {
         "--dns-prefetch-disable",
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
       ],
+      // Playwright defaults this to false even for a non-root process. Pages
+      // are hostile input, so keep Chromium's renderer processes behind their
+      // own sandbox as well as the surrounding container boundary.
+      chromiumSandbox: true,
       timeout: BROWSER_SERVER_LAUNCH_TIMEOUT_MS,
     });
     const browser = await chromium.connect(server.wsEndpoint(), {
@@ -155,6 +159,23 @@ interface GuardState {
  * Chromium cannot resolve a different address between the check and connect.
  */
 async function installAddressGuard(context: BrowserContext, state: GuardState): Promise<void> {
+  let primaryPage: Page | null = null;
+  context.on("page", (createdPage) => {
+    if (!primaryPage) {
+      primaryPage = createdPage;
+      return;
+    }
+    // Playwright disables Chromium's popup blocker for automation. Rendering
+    // needs exactly one page; extra pages only multiply processes and network
+    // work under attacker control.
+    createdPage.close().catch(() => undefined);
+  });
+  context.on("download", (download) => {
+    // `acceptDownloads: false` denies persistence; cancelling the event as
+    // well stops an attachment response from consuming the render budget.
+    download.cancel().catch(() => undefined);
+  });
+
   await context.routeWebSocket("**/*", async (webSocket) => {
     await webSocket.close({ code: 1008, reason: "WebSockets disabled" });
   });
@@ -246,6 +267,7 @@ export async function renderPage(request: RenderRequest): Promise<RenderResponse
     const acquired = await browserManager.acquire();
     ({ generation } = acquired);
     const contextPromise = acquired.handle.browser.newContext({
+      acceptDownloads: false,
       proxy: { bypass: "<-loopback>", server: proxy.server },
       serviceWorkers: "block",
       ...(request.locale ? { locale: request.locale } : {}),

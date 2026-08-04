@@ -43,6 +43,10 @@ has to be in the **root** `.env` or the shell. Compose does not interpolate from
 | `AUTH_RATE_LIMIT_ENABLED` | no | `web` | Overrides Better Auth's default of on in production, off in development. Limits are per client address, so set `false` only where every request already shares one — a test run, say. |
 | `RENDER_URL` | no | `worker` | Base URL of the renderer sidecar, e.g. `http://renderer:3002` (compose) or `http://localhost:3002` (local dev). Unset means browser-mode listings record a `network_error` check run rather than the worker crashing. See [Browser render mode](#browser-render-mode) below. |
 | `COMPOSE_PROFILES` | no | compose only | Set to `browser` to bring up the `renderer` service. Root `.env` only — this is a compose-native variable, not read by any app. |
+| `RENDER_CPUS` | no | compose only | Renderer CPU ceiling. Defaults to `2.0`. Prefer reducing render concurrency before raising it. |
+| `RENDER_MEMORY_LIMIT` | no | compose only | Renderer memory ceiling. Defaults to `2g`. |
+| `RENDER_PIDS_LIMIT` | no | compose only | Renderer process ceiling. Defaults to `512`. |
+| `RENDER_TMPFS_LIMIT` | no | compose only | Size of the renderer's writable temporary filesystem. Defaults to `512m`; the rest of its filesystem is read-only. |
 | `NEXT_PUBLIC_EMAIL_ENABLED` | no | `web` **build** | Docker only, and a *build* argument rather than runtime config — see [Notifications](notifications.md#docker-next_public_email_enabled-is-a-build-argument). |
 | `TZ` | no | all | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
 | `POSTGRES_PASSWORD` | no | dev `postgres` | Dev container only. Defaults to `password`. |

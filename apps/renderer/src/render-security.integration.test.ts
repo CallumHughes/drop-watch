@@ -28,7 +28,7 @@ function listenHttp(
     if (path === "/allow") {
       response.writeHead(200, { "content-type": "text/html" });
       response.end(`<!doctype html>
-        <body data-ready="pending">
+        <body data-popup="pending" data-ready="pending">
           <script>
             const sheet = document.createElement("link");
             sheet.rel = "stylesheet";
@@ -42,6 +42,13 @@ function listenHttp(
             });
             peer.createDataChannel("probe");
             peer.createOffer().then((offer) => peer.setLocalDescription(offer)).catch(() => undefined);
+            const popup = window.open("/popup");
+            const popupCheck = setInterval(() => {
+              if (!popup || popup.closed) {
+                clearInterval(popupCheck);
+                document.body.dataset.popup = "contained";
+              }
+            }, 10);
           </script>
         </body>`);
       return;
@@ -108,6 +115,7 @@ describe("real Chromium egress policy", () => {
       });
       expect(allowed.status).toBe("ok");
       expect(allowed.status === "ok" ? allowed.html : "").toContain('data-ready="stylesheet"');
+      expect(allowed.status === "ok" ? allowed.html : "").toContain('data-popup="contained"');
 
       const blocked = await renderPage({ url: `http://127.0.0.1:${http.port}/blocked` });
       expect(blocked.status).toBe("network_error");
