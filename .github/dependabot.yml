@@ -10,6 +10,11 @@ updates:
       npm-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    # @types/node tracks the runtime major: ahead of it, typecheck passes on
+    # APIs the container doesn't have. Moves with the Node bump, not before it.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
