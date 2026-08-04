@@ -30,7 +30,20 @@ export const renderRequestSchema = z.object({
   locale: z.string().max(35).optional(),
   maxBytes: z.int().positive().max(DEFAULT_RENDER_MAX_BYTES).optional(),
   timeoutMs: z.int().positive().max(MAX_RENDER_TIMEOUT_MS).optional(),
-  url: z.url().max(2048),
+  /**
+   * `z.url()` is purely syntactic — on its own it accepts `file:///etc/passwd`
+   * and `javascript:`, which undici rejects for free but Chromium will happily
+   * navigate. The API layer already refines user input the same way
+   * (`packages/api/src/routers/preview.ts`); this repeats it at the contract
+   * because the sidecar, not the caller, is the process holding the browser.
+   */
+  url: z
+    .url()
+    .max(2048)
+    .refine(
+      (value) => value.startsWith("http://") || value.startsWith("https://"),
+      "Only http and https URLs can be rendered"
+    ),
   userAgent: z.string().max(500).optional(),
   /**
    * The `goto` condition only. Network-idle is applied afterwards on its own

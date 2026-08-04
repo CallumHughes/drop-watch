@@ -47,6 +47,11 @@ ARG PLAYWRIGHT_VERSION
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm install --omit=dev playwright@${PLAYWRIGHT_VERSION}
 
+# Drop to the non-root account Microsoft's image already ships for exactly
+# this. Nothing here writes to disk — the bundle and node_modules are
+# installed above as root and only ever read — so there is nothing to chown.
+USER pwuser
+
 EXPOSE 3002
 
 # `node` directly, so compose's SIGTERM reaches the graceful-shutdown handler

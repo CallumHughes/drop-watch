@@ -87,4 +87,19 @@ describe("renderRequestSchema", () => {
   it("accepts a plain valid request", () => {
     expect(renderRequestSchema.safeParse({ url: "https://example.com" }).success).toBe(true);
   });
+
+  // Chromium navigates these happily; undici rejects them for free, so the
+  // http path never had to care and this one does.
+  it.each([
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "data:text/html,<p>x",
+    "ftp://example.com",
+  ])("rejects the non-http scheme %s", (url) => {
+    expect(renderRequestSchema.safeParse({ url }).success).toBe(false);
+  });
+
+  it("accepts plain http as well as https", () => {
+    expect(renderRequestSchema.safeParse({ url: "http://shop.example.com/x" }).success).toBe(true);
+  });
 });
