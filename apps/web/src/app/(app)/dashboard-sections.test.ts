@@ -6,6 +6,7 @@ import { groupIntoSections } from "./dashboard-sections";
 function summary(id: string, overrides: Partial<ProductSummary> = {}): ProductSummary {
   return {
     changePercent: null,
+    cheapestListingId: null,
     consecutiveFailures: 0,
     history: [],
     lastCheck: null,
