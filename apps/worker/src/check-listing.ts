@@ -15,10 +15,12 @@
 import type { ExtractionResult, ExtractorStrategy } from "@drop-watch/core/extract";
 import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
-import { fetchPage } from "@drop-watch/core/fetch";
+import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
+import { renderPage } from "@drop-watch/core/render";
 import { db } from "@drop-watch/db";
 import type { Listing, NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
 import { checkRuns, listings, pricePoints, products } from "@drop-watch/db/schema/products";
+import { env } from "@drop-watch/env/worker";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
@@ -54,6 +56,65 @@ function conditionalRequest(listing: Listing): { etag?: string; lastModified?: s
     options.lastModified = listing.lastModified;
   }
   return options;
+}
+
+/** Extracted so the test can assert on it without duplicating the string. */
+export const RENDER_UNCONFIGURED_ERROR =
+  "browser rendering is not configured (RENDER_URL is unset)";
+
+/**
+ * Decides how a listing's page should be retrieved. Pure and directly
+ * testable, unlike `retrievePage` itself, which needs a live sidecar.
+ */
+export function renderTarget(
+  listing: Pick<Listing, "render">,
+  renderUrl: string | undefined
+): "http" | "browser" | "unconfigured" {
+  if (listing.render !== "browser") {
+    return "http";
+  }
+  return renderUrl ? "browser" : "unconfigured";
+}
+
+/**
+ * Synthesised result for a browser-mode listing with no sidecar configured.
+ * Flows through the untouched `toCheckOutcome` into a real `check_runs` row —
+ * visible in the check-run log and able to trip the watch-broken alarm — the
+ * same as any other target-side failure, rather than crashing the worker.
+ */
+export function unconfiguredRenderResult(): FetchPageResult {
+  return { durationMs: 0, error: RENDER_UNCONFIGURED_ERROR, status: "network_error" };
+}
+
+/**
+ * Retrieves a listing's page over plain HTTP or through the renderer sidecar,
+ * depending on `listing.render`. Never throws — both paths already return a
+ * `FetchPageResult` variant for every failure mode.
+ */
+function retrievePage(listing: Listing): Promise<FetchPageResult> {
+  const renderUrl = env.RENDER_URL;
+  const target = renderTarget(listing, renderUrl);
+
+  if (target === "http") {
+    return fetchPage(listing.url, conditionalRequest(listing));
+  }
+
+  if (target === "unconfigured" || renderUrl === undefined) {
+    return Promise.resolve(unconfiguredRenderResult());
+  }
+
+  // `renderPage` talks to the sidecar on localhost, not to the store, so
+  // without this wrap a browser check would skip the per-domain politeness
+  // queue entirely — `fetchPage` applies it for us on the http path.
+  //
+  // Deliberately no `conditionalRequest(listing)`: a browser render sends no
+  // cache validators, and `buildWrite` only overwrites the ones it actually
+  // received, so the stored etag/lastModified survive untouched.
+  return withDomainQueue(listing.url, () =>
+    renderPage(renderUrl, listing.url, {
+      ...(listing.locale ? { locale: listing.locale } : {}),
+    })
+  );
 }
 
 interface CheckWrite {
@@ -231,7 +292,7 @@ async function runCheck(listingId: string, source: CheckSource): Promise<void> {
   log.set({ productId: product.id, url: listing.url });
 
   const startedAt = new Date();
-  const fetched = await fetchPage(listing.url, conditionalRequest(listing));
+  const fetched = await retrievePage(listing);
   const extraction = extractFrom(listing, fetched);
   const extractedCurrency = extraction?.ok ? extraction.currency : undefined;
   const currency = extractedCurrency ?? listing.currency ?? null;
@@ -259,6 +320,7 @@ async function runCheck(listingId: string, source: CheckSource): Promise<void> {
     nextCheckAt: scheduledFor.toISOString(),
     outcome: outcome.status,
     price: write.pricePoint?.price ?? null,
+    render: listing.render,
   });
   if (outcome.status === "ok") {
     log.info("check complete");

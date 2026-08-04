@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@hono/node-server':
+      specifier: ^2.0.12
+      version: 2.0.12
     '@orpc/client':
       specifier: ^1.14.13
       version: 1.14.13
@@ -54,6 +57,9 @@ catalogs:
     evlog:
       specifier: ^2.22.4
       version: 2.22.4
+    hono:
+      specifier: ^4.12.32
+      version: 4.12.33
     lucide-react:
       specifier: ^1.28.0
       version: 1.28.0
@@ -69,6 +75,9 @@ catalogs:
     pg-boss:
       specifier: ^12.26.4
       version: 12.26.4
+    playwright:
+      specifier: 1.62.1
+      version: 1.62.1
     react:
       specifier: ^19.2.7
       version: 19.2.8
@@ -147,6 +156,46 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  apps/renderer:
+    dependencies:
+      '@drop-watch/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.0.12(hono@4.12.33)
+      evlog:
+        specifier: 'catalog:'
+        version: 2.22.4(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0))
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.33
+      p-queue:
+        specifier: ^9.3.3
+        version: 9.3.3
+      playwright:
+        specifier: 'catalog:'
+        version: 1.62.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@drop-watch/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      rolldown:
+        specifier: ^1.2.1
+        version: 1.2.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@24.13.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0))
 
   apps/web:
     dependencies:

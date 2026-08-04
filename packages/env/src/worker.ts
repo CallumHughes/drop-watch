@@ -15,6 +15,10 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().min(1),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    // Base URL of the renderer sidecar. Unset is a fully supported
+    // configuration, exactly like RESEND_API_KEY: browser-mode listings simply
+    // record a `network_error` check run instead of crashing the worker.
+    RENDER_URL: z.url().optional(),
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
 });

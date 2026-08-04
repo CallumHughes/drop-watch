@@ -41,6 +41,8 @@ has to be in the **root** `.env` or the shell. Compose does not interpolate from
 | `EMAIL_FROM` | no | `web`, `worker` | `From:` address. Defaults to `onboarding@resend.dev`, which needs no verified domain but which Resend only delivers to the address that owns your Resend account. |
 | `APP_URL` | no | `web`, `worker` | Absolute base URL for links inside emails. The worker has no `BETTER_AUTH_URL` of its own; `web` falls back to that. |
 | `AUTH_RATE_LIMIT_ENABLED` | no | `web` | Overrides Better Auth's default of on in production, off in development. Limits are per client address, so set `false` only where every request already shares one — a test run, say. |
+| `RENDER_URL` | no | `worker` | Base URL of the renderer sidecar, e.g. `http://renderer:3002` (compose) or `http://localhost:3002` (local dev). Unset means browser-mode listings record a `network_error` check run rather than the worker crashing. See [Browser render mode](#browser-render-mode) below. |
+| `COMPOSE_PROFILES` | no | compose only | Set to `browser` to bring up the `renderer` service. Root `.env` only — this is a compose-native variable, not read by any app. |
 | `NEXT_PUBLIC_EMAIL_ENABLED` | no | `web` **build** | Docker only, and a *build* argument rather than runtime config — see [Notifications](notifications.md#docker-next_public_email_enabled-is-a-build-argument). |
 | `TZ` | no | all | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
 | `POSTGRES_PASSWORD` | no | dev `postgres` | Dev container only. Defaults to `password`. |
@@ -49,6 +51,30 @@ has to be in the **root** `.env` or the shell. Compose does not interpolate from
 | `SEED_ADMIN_NAME` | seed only | `pnpm db:seed` | Defaults to `Admin`. |
 | `SEED_ADMIN_PASSWORD` | seed only | `pnpm db:seed` | ≥8 chars. No default on purpose. |
 | `SKIP_ENV_VALIDATION` | no | builds | Bypasses every schema. Set during the Docker build only. |
+
+## Browser render mode
+
+Some product pages compose their price into the DOM with JavaScript, so a
+plain HTTP fetch never sees it. Browser render mode routes a listing's check
+through the `renderer` sidecar (headless Chromium via Playwright) instead,
+which returns the post-JavaScript HTML.
+
+It is **not** for bot protection. Sites with active bot protection (Amazon in
+particular) are treated as unsupported — DropWatch does not escalate against
+them (`packages/core/src/fetch/index.ts:8-10`). A headless browser does not
+change that stance.
+
+It is opt-in, via the `browser` compose profile — see [`.env.example`](../.env.example)
+and `RENDER_URL` above. In this release, `render` is settable only by SQL:
+
+```sql
+UPDATE listings SET render = 'browser' WHERE id = '...';
+```
+
+There is no UI for it yet; that is a deliberate follow-up. When `RENDER_URL`
+is unset, or the sidecar is down or unreachable, the affected listing simply
+records a `network_error` check run — never a crash — the same as any other
+target-side failure.
 
 ## `HA_URL` / `HA_WEBHOOK_ID` are seed values, not runtime config
 
