@@ -1,0 +1,30 @@
+{
+  "name": "@drop-watch/renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "rolldown -c",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@drop-watch/core": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "evlog": "catalog:",
+    "hono": "catalog:",
+    "p-queue": "^9.3.3",
+    "playwright": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@drop-watch/config": "workspace:*",
+    "@types/node": "catalog:",
+    "rolldown": "^1.2.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

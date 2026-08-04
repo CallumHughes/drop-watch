@@ -45,7 +45,7 @@ primitives:
     code:
       - apps/worker/**
     depends_on:
-      [job-queue, app-db, fetcher, extractor, alert-rules, notifier, email]
+      [job-queue, app-db, fetcher, extractor, alert-rules, notifier, email, renderer]
 
   - id: url-cli
     group: surfaces
@@ -54,11 +54,22 @@ primitives:
       - packages/core/src/bin/**
     depends_on: [fetcher, extractor]
 
+  - id: renderer
+    group: surfaces
+    summary: >
+      Headless-Chromium sidecar (Playwright) that returns post-JavaScript HTML
+      over HTTP. No database access, no queue, no cron.
+    code:
+      - apps/renderer/**
+
   - id: fetcher
     group: domain
-    summary: HTTP retrieval of a product page — timeouts, headers, retry budget.
+    summary: >
+      Retrieval of a product page, plain HTTP or via the renderer sidecar for
+      JS-composed pages — timeouts, headers, retry budget, per-domain queue.
     code:
       - packages/core/src/fetch/**
+      - packages/core/src/render/**
 
   - id: extractor
     group: domain

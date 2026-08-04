@@ -29,18 +29,23 @@ x-app-environment: &app-environment
   # make "last checked" wrong by an hour for half the year.
   TZ: ${TZ:-Europe/London}
   # Email is opt-in and RESEND_API_KEY is the switch; unset means webhook-only
-  # alerting, which is a supported configuration. Both services need all three:
-  # `web` sends Better Auth's verification and reset mail, `worker` sends the
-  # alerts, and APP_URL is how the worker — which has no BETTER_AUTH_URL of its
-  # own — knows what to link to.
+  # alerting, which is a supported configuration. Both services need all
+  # three: `web` sends Better Auth's verification and reset mail, `worker`
+  # sends the alerts, and APP_URL is how the worker — which has no
+  # BETTER_AUTH_URL of its own — knows what to link to.
+  #
+  # RENDER_URL is the browser-render switch, on the same footing: unset means
+  # a browser-mode listing records a `network_error` check run rather than the
+  # worker crashing (see the `renderer` service and packages/env/src/worker.ts).
   #
   # Listed with no value, so compose takes them from the shell or from the root
   # `.env`, and omits them entirely when neither has them. Note the precedence:
   # an `environment` key overrides `env_file` even when it resolves to nothing,
-  # so for containers these three belong in the root `.env` (which compose
+  # so for containers these belong in the root `.env` (which compose
   # interpolates) rather than only in `apps/web/.env` (which it does not).
   APP_URL:
   EMAIL_FROM:
+  RENDER_URL:
   RESEND_API_KEY:
 
 services:
@@ -111,6 +116,46 @@ services:
     # The worker waits up to 30s for in-flight checks on SIGTERM; give it room
     # to finish rather than having Docker kill it mid-write.
     stop_grace_period: 40s
+    restart: unless-stopped
+    # No depends_on: renderer here — that would force the `browser` profile on
+    # for everyone. The worker degrades gracefully when RENDER_URL is unset
+    # (see apps/worker/src/check-listing.ts), which is exactly what makes this
+    # dependency unnecessary.
+
+  # Headless-Chromium sidecar for browser-mode listings. Opt-in: gated behind
+  # the `browser` profile so `pnpm docker:up` never pulls a ~2GB image for
+  # someone who will not use it. Enable with `COMPOSE_PROFILES=browser` in the
+  # root `.env` (see .env.example). Reached only by `web` and `worker`, over
+  # the compose network — no published ports.
+  renderer:
+    profiles: ["browser"]
+    build:
+      context: .
+      dockerfile: apps/renderer/Dockerfile
+    init: true
+    # Chromium crashes on heavy pages with Docker's default 64MB /dev/shm, and
+    # the usual workaround (--disable-dev-shm-usage) only trades crashes for
+    # disk I/O. Give it real shared memory instead.
+    shm_size: "1gb"
+    environment:
+      NODE_ENV: production
+      TZ: ${TZ:-Europe/London}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3002/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Must stay under the worker's 40s: the renderer drains for 20s, the
+    # worker waits 30s for in-flight checks, so the renderer must never die
+    # first while the worker is still waiting on an answer from it.
+    stop_grace_period: 30s
     restart: unless-stopped
 
   # Development only. The production override disables this service — see

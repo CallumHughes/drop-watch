@@ -8,6 +8,8 @@
     "./rules": "./src/rules/index.ts",
     "./notify": "./src/notify/index.ts",
     "./fetch": "./src/fetch/index.ts",
+    "./render": "./src/render/index.ts",
+    "./render/contract": "./src/render/contract.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {

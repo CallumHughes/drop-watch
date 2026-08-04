@@ -357,27 +357,23 @@ async function fetchWithRetries(url: string, options: FetchPageOptions): Promise
 }
 
 /**
- * Fetches a product page, queued behind any other in-flight request to the same
- * domain. Never throws — every failure mode comes back as a result variant.
+ * Runs `fn` behind the per-domain queue for `url`.
+ *
+ * Exported for the browser render path, which reaches the origin through the
+ * renderer sidecar rather than through `fetchPage` and would otherwise skip its
+ * turn entirely — the request it makes is to `localhost`, not to the store.
+ *
+ * A URL that will not parse runs unqueued: the queue is politeness, and `fn`
+ * reports the bad URL itself.
  */
-export async function fetchPage(
-  url: string,
-  options: FetchPageOptions = {}
-): Promise<FetchPageResult> {
-  let key: string;
-  try {
-    key = hostnameKey(url);
-  } catch {
-    return {
-      durationMs: 0,
-      error: `invalid URL: ${url}`,
-      status: "network_error",
-    };
+export async function withDomainQueue<T>(url: string, fn: () => Promise<T>): Promise<T> {
+  if (!URL.canParse(url)) {
+    return await fn();
   }
-
+  const key = hostnameKey(url);
   const queue = queueFor(key);
   try {
-    return await queue.add(() => fetchWithRetries(url, options));
+    return await queue.add(fn);
   } finally {
     // Evict the queue once the domain is idle so the map cannot grow without
     // bound. A request queued between completion and this check keeps the
@@ -387,6 +383,24 @@ export async function fetchPage(
       queues.delete(key);
     }
   }
+}
+
+/**
+ * Fetches a product page, queued behind any other in-flight request to the same
+ * domain. Never throws — every failure mode comes back as a result variant.
+ */
+export async function fetchPage(
+  url: string,
+  options: FetchPageOptions = {}
+): Promise<FetchPageResult> {
+  if (!URL.canParse(url)) {
+    return {
+      durationMs: 0,
+      error: `invalid URL: ${url}`,
+      status: "network_error",
+    };
+  }
+  return await withDomainQueue(url, () => fetchWithRetries(url, options));
 }
 
 /** Number of per-domain queues currently tracked. Exposed for tests. */

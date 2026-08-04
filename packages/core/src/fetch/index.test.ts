@@ -2,7 +2,14 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { domainQueueCount, fetchPage, hostnameKey, isRetryableStatus, retryDelayMs } from "./index";
+import {
+  domainQueueCount,
+  fetchPage,
+  hostnameKey,
+  isRetryableStatus,
+  retryDelayMs,
+  withDomainQueue,
+} from "./index";
 
 describe("hostnameKey", () => {
   it("lowercases the hostname", () => {
@@ -353,5 +360,50 @@ describe("fetchPage", () => {
     if (result.status === "network_error") {
       expect(result.error).toContain("invalid URL");
     }
+  });
+});
+
+describe("withDomainQueue", () => {
+  it("serialises two concurrent calls on the same hostname", async () => {
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    const run = () =>
+      withDomainQueue("https://queue-test.example.com/a", async () => {
+        inFlight += 1;
+        maxConcurrent = Math.max(maxConcurrent, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlight -= 1;
+      });
+    await Promise.all([run(), run()]);
+    expect(maxConcurrent).toBe(1);
+  });
+
+  it("evicts the queue once the domain goes idle", async () => {
+    const url = "https://queue-eviction-test.example.com/a";
+    const first = withDomainQueue(url, () => new Promise((resolve) => setTimeout(resolve, 10)));
+    const second = withDomainQueue(url, () => new Promise((resolve) => setTimeout(resolve, 10)));
+    expect(domainQueueCount()).toBeGreaterThan(0);
+    await first;
+    await second;
+    expect(domainQueueCount()).toBe(0);
+  });
+
+  it("runs an unparseable URL unqueued rather than throwing", async () => {
+    await expect(withDomainQueue("not a url", () => Promise.resolve("ran"))).resolves.toBe("ran");
+  });
+
+  it("propagates the callback's return value", async () => {
+    const result = await withDomainQueue("https://queue-return-test.example.com/a", () =>
+      Promise.resolve(42)
+    );
+    expect(result).toBe(42);
+  });
+
+  it("propagates the callback's rejection", async () => {
+    await expect(
+      withDomainQueue("https://queue-reject-test.example.com/a", () =>
+        Promise.reject(new Error("boom"))
+      )
+    ).rejects.toThrow("boom");
   });
 });
