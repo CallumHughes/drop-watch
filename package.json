@@ -2,7 +2,7 @@
   "name": "drop-watch",
   "private": true,
   "engines": {
-    "node": ">=24",
+    "node": "^24",
     "pnpm": ">=11"
   },
   "workspaces": [

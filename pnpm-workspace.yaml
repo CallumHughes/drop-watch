@@ -1,6 +1,8 @@
 packages:
   - apps/*
   - packages/*
+# Makes engines.node a failed install rather than a warning.
+engineStrict: true
 allowBuilds:
   esbuild: true
   sharp: true
