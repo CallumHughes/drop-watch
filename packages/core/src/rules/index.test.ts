@@ -40,71 +40,139 @@ function memory(entries: [AlertStateKey, AlertMemory][] = []): Map<AlertStateKey
 
 describe("conditionsMet — target", () => {
   it("fires when the price is below the target", () => {
-    const triggers = conditionsMet(config({ targetPrice: "60.00" }), at("55.44"), null);
+    const triggers = conditionsMet(
+      config({ targetPrice: "60.00" }),
+      at("55.44"),
+      null,
+      at("55.44")
+    );
     expect(triggers.map((t) => t.rule)).toEqual(["target"]);
   });
 
   it("fires when the price is exactly the target", () => {
-    expect(conditionsMet(config({ targetPrice: "60.00" }), at("60.00"), null)).toHaveLength(1);
+    expect(
+      conditionsMet(config({ targetPrice: "60.00" }), at("60.00"), null, at("60.00"))
+    ).toHaveLength(1);
   });
 
   it("does not fire a penny above the target", () => {
-    expect(conditionsMet(config({ targetPrice: "60.00" }), at("60.01"), null)).toEqual([]);
+    expect(conditionsMet(config({ targetPrice: "60.00" }), at("60.01"), null, at("60.01"))).toEqual(
+      []
+    );
   });
 
   it("does nothing without a target", () => {
-    expect(conditionsMet(config(), at("0.01"), null)).toEqual([]);
+    expect(conditionsMet(config(), at("0.01"), null, at("0.01"))).toEqual([]);
   });
 
   it("is silent when the rule is not enabled", () => {
     const disabled = config({ rules: ["restock"], targetPrice: "60.00" });
-    expect(conditionsMet(disabled, at("1.00"), null)).toEqual([]);
+    expect(conditionsMet(disabled, at("1.00"), null, at("1.00"))).toEqual([]);
+  });
+
+  it("fires on the cheapest listing even when the checked listing is above target", () => {
+    const triggers = conditionsMet(
+      config({ targetPrice: "60.00" }),
+      at("65.00"),
+      null,
+      at("50.00")
+    );
+    expect(triggers.map((t) => t.rule)).toEqual(["target"]);
+    expect(triggers.map((t) => t.subject.price)).toEqual(["50.00"]);
+  });
+
+  it("never fires without a cheapest observation, however low the checked listing is", () => {
+    expect(conditionsMet(config({ targetPrice: "60.00" }), at("10.00"), null, null)).toEqual([]);
   });
 });
 
 describe("conditionsMet — drop_percent", () => {
   it("fires on exactly the configured drop", () => {
-    const triggers = conditionsMet(config({ dropPercent: 10 }), at("90.00"), at("100.00"));
+    const triggers = conditionsMet(
+      config({ dropPercent: 10 }),
+      at("90.00"),
+      at("100.00"),
+      at("90.00")
+    );
     expect(triggers.map((t) => t.rule)).toEqual(["drop_percent"]);
   });
 
   it("does not fire a penny short of the threshold", () => {
-    expect(conditionsMet(config({ dropPercent: 10 }), at("90.01"), at("100.00"))).toEqual([]);
+    expect(
+      conditionsMet(config({ dropPercent: 10 }), at("90.01"), at("100.00"), at("90.01"))
+    ).toEqual([]);
   });
 
   it("never fires on a rise", () => {
-    expect(conditionsMet(config({ dropPercent: 10 }), at("120.00"), at("100.00"))).toEqual([]);
+    expect(
+      conditionsMet(config({ dropPercent: 10 }), at("120.00"), at("100.00"), at("120.00"))
+    ).toEqual([]);
   });
 
   it("needs a previous observation", () => {
-    expect(conditionsMet(config({ dropPercent: 10 }), at("1.00"), null)).toEqual([]);
+    expect(conditionsMet(config({ dropPercent: 10 }), at("1.00"), null, at("1.00"))).toEqual([]);
   });
 
   it("ignores a previous price of zero rather than dividing by it", () => {
-    expect(conditionsMet(config({ dropPercent: 10 }), at("0.00"), at("0.00"))).toEqual([]);
+    expect(conditionsMet(config({ dropPercent: 10 }), at("0.00"), at("0.00"), at("0.00"))).toEqual(
+      []
+    );
+  });
+
+  it("is unaffected by a cheapest observation from another listing", () => {
+    const triggers = conditionsMet(
+      config({ dropPercent: 10 }),
+      at("90.00"),
+      at("100.00"),
+      at("1.00")
+    );
+    expect(triggers.map((t) => t.rule)).toEqual(["drop_percent"]);
+    expect(triggers.map((t) => t.subject.price)).toEqual(["90.00"]);
   });
 });
 
 describe("conditionsMet — restock", () => {
   it("fires on out-of-stock becoming in-stock", () => {
-    const triggers = conditionsMet(config(), at("10.00", true), at("10.00", false));
+    const triggers = conditionsMet(
+      config(),
+      at("10.00", true),
+      at("10.00", false),
+      at("10.00", true)
+    );
     expect(triggers.map((t) => t.rule)).toEqual(["restock"]);
   });
 
   it("does not fire when the product was already in stock", () => {
-    expect(conditionsMet(config(), at("10.00", true), at("10.00", true))).toEqual([]);
+    expect(
+      conditionsMet(config(), at("10.00", true), at("10.00", true), at("10.00", true))
+    ).toEqual([]);
   });
 
   it("treats unknown stock as not a restock", () => {
-    expect(conditionsMet(config(), at("10.00", true), at("10.00", null))).toEqual([]);
-    expect(conditionsMet(config(), at("10.00", null), at("10.00", false))).toEqual([]);
+    expect(
+      conditionsMet(config(), at("10.00", true), at("10.00", null), at("10.00", true))
+    ).toEqual([]);
+    expect(
+      conditionsMet(config(), at("10.00", null), at("10.00", false), at("10.00", null))
+    ).toEqual([]);
+  });
+
+  it("is unaffected by a cheapest observation from another listing", () => {
+    const triggers = conditionsMet(
+      config(),
+      at("10.00", true),
+      at("10.00", false),
+      at("1.00", false)
+    );
+    expect(triggers.map((t) => t.rule)).toEqual(["restock"]);
+    expect(triggers.map((t) => t.subject.price)).toEqual(["10.00"]);
   });
 });
 
 describe("conditionsMet — combinations", () => {
   it("reports every rule that holds, in rule order", () => {
     const both = config({ dropPercent: 10, targetPrice: "95.00" });
-    const triggers = conditionsMet(both, at("90.00"), at("100.00"));
+    const triggers = conditionsMet(both, at("90.00"), at("100.00"), at("90.00"));
     expect(triggers.map((t) => t.rule)).toEqual(["target", "drop_percent"]);
   });
 });
@@ -148,6 +216,7 @@ describe("evaluateAlerts", () => {
 
   it("fires once on a lowered target", () => {
     const fired = evaluateAlerts({
+      cheapest: at("55.44"),
       config: targeted,
       latest: at("55.44"),
       memory: memory(),
@@ -159,6 +228,7 @@ describe("evaluateAlerts", () => {
 
   it("stays silent on the next check at the same price", () => {
     const fired = evaluateAlerts({
+      cheapest: at("55.44"),
       config: targeted,
       latest: at("55.44"),
       memory: memory([["target", { lastAlertedAt: hoursAgo(1), lastAlertedPrice: "55.44" }]]),
@@ -170,6 +240,7 @@ describe("evaluateAlerts", () => {
 
   it("speaks up again when the price falls further", () => {
     const fired = evaluateAlerts({
+      cheapest: at("49.99"),
       config: targeted,
       latest: at("49.99"),
       memory: memory([["target", { lastAlertedAt: hoursAgo(1), lastAlertedPrice: "55.44" }]]),
@@ -182,6 +253,7 @@ describe("evaluateAlerts", () => {
   it("dedupes per rule, not per product", () => {
     const both = config({ dropPercent: 10, targetPrice: "95.00" });
     const fired = evaluateAlerts({
+      cheapest: at("90.00"),
       config: both,
       latest: at("90.00"),
       memory: memory([["target", { lastAlertedAt: hoursAgo(1), lastAlertedPrice: "90.00" }]]),
@@ -194,6 +266,7 @@ describe("evaluateAlerts", () => {
   it("honours an overridden cooldown", () => {
     const seen = memory([["target", { lastAlertedAt: hoursAgo(2), lastAlertedPrice: "55.44" }]]);
     const args = {
+      cheapest: at("55.44"),
       config: targeted,
       latest: at("55.44"),
       memory: seen,
@@ -202,6 +275,45 @@ describe("evaluateAlerts", () => {
     };
     expect(evaluateAlerts({ ...args, cooldownMs: cooldownMs(60) })).toHaveLength(1);
     expect(evaluateAlerts({ ...args, cooldownMs: cooldownMs(180) })).toEqual([]);
+  });
+
+  it("never fires target when there is no cheapest observation", () => {
+    const fired = evaluateAlerts({
+      cheapest: null,
+      config: targeted,
+      latest: at("10.00"),
+      memory: memory(),
+      now: NOW,
+      previous: null,
+    });
+    expect(fired).toEqual([]);
+  });
+
+  it("dedupes target on the cheapest listing's price, not the checked listing's", () => {
+    // The checked listing sits above target; a cheaper store elsewhere is
+    // what actually gates the alert.
+    const fired = evaluateAlerts({
+      cheapest: at("55.44"),
+      config: targeted,
+      latest: at("65.00"),
+      memory: memory([["target", { lastAlertedAt: hoursAgo(1), lastAlertedPrice: "55.44" }]]),
+      now: NOW,
+      previous: null,
+    });
+    expect(fired).toEqual([]);
+  });
+
+  it("re-fires target when a new store becomes the cheapest at a lower price", () => {
+    const fired = evaluateAlerts({
+      cheapest: at("49.99"),
+      config: targeted,
+      latest: at("65.00"),
+      memory: memory([["target", { lastAlertedAt: hoursAgo(1), lastAlertedPrice: "55.44" }]]),
+      now: NOW,
+      previous: null,
+    });
+    expect(fired.map((t) => t.rule)).toEqual(["target"]);
+    expect(fired.map((t) => t.subject.price)).toEqual(["49.99"]);
   });
 });
 

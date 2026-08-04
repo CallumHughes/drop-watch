@@ -71,7 +71,9 @@ describe("ntfyChannel", () => {
 
     expect(result).toEqual({ httpStatus: 200, ok: true });
     expect(captured(seen).body).toContain(payload.url);
-    expect((captured(seen).headers as Record<string, string>).title).toBe("Target hit: Bulbasaur");
+    expect((captured(seen).headers as Record<string, string>).title).toBe(
+      "Target hit: Bulbasaur at scrapeme.live"
+    );
     expect((captured(seen).headers as Record<string, string>).authorization).toBeUndefined();
   });
 
@@ -107,7 +109,7 @@ describe("ntfyChannel", () => {
     await channel.send({ ...payload, title: "Pokémon café" });
 
     expect((captured(seen).headers as Record<string, string>).title).toBe(
-      "Target hit: Pok?mon caf?"
+      "Target hit: Pok?mon caf? at scrapeme.live"
     );
   });
 

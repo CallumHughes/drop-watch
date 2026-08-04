@@ -26,9 +26,14 @@
  * Watch-broken dedupe does not live in `alert_state` — it is one alarm per
  * listing, so it lives on `listings.brokenReportedAt`: set when the alarm is
  * sent, cleared on the first ok check.
+ *
+ * `target` is the one rule not about the listing this check ran against — it
+ * is about the product's cheapest *active* listing right now, so this module
+ * loads that separately (`cheapestCurrentSample`) and hands it to `core/rules`
+ * alongside the checked listing's own `latest`/`previous`.
  */
 
-import { percentChange } from "@drop-watch/core/decimal";
+import { cheapestByMinorUnits, percentChange } from "@drop-watch/core/decimal";
 import type { NotificationPayload } from "@drop-watch/core/notify";
 import type { AlertChannel } from "@drop-watch/core/notify/channels";
 import { deliverAlert } from "@drop-watch/core/notify/channels";
@@ -53,7 +58,7 @@ import { alertState, checkRuns, listings, pricePoints } from "@drop-watch/db/sch
 import type { Settings } from "@drop-watch/db/schema/settings";
 import { alertTargets, loadSettings } from "@drop-watch/db/settings";
 import { emailChannel, emailEnabled } from "@drop-watch/email";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 
 import type { CheckOutcome } from "./outcome";
@@ -65,6 +70,9 @@ const OBSERVATION_WINDOW = 2;
 interface Sample extends Observation {
   currency: string;
 }
+
+/** A sample plus which listing it came from — what the `target` rule needs to name a store. */
+type ListingSample = Sample & { listingId: string; url: string };
 
 /** Everything the worker knows once a check has been committed. */
 export interface AlertContext {
@@ -87,6 +95,42 @@ async function recentSamples(listingId: string, limit: number): Promise<Sample[]
     .where(eq(pricePoints.listingId, listingId))
     .orderBy(desc(pricePoints.observedAt), desc(pricePoints.id))
     .limit(limit);
+}
+
+/**
+ * The latest price point of every active listing of a product, in the
+ * product's currency. `DISTINCT ON (listing_id)` ordered by `observed_at
+ * DESC, id DESC` is "latest per listing" in one query rather than N.
+ *
+ * When `product.currency` is null the product has never had a successful
+ * extraction, so at most one listing can have data — nothing to filter.
+ */
+async function latestSampleByListing(product: Product): Promise<ListingSample[]> {
+  const conditions = [eq(listings.productId, product.id), eq(listings.active, true)];
+  if (product.currency) {
+    conditions.push(eq(pricePoints.currency, product.currency));
+  }
+  return await db
+    .selectDistinctOn([pricePoints.listingId], {
+      currency: pricePoints.currency,
+      inStock: pricePoints.inStock,
+      listingId: pricePoints.listingId,
+      price: pricePoints.price,
+      url: listings.url,
+    })
+    .from(pricePoints)
+    .innerJoin(listings, eq(pricePoints.listingId, listings.id))
+    .where(and(...conditions))
+    .orderBy(pricePoints.listingId, desc(pricePoints.observedAt), desc(pricePoints.id));
+}
+
+/**
+ * The cheapest current listing of a product — the `target` rule's subject.
+ * `null` when no active listing has ever recorded a price in the product's
+ * currency.
+ */
+async function cheapestCurrentSample(product: Product): Promise<ListingSample | null> {
+  return cheapestByMinorUnits(await latestSampleByListing(product));
 }
 
 /** The dedupe state for a product's price rules, keyed by rule. */
@@ -119,7 +163,40 @@ function markBrokenReported(listingId: string, now: Date) {
   return db.update(listings).set({ brokenReportedAt: now }).where(eq(listings.id, listingId));
 }
 
-function priceAlertPayload(
+/**
+ * `target` fires on the cheapest current listing, which may not be the one
+ * this check ran against — the payload names that listing, not the checked
+ * one. `previousPrice`/`pctChange` only make sense when the cheapest listing
+ * is the checked listing; otherwise there is no cross-store "previous" to
+ * report, so both stay `null` rather than comparing prices from two stores.
+ */
+function targetAlertPayload(
+  product: Product,
+  listing: Listing,
+  cheapest: ListingSample,
+  previous: Sample | null
+): NotificationPayload {
+  const checkedListingIsCheapest = cheapest.listingId === listing.id;
+  const comparablePrevious = checkedListingIsCheapest ? previous : null;
+  return {
+    consecutiveFailures: null,
+    currency: cheapest.currency,
+    error: null,
+    imageUrl: product.imageUrl,
+    inStock: cheapest.inStock,
+    listingId: cheapest.listingId,
+    pctChange: comparablePrevious ? percentChange(comparablePrevious.price, cheapest.price) : null,
+    previousPrice: comparablePrevious ? comparablePrevious.price : null,
+    price: cheapest.price,
+    productId: product.id,
+    rule: "target",
+    title: product.title,
+    url: cheapest.url,
+  };
+}
+
+/** `drop_percent`/`restock` fire on the listing that was actually checked. */
+function checkedListingAlertPayload(
   product: Product,
   listing: Listing,
   trigger: RuleTrigger,
@@ -141,6 +218,23 @@ function priceAlertPayload(
     title: product.title,
     url: listing.url,
   };
+}
+
+function priceAlertPayload(
+  product: Product,
+  listing: Listing,
+  trigger: RuleTrigger,
+  latest: Sample,
+  previous: Sample | null,
+  cheapest: ListingSample | null
+): NotificationPayload {
+  // `trigger.rule === "target"` implies `cheapest` is non-null — the rules
+  // module never fires `target` without one — but the type does not know
+  // that, so the fallback keeps this total rather than asserting.
+  if (trigger.rule === "target" && cheapest) {
+    return targetAlertPayload(product, listing, cheapest, previous);
+  }
+  return checkedListingAlertPayload(product, listing, trigger, latest, previous);
 }
 
 function brokenPayload(
@@ -211,7 +305,10 @@ async function runPriceAlerts(
     return;
   }
 
+  const cheapest = await cheapestCurrentSample(product);
+
   const triggers = evaluateAlerts({
+    cheapest,
     config: {
       dropPercent: product.dropPercent,
       rules: product.rules,
@@ -228,11 +325,14 @@ async function runPriceAlerts(
     // biome-ignore lint/performance/noAwaitInLoops: a product rarely fires two rules at once, and the ones that do should arrive in rule order rather than racing.
     const sent = await deliver(
       channels,
-      priceAlertPayload(product, listing, trigger, latest, previous),
+      priceAlertPayload(product, listing, trigger, latest, previous, cheapest),
       trigger.reason
     );
     if (sent) {
-      await rememberAlert(product.id, trigger.rule, latest.price, now);
+      // The dedupe price is the trigger's own subject — the cheapest
+      // listing's for `target`, the checked listing's for the rest — not
+      // uniformly `latest.price`.
+      await rememberAlert(product.id, trigger.rule, trigger.subject.price, now);
     }
   }
 }

@@ -25,9 +25,14 @@ const base: NotificationPayload = {
 };
 
 describe("alertMessage", () => {
-  it("titles a target alert with the product label", () => {
+  it("titles a target alert with the product label and the store", () => {
     const message = alertMessage(base);
-    expect(message.title).toBe("Target hit: Bulbasaur");
+    expect(message.title).toBe("Target hit: Bulbasaur at scrapeme.live");
+  });
+
+  it("strips a leading www. from the store name", () => {
+    const message = alertMessage({ ...base, url: "https://www.scrapeme.live/shop/Bulbasaur/" });
+    expect(message.title).toBe("Target hit: Bulbasaur at scrapeme.live");
   });
 
   it("formats price, previous price and percent change without going through Number", () => {
@@ -37,19 +42,19 @@ describe("alertMessage", () => {
     expect(message.body).toContain(base.url);
   });
 
-  it("falls back to the hostname when there is no title", () => {
+  it("falls back to the hostname when there is no title, without repeating it", () => {
     const message = alertMessage({ ...base, title: null, url: "https://www.example.com/x" });
     expect(message.title).toBe("Target hit: example.com");
   });
 
   it("titles a drop_percent alert", () => {
     const message = alertMessage({ ...base, rule: "drop_percent" });
-    expect(message.title).toBe("Price drop: Bulbasaur");
+    expect(message.title).toBe("Price drop: Bulbasaur at scrapeme.live");
   });
 
   it("titles a restock alert", () => {
     const message = alertMessage({ ...base, rule: "restock" });
-    expect(message.title).toBe("Back in stock: Bulbasaur");
+    expect(message.title).toBe("Back in stock: Bulbasaur at scrapeme.live");
   });
 
   it("describes a watch_broken alert by its failure count and error", () => {
@@ -59,7 +64,7 @@ describe("alertMessage", () => {
       error: "selector not found",
       rule: "watch_broken",
     });
-    expect(message.title).toBe("Watch broken: Bulbasaur");
+    expect(message.title).toBe("Watch broken: Bulbasaur at scrapeme.live");
     expect(message.body).toContain("The last 5 checks failed in a row.");
     expect(message.body).toContain("selector not found");
   });
