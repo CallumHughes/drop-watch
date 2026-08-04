@@ -61,6 +61,7 @@ primitives:
       over HTTP. No database access, no queue, no cron.
     code:
       - apps/renderer/**
+    depends_on: [outbound-network-guard]
 
   - id: fetcher
     group: domain
@@ -70,6 +71,16 @@ primitives:
     code:
       - packages/core/src/fetch/**
       - packages/core/src/render/**
+    depends_on: [outbound-network-guard]
+
+  - id: outbound-network-guard
+    group: domain
+    summary: >
+      Shared SSRF boundary for plain HTTP and browser retrieval. Restricts
+      schemes and non-public addresses, re-checks DNS at connection time where
+      possible, and supports an explicit private-host deployment allowlist.
+    code:
+      - packages/core/src/net/**
 
   - id: extractor
     group: domain
