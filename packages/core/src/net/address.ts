@@ -13,6 +13,7 @@
 const IPV4_PATTERN = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 const IPV4_OCTETS = 4;
 const IPV6_GROUPS = 8;
+const IPV6_BITS_PER_GROUP = 16;
 const MAX_OCTET = 255;
 const MAX_GROUP = 0xff_ff;
 const HEX = 16;
@@ -22,6 +23,12 @@ interface Prefix {
   /** Network address as an unsigned 32-bit integer. */
   base: number;
   bits: number;
+}
+
+interface Ipv6Policy {
+  base: readonly number[];
+  bits: number;
+  globallyReachable: boolean;
 }
 
 /**
@@ -44,6 +51,36 @@ const IPV4_BLOCKED: readonly Prefix[] = [
   { base: ipv4ToInt([203, 0, 113, 0]), bits: 24 }, // TEST-NET-3
   { base: ipv4ToInt([224, 0, 0, 0]), bits: 4 }, // multicast
   { base: ipv4ToInt([240, 0, 0, 0]), bits: 4 }, // reserved, and 255.255.255.255 with it
+];
+
+/**
+ * IPv6 special-purpose blocks and their IANA "Globally Reachable" values.
+ *
+ * The table is matched by longest prefix so that the globally reachable
+ * assignments inside 2001::/23 override its non-reachable parent block.
+ */
+const IPV6_POLICY: readonly Ipv6Policy[] = [
+  { base: [0, 0, 0, 0, 0, 0, 0, 1], bits: 128, globallyReachable: false }, // loopback
+  { base: [0, 0, 0, 0, 0, 0, 0, 0], bits: 128, globallyReachable: false }, // unspecified
+  { base: [0x20_01, 1, 0, 0, 0, 0, 0, 1], bits: 128, globallyReachable: true }, // PCP anycast
+  { base: [0x20_01, 1, 0, 0, 0, 0, 0, 2], bits: 128, globallyReachable: true }, // TURN anycast
+  { base: [0x20_01, 1, 0, 0, 0, 0, 0, 3], bits: 128, globallyReachable: true }, // DNS-SD anycast
+  { base: [0x20_01, 0x20, 0, 0, 0, 0, 0, 0], bits: 28, globallyReachable: true }, // ORCHIDv2
+  { base: [0x20_01, 0x30, 0, 0, 0, 0, 0, 0], bits: 28, globallyReachable: true }, // Drone Remote ID
+  { base: [0x20_01, 4, 0x1_12, 0, 0, 0, 0, 0], bits: 48, globallyReachable: true }, // AS112-v6
+  { base: [0x20_01, 3, 0, 0, 0, 0, 0, 0], bits: 32, globallyReachable: true }, // AMT
+  { base: [0x20_01, 2, 0, 0, 0, 0, 0, 0], bits: 48, globallyReachable: false }, // benchmarking
+  { base: [0x20_01, 0x0d_b8, 0, 0, 0, 0, 0, 0], bits: 32, globallyReachable: false }, // documentation
+  { base: [0x20_01, 0, 0, 0, 0, 0, 0, 0], bits: 23, globallyReachable: false }, // IETF protocol assignments
+  { base: [0x64, 0xff_9b, 1, 0, 0, 0, 0, 0], bits: 48, globallyReachable: false }, // NAT64
+  { base: [0x64, 0xff_9b, 0, 0, 0, 0, 0, 0], bits: 96, globallyReachable: true }, // NAT64
+  { base: [0x1_00, 0, 0, 0, 0, 0, 0, 0], bits: 64, globallyReachable: false }, // discard-only
+  { base: [0x1_00, 0, 0, 1, 0, 0, 0, 0], bits: 64, globallyReachable: false }, // dummy prefix
+  { base: [0x3f_ff, 0, 0, 0, 0, 0, 0, 0], bits: 20, globallyReachable: false }, // documentation
+  { base: [0x5f_00, 0, 0, 0, 0, 0, 0, 0], bits: 16, globallyReachable: false }, // SRv6 SIDs
+  { base: [0xfc_00, 0, 0, 0, 0, 0, 0, 0], bits: 7, globallyReachable: false }, // unique-local
+  { base: [0xfe_80, 0, 0, 0, 0, 0, 0, 0], bits: 10, globallyReachable: false }, // link-local
+  { base: [0xff_00, 0, 0, 0, 0, 0, 0, 0], bits: 8, globallyReachable: false }, // multicast
 ];
 
 function ipv4ToInt(octets: readonly number[]): number {
@@ -148,6 +185,25 @@ function groupsMatch(groups: readonly number[], prefix: readonly number[]): bool
   return prefix.every((expected, index) => groups[index] === expected);
 }
 
+function ipv6PrefixMatches(groups: readonly number[], prefix: Ipv6Policy): boolean {
+  const completeGroups = Math.floor(prefix.bits / IPV6_BITS_PER_GROUP);
+  for (let index = 0; index < completeGroups; index += 1) {
+    if (groups[index] !== prefix.base[index]) {
+      return false;
+    }
+  }
+
+  const remainingBits = prefix.bits % IPV6_BITS_PER_GROUP;
+  if (remainingBits === 0) {
+    return true;
+  }
+
+  const mask = (MAX_GROUP << (IPV6_BITS_PER_GROUP - remainingBits)) & MAX_GROUP;
+  const group = groups[completeGroups] ?? 0;
+  const base = prefix.base[completeGroups] ?? 0;
+  return (group & mask) === (base & mask);
+}
+
 /**
  * An embedded IPv4 address, if there is one. `::ffff:169.254.169.254` reaches
  * the metadata service exactly as the bare v4 form does, so it is judged as v4.
@@ -175,26 +231,13 @@ function isIpv6Routable(groups: readonly number[]): boolean {
   if (embedded) {
     return isIpv4Routable(embedded);
   }
-  // ::/128 unspecified and ::1/128 loopback.
-  if (groups.slice(0, 7).every((group) => group === 0) && (groups[7] ?? 0) <= 1) {
-    return false;
+  let mostSpecific: Ipv6Policy | undefined;
+  for (const policy of IPV6_POLICY) {
+    if (ipv6PrefixMatches(groups, policy) && (!mostSpecific || policy.bits > mostSpecific.bits)) {
+      mostSpecific = policy;
+    }
   }
-  const first = groups[0] ?? 0;
-  const second = groups[1] ?? 0;
-  const blocked =
-    // 100::/64 discard-only.
-    groupsMatch(groups, [0x01_00, 0, 0, 0]) ||
-    // 2001::/23 IETF protocol assignments — Teredo (2001::/32) among them.
-    (first === 0x20_01 && (second & 0xfe_00) === 0) ||
-    // 2001:db8::/32 documentation.
-    (first === 0x20_01 && second === 0x0d_b8) ||
-    // fc00::/7 unique-local.
-    (first & 0xfe_00) === 0xfc_00 ||
-    // fe80::/10 link-local.
-    (first & 0xff_c0) === 0xfe_80 ||
-    // ff00::/8 multicast.
-    (first & 0xff_00) === 0xff_00;
-  return !blocked;
+  return mostSpecific?.globallyReachable ?? true;
 }
 
 /**

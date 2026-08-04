@@ -80,6 +80,49 @@ describe("isGloballyRoutable", () => {
     }
   });
 
+  it("matches the current IANA IPv6 special-purpose boundaries", () => {
+    const blocked = [
+      "64:ff9b:1::",
+      "64:ff9b:1:ffff:ffff:ffff:ffff:ffff",
+      "100:0:0:1::",
+      "100:0:0:1:ffff:ffff:ffff:ffff",
+      "3fff::",
+      "3fff:0fff:ffff:ffff:ffff:ffff:ffff:ffff",
+      "5f00::",
+      "5f00:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+    ];
+    for (const ip of blocked) {
+      expect(isGloballyRoutable(ip), ip).toBe(false);
+    }
+
+    const outside = ["64:ff9a:ffff::1", "100:0:0:2::1", "3fff:1000::1", "5f01::1"];
+    for (const ip of outside) {
+      expect(isGloballyRoutable(ip), ip).toBe(true);
+    }
+  });
+
+  it("allows only the globally reachable exceptions inside 2001::/23", () => {
+    const routable = [
+      "2001:1::1",
+      "2001:1::2",
+      "2001:1::3",
+      "2001:3::1",
+      "2001:4:112::1",
+      "2001:20::1",
+      "2001:30::1",
+    ];
+    for (const ip of routable) {
+      expect(isGloballyRoutable(ip), ip).toBe(true);
+    }
+
+    const blocked = ["2001::1", "2001:1::4", "2001:2::1", "2001:db8::1"];
+    for (const ip of blocked) {
+      expect(isGloballyRoutable(ip), ip).toBe(false);
+    }
+
+    expect(isGloballyRoutable("2001:200::1")).toBe(true);
+  });
+
   it("unwraps IPv4-mapped, NAT64 and 6to4 addresses before judging them", () => {
     expect(isGloballyRoutable("::ffff:169.254.169.254")).toBe(false);
     expect(isGloballyRoutable("::ffff:127.0.0.1")).toBe(false);
