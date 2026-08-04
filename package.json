@@ -47,7 +47,7 @@
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
-    "turbo": "^2.10.2",
+    "turbo": "^2.10.8",
     "typescript": "catalog:",
     "ultracite": "7.9.4"
   },
