@@ -141,6 +141,12 @@ describe("renderPage", () => {
           // Never respond; the client's own deadline is what ends this.
           return;
         }
+        // A healthy sidecar reporting that the *store* timed out.
+        if (targetUrl.includes("mode-target-timeout")) {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ durationMs: 20_000, error: "timed out", status: "timeout" }));
+          return;
+        }
         res.writeHead(200, { "content-type": "application/json" });
         res.end(
           JSON.stringify({
@@ -199,52 +205,62 @@ describe("renderPage", () => {
     expect(renderRequestSchema.safeParse(sent).success).toBe(true);
   });
 
-  it("returns network_error mentioning the renderer on a sidecar 500", async () => {
+  it("returns renderer_error mentioning the renderer on a sidecar 500", async () => {
     const result = await renderPage(origin, "https://example.com/mode-500");
-    expect(result.status).toBe("network_error");
-    if (result.status === "network_error") {
+    expect(result.status).toBe("renderer_error");
+    if (result.status === "renderer_error") {
       expect(result.error).toContain("renderer");
       expect(result.error).toContain("500");
     }
   });
 
-  it("returns network_error on a sidecar 429", async () => {
+  it("returns renderer_error on a sidecar 429, keeping the status in the message", async () => {
     const result = await renderPage(origin, "https://example.com/mode-429");
-    expect(result.status).toBe("network_error");
-    if (result.status === "network_error") {
+    expect(result.status).toBe("renderer_error");
+    if (result.status === "renderer_error") {
       expect(result.error).toContain("renderer");
       expect(result.error).toContain("429");
     }
   });
 
-  it("returns network_error for a malformed JSON body on a 200, not a throw", async () => {
+  it("returns renderer_error for a malformed JSON body on a 200, not a throw", async () => {
     const result = await renderPage(origin, "https://example.com/mode-malformed-json");
-    expect(result.status).toBe("network_error");
+    expect(result.status).toBe("renderer_error");
   });
 
-  it("returns network_error when a 200 body fails renderResponseSchema", async () => {
+  it("returns renderer_error when a 200 body fails renderResponseSchema", async () => {
     const result = await renderPage(origin, "https://example.com/mode-invalid-schema");
-    expect(result.status).toBe("network_error");
+    expect(result.status).toBe("renderer_error");
   });
 
-  it("returns timeout when the sidecar never responds", async () => {
+  // The sidecar failing to answer at all is a fault in the renderer; a slow
+  // store comes back as `timeout` inside a 200.
+  it("returns renderer_error when the sidecar never responds", async () => {
     const result = await renderPage(origin, "https://example.com/mode-hang", {
       timeoutMs: 50,
     });
-    expect(result.status).toBe("timeout");
+    expect(result.status).toBe("renderer_error");
+    if (result.status === "renderer_error") {
+      expect(result.error).toContain("did not answer");
+    }
   }, 10_000);
 
-  it("returns network_error for an unreachable sidecar", async () => {
+  it("returns renderer_error for an unreachable sidecar", async () => {
     const result = await renderPage(unreachableOrigin, "https://example.com/product");
-    expect(result.status).toBe("network_error");
-    if (result.status === "network_error") {
+    expect(result.status).toBe("renderer_error");
+    if (result.status === "renderer_error") {
       expect(result.error).toContain("renderer unreachable");
     }
   });
 
-  it("returns network_error for an unparseable base URL", async () => {
+  it("returns renderer_error for an unparseable base URL", async () => {
     const result = await renderPage("not a url", "https://example.com/product");
-    expect(result.status).toBe("network_error");
+    expect(result.status).toBe("renderer_error");
+  });
+
+  it("still reports a store-side timeout the sidecar saw as timeout", async () => {
+    const result = await renderPage(origin, "https://example.com/mode-target-timeout");
+    expect(result.status).toBe("timeout");
   });
 
   it("never throws, across sidecar failures, transport failures, and bad input", async () => {

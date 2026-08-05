@@ -90,11 +90,17 @@ export const renderResponseSchema = z.discriminatedUnion("status", [
 
 export type RenderResponse = z.infer<typeof renderResponseSchema>;
 
+/**
+ * `ok` is a liveness claim rather than "a browser process exists": it goes
+ * false when a render has been in flight past any budget this contract allows.
+ * `stalledMs` is that render's age, present only when one is stuck.
+ */
 export const healthResponseSchema = z.object({
   browser: z.enum(["connected", "idle"]),
   inFlight: z.int(),
   ok: z.boolean(),
   queued: z.int(),
+  stalledMs: z.int().optional(),
 });
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>;

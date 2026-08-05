@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ALLOWED_PRIVATE_HOSTS_ENV } from "../net/guard";
 import {
   domainQueueCount,
   fetchPage,
@@ -185,6 +186,11 @@ describe("fetchPage", () => {
   };
 
   beforeAll(async () => {
+    // Every case below fetches from a loopback server, which the address guard
+    // blocks by default. The exemption is set here rather than the guard being
+    // relaxed, so these tests exercise the same code path a self-hosted
+    // deployment scraping its own LAN does.
+    process.env[ALLOWED_PRIVATE_HOSTS_ENV] = "127.0.0.1";
     server = createServer((req, res) => {
       requests.push({ headers: req.headers, url: req.url });
       const path = (req.url ?? "").split("?")[0] ?? "";
@@ -204,6 +210,9 @@ describe("fetchPage", () => {
   });
 
   afterAll(async () => {
+    // `delete`, not an assignment: writing `undefined` into process.env stores
+    // the four-character string "undefined".
+    delete process.env[ALLOWED_PRIVATE_HOSTS_ENV];
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });

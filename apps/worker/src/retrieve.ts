@@ -7,7 +7,7 @@
  * actually fetches, and that half cannot be imported without a database.
  */
 
-import type { FetchPageResult } from "@drop-watch/core/fetch";
+import type { RendererFault } from "@drop-watch/core/render";
 import type { Listing } from "@drop-watch/db/schema/products";
 
 /** Extracted so the test can assert on it without duplicating the string. */
@@ -30,10 +30,9 @@ export function renderTarget(
 
 /**
  * Synthesised result for a browser-mode listing with no sidecar configured.
- * Flows through the untouched `toCheckOutcome` into a real `check_runs` row —
- * visible in the check-run log and able to trip the watch-broken alarm — the
- * same as any other target-side failure, rather than crashing the worker.
+ * Flows through `toCheckOutcome` into a real `check_runs` row — visible in the
+ * log and able to trip the watch-broken alarm — rather than crashing the worker.
  */
-export function unconfiguredRenderResult(): FetchPageResult {
-  return { durationMs: 0, error: RENDER_UNCONFIGURED_ERROR, status: "network_error" };
+export function unconfiguredRenderResult(): RendererFault {
+  return { durationMs: 0, error: RENDER_UNCONFIGURED_ERROR, status: "renderer_error" };
 }

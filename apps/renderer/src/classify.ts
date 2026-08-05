@@ -7,7 +7,7 @@
 import type { RenderResponse } from "@drop-watch/core/render/contract";
 
 /** Resource types blocked before they reach the network. */
-const BLOCKED_RESOURCE_TYPES = new Set(["font", "image", "media", "stylesheet"]);
+const BLOCKED_RESOURCE_TYPES = new Set(["font", "image", "media"]);
 
 const TIMEOUT_ERROR_NAME = "TimeoutError";
 
@@ -53,15 +53,41 @@ export function classifyError(error: unknown, durationMs: number): RenderRespons
 }
 
 /**
- * `image`, `media` and `font` are the obvious cut — cheerio never renders
- * them. `stylesheet` joins them for the same reason: the extractor
- * (`packages/core/src/extract`) works over the parsed DOM and never computes
- * layout or style, so CSS is pure download weight. Blocking it is normally a
- * risky move (it can change layout-dependent visibility), but nothing here
- * ever looks at layout — it is the single biggest latency win available.
+ * `image`, `media` and `font` do not participate in DOM construction. Keep
+ * stylesheets: page JavaScript can wait for their load event or inspect the
+ * CSSOM before composing the product data that this renderer exists to expose.
  */
 export function shouldBlockResource(resourceType: string): boolean {
   return BLOCKED_RESOURCE_TYPES.has(resourceType);
+}
+
+/**
+ * How long the oldest in-flight render has been running past `thresholdMs`, or
+ * `null` when nothing is overdue. `isConnected()` stays true of a Chromium that
+ * has stopped completing anything, so liveness is measured this way instead.
+ */
+export function stalledFor(
+  oldestStartedAt: number | null,
+  now: number,
+  thresholdMs: number
+): number | null {
+  if (oldestStartedAt === null) {
+    return null;
+  }
+  const age = now - oldestStartedAt;
+  return age > thresholdMs ? age : null;
+}
+
+/**
+ * Schemes that resolve inside the browser and never open a socket, so the
+ * address guard has nothing to say about them. Everything else non-http(s) is
+ * refused.
+ */
+const INERT_SCHEMES = new Set(["about:", "blob:", "data:"]);
+
+export function isInertScheme(url: string): boolean {
+  const separator = url.indexOf(":");
+  return separator === -1 ? false : INERT_SCHEMES.has(url.slice(0, separator + 1).toLowerCase());
 }
 
 /**

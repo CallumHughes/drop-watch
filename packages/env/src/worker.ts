@@ -13,11 +13,16 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
   runtimeEnv: process.env,
   server: {
+    // Hostnames the SSRF guard in `@drop-watch/core/net/guard` exempts from
+    // its private-address block, comma-separated. Declared here for validation
+    // and discoverability; the guard itself reads `process.env` directly,
+    // because it is also loaded by the renderer, which has no env package.
+    ALLOWED_PRIVATE_HOSTS: z.string().optional(),
     DATABASE_URL: z.string().min(1),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     // Base URL of the renderer sidecar. Unset is a fully supported
     // configuration, exactly like RESEND_API_KEY: browser-mode listings simply
-    // record a `network_error` check run instead of crashing the worker.
+    // record a `renderer_error` check run instead of crashing the worker.
     RENDER_URL: z.url().optional(),
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

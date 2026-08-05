@@ -35,7 +35,7 @@ x-app-environment: &app-environment
   # BETTER_AUTH_URL of its own — knows what to link to.
   #
   # RENDER_URL is the browser-render switch, on the same footing: unset means
-  # a browser-mode listing records a `network_error` check run rather than the
+  # a browser-mode listing records a `renderer_error` check run rather than the
   # worker crashing (see the `renderer` service and packages/env/src/worker.ts).
   #
   # Listed with no value, so compose takes them from the shell or from the root
@@ -43,6 +43,9 @@ x-app-environment: &app-environment
   # an `environment` key overrides `env_file` even when it resolves to nothing,
   # so for containers these belong in the root `.env` (which compose
   # interpolates) rather than only in `apps/web/.env` (which it does not).
+  # ALLOWED_PRIVATE_HOSTS rides along for the same reason: the SSRF guard reads
+  # it in whichever process is doing the fetching, and both of these do.
+  ALLOWED_PRIVATE_HOSTS:
   APP_URL:
   EMAIL_FROM:
   RENDER_URL:
@@ -117,6 +120,9 @@ services:
     # to finish rather than having Docker kill it mid-write.
     stop_grace_period: 40s
     restart: unless-stopped
+    networks:
+      - default
+      - renderer-control
     # No depends_on: renderer here — that would force the `browser` profile on
     # for everyone. The worker degrades gracefully when RENDER_URL is unset
     # (see apps/worker/src/check-listing.ts), which is exactly what makes this
@@ -133,11 +139,35 @@ services:
       context: .
       dockerfile: apps/renderer/Dockerfile
     init: true
+    # The browser receives hostile page content. These limits contain CPU,
+    # memory, process and filesystem amplification even when Chromium itself
+    # stops responding to Playwright's deadlines.
+    cpus: ${RENDER_CPUS:-2.0}
+    mem_limit: ${RENDER_MEMORY_LIMIT:-2g}
+    pids_limit: ${RENDER_PIDS_LIMIT:-512}
+    read_only: true
+    tmpfs:
+      - /tmp:size=${RENDER_TMPFS_LIMIT:-512m},mode=1777
+    cap_drop:
+      - ALL
+    # Chromium's namespace sandbox chroots its zygote after isolating it. Keep
+    # that one narrow capability; Chromium fails closed if it is removed.
+    cap_add:
+      - SYS_CHROOT
+    security_opt:
+      - no-new-privileges:true
+      # Playwright's Docker seccomp profile is the default Docker profile plus
+      # the user-namespace syscalls Chromium needs for its own sandbox.
+      - seccomp=./apps/renderer/seccomp_profile.json
     # Chromium crashes on heavy pages with Docker's default 64MB /dev/shm, and
     # the usual workaround (--disable-dev-shm-usage) only trades crashes for
     # disk I/O. Give it real shared memory instead.
     shm_size: "1gb"
     environment:
+      # The sidecar applies the same address guard the worker does, so it needs
+      # the same exemptions — Chromium resolves names itself and would
+      # otherwise be the one path around the policy.
+      ALLOWED_PRIVATE_HOSTS:
       NODE_ENV: production
       TZ: ${TZ:-Europe/London}
     healthcheck:
@@ -157,6 +187,11 @@ services:
     # first while the worker is still waiting on an answer from it.
     stop_grace_period: 30s
     restart: unless-stopped
+    # Do not put a compromised browser on the application/database network.
+    # The worker joins this network solely to call the renderer; the bridge
+    # retains normal outbound internet access for guarded page requests.
+    networks:
+      - renderer-control
 
   # Development only. The production override disables this service — see
   # docker-compose.prod.yml.
@@ -186,3 +221,6 @@ services:
 
 volumes:
   drop-watch_postgres_data:
+
+networks:
+  renderer-control:

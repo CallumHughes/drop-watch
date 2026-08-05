@@ -7,6 +7,7 @@ const STATUS_LABELS: Record<CheckStatus, string> = {
   http_error: "HTTP error",
   network_error: "network error",
   ok: "ok",
+  renderer_error: "renderer error",
   timeout: "timed out",
 };
 

@@ -20,11 +20,11 @@ describe("renderTarget", () => {
 });
 
 describe("unconfiguredRenderResult", () => {
-  it("is a network_error carrying the shared constant", () => {
+  it("is a renderer_error carrying the shared constant", () => {
     expect(unconfiguredRenderResult()).toEqual({
       durationMs: 0,
       error: RENDER_UNCONFIGURED_ERROR,
-      status: "network_error",
+      status: "renderer_error",
     });
   });
 

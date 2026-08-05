@@ -3,9 +3,10 @@
  * `/healthz`, fronting the Playwright driver in `./render`.
  *
  * Non-200 is reserved for the sidecar's own faults — 400 malformed request,
- * 429 at capacity, 503 shutting down. Everything else the render itself might
- * do (timeout, HTTP error from the target, network failure) still comes back
- * 200, because the render *ran*; the body's `status` field says how it went.
+ * 429 at capacity, 500 renderer infrastructure failure, 503 shutting down.
+ * Everything the target might do (timeout, HTTP error, network failure) still
+ * comes back 200, because the render *ran*; the body's `status` says how it
+ * went.
  * That split keeps "the retailer is broken" and "my renderer is broken" from
  * collapsing into the same signal for the worker.
  */
@@ -21,7 +22,7 @@ import { serve } from "@hono/node-server";
 import { createLogger, initLogger, log } from "evlog";
 import { Hono } from "hono";
 import PQueue from "p-queue";
-import { browserStatus, closeBrowser, renderPage } from "./render";
+import { browserStatus, closeBrowser, renderPage, stalledRenderMs } from "./render";
 
 const SERVICE_NAME = "drop-watch-renderer";
 
@@ -30,13 +31,12 @@ const DEFAULT_RENDER_CONCURRENCY = 2;
 /** Once this many requests are queued behind `concurrency`, reject new ones outright rather than let them age out behind others' timeouts. */
 const QUEUE_LIMIT_MULTIPLIER = 4;
 /**
- * How long shutdown waits for in-flight renders to drain before closing the
- * browser and exiting anyway. Must stay comfortably under the worker's
- * `SHUTDOWN_TIMEOUT_MS` (30_000, `apps/worker/src/index.ts`) — otherwise a
- * stack-wide `docker compose down` kills this service mid-render while the
- * worker is still politely waiting for an answer that will never come.
+ * One absolute shutdown budget leaves margin under Docker's 30-second stop
+ * grace. Only its first slice is available for draining; all browser launch,
+ * graceful-close, and forced-kill work shares the same final deadline.
  */
-const RENDER_SHUTDOWN_TIMEOUT_MS = 20_000;
+const SHUTDOWN_BUDGET_MS = 28_000;
+const RENDER_DRAIN_TIMEOUT_MS = 8000;
 
 const port = Number(process.env.RENDER_PORT) || DEFAULT_RENDER_PORT;
 const concurrency = Number(process.env.RENDER_CONCURRENCY) || DEFAULT_RENDER_CONCURRENCY;
@@ -61,9 +61,23 @@ app.post(RENDER_PATH, async (c) => {
   if (queue.size >= queueLimit) {
     return c.json({ error: "renderer at capacity" }, 429);
   }
+  if (shuttingDown) {
+    return c.body(null, 503);
+  }
 
   const requestLog = createLogger({ action: "render", url: parsed.data.url });
-  const result = await queue.add(() => renderPage(parsed.data));
+  let result: Awaited<ReturnType<typeof renderPage>>;
+  try {
+    result = await queue.add(() => renderPage(parsed.data));
+  } catch (error) {
+    requestLog.set({
+      error: error instanceof Error ? error.message : String(error),
+      renderStatus: "renderer_error",
+    });
+    requestLog.error("renderer infrastructure failure");
+    requestLog.emit();
+    return c.json({ error: "renderer infrastructure failure" }, 500);
+  }
   // `renderStatus`, not `status`: evlog reserves `status` for a numeric HTTP
   // status, and this is the render's own outcome variant.
   requestLog.set({ durationMs: result.durationMs, renderStatus: result.status });
@@ -77,17 +91,28 @@ app.post(RENDER_PATH, async (c) => {
   return c.json(result, 200);
 });
 
-app.get(HEALTH_PATH, (c) =>
-  c.json(
+/**
+ * Reports unhealthy for a stuck browser as well as a shutting-down one: a
+ * Chromium that has stopped completing renders keeps `isConnected()` true while
+ * holding its concurrency slots.
+ */
+app.get(HEALTH_PATH, (c) => {
+  const stalledMs = stalledRenderMs();
+  const ok = !(shuttingDown || stalledMs !== null);
+  if (stalledMs !== null) {
+    log.warn("renderer", `render stalled for ${stalledMs}ms; reporting unhealthy`);
+  }
+  return c.json(
     {
       browser: browserStatus(),
       inFlight: queue.pending,
-      ok: !shuttingDown,
+      ok,
       queued: queue.size,
+      ...(stalledMs === null ? {} : { stalledMs }),
     },
-    shuttingDown ? 503 : 200
-  )
-);
+    ok ? 200 : 503
+  );
+});
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,13 +126,18 @@ function installShutdown(server: ServerType): void {
     }
     stopping = true;
     shuttingDown = true;
+    const deadlineAt = Date.now() + SHUTDOWN_BUDGET_MS;
     log.info("renderer", `${signal} received, stopping`);
 
     // Stop accepting new connections; existing responses still complete.
     server.close();
+    // Queued renders have not started and must not launch Chromium after the
+    // manager begins closing. Running renders may use the short drain slice.
+    queue.pause();
     // Give in-flight renders a chance to finish, but do not wait forever.
-    await Promise.race([queue.onIdle(), sleep(RENDER_SHUTDOWN_TIMEOUT_MS)]);
-    await closeBrowser();
+    const drainMs = Math.min(RENDER_DRAIN_TIMEOUT_MS, Math.max(0, deadlineAt - Date.now()));
+    await Promise.race([queue.onIdle(), sleep(drainMs)]);
+    await closeBrowser(deadlineAt);
 
     process.exit(0);
   };
