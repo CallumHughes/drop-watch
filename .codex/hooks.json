@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pnpm run fix --skip=correctness/noUnusedImports"
+            "command": "pnpm run fix"
           }
         ]
       }
