@@ -13,10 +13,10 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test-url": "tsx src/bin/test-url.ts",
-    "check-types": "tsc --noEmit"
+    "test-url": "tsx src/bin/test-url.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
