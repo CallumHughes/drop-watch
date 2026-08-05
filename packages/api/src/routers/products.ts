@@ -311,6 +311,24 @@ async function loadFailureWindowRuns(productId: string, limit: number): Promise<
   return rows.map(({ rank: _rank, ...run }) => run);
 }
 
+/**
+ * What a "check now" press gets back. The job is only *enqueued* here — the
+ * worker picks it up a moment later — so the useful part is `queuedAt`: a
+ * caller waiting for the result knows any check run that started at or after
+ * it is the one it asked for. Server-stamped on purpose, so the comparison is
+ * between two server clocks and a browser's own skew cannot make a stale
+ * check look like a fresh one.
+ *
+ * "Already checking" is not a failure: pg-boss's exclusive policy allows one
+ * check per listing at a time, and a second press while one is in flight is
+ * absorbed. `jobId` is null in that case.
+ */
+export interface CheckNowResult {
+  jobId: string | null;
+  queuedAt: Date;
+  status: "already_checking" | "queued";
+}
+
 /** Min/max/avg over one product's whole price history. Prices stay decimal strings. */
 export interface PriceStats {
   avg: string;
@@ -416,24 +434,22 @@ export const productsRouter = {
    */
   checkNow: protectedProcedure
     .input(productIdInput)
-    .handler(
-      async ({
-        context,
-        input,
-      }): Promise<{ jobId: string | null; status: "already_checking" | "queued" }> => {
-        const product = await loadProduct(input.id, context.session.user.id);
-        const activeListings = await db
-          .select()
-          .from(listings)
-          .where(and(eq(listings.productId, product.id), eq(listings.active, true)));
-        const boss = await getSenderBoss();
-        const jobIds = await Promise.all(
-          activeListings.map((listing) => sendCheckNow(boss, listing.id))
-        );
-        const jobId = jobIds.find((id): id is string => id !== null) ?? null;
-        return jobId ? { jobId, status: "queued" } : { jobId: null, status: "already_checking" };
-      }
-    ),
+    .handler(async ({ context, input }): Promise<CheckNowResult> => {
+      const product = await loadProduct(input.id, context.session.user.id);
+      const activeListings = await db
+        .select()
+        .from(listings)
+        .where(and(eq(listings.productId, product.id), eq(listings.active, true)));
+      const boss = await getSenderBoss();
+      const queuedAt = new Date();
+      const jobIds = await Promise.all(
+        activeListings.map((listing) => sendCheckNow(boss, listing.id))
+      );
+      const jobId = jobIds.find((id): id is string => id !== null) ?? null;
+      return jobId
+        ? { jobId, queuedAt, status: "queued" }
+        : { jobId: null, queuedAt, status: "already_checking" };
+    }),
   /**
    * Every check attempt for one product's listing(s), newest first. This is
    * the answer to "why did this silently stop working".

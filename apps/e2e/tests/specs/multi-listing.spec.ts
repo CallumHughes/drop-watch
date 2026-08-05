@@ -5,7 +5,7 @@ import type { AlertPayload } from "../support/webhook-sink";
  * One product, two stores: the fixture server's two products stand in for two
  * retailers selling the same thing, tied together as listings on one product
  * via `productDetail.addStore`. Every price-touching wait uses the same
- * generous timeout `check-now.spec.ts` does — worker pickup plus one UI poll.
+ * generous timeout `check-now.spec.ts` does, and for the same reason.
  */
 const CHECK_TIMEOUT_MS = 45_000;
 const ALERT_TIMEOUT_MS = 20_000;
