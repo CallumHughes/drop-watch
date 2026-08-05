@@ -156,8 +156,8 @@ jobs:
         image: [web, worker, renderer, migrate]
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
         with:
           context: .
           # Three of the four are apps/<name>/Dockerfile; the migration job is
