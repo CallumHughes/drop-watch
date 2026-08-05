@@ -60,6 +60,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The renderer unit suite includes a real-browser SSRF/side-channel trap.
       - run: pnpm --filter @drop-watch/renderer exec playwright install --with-deps chromium
+      # Ubuntu 24.04's AppArmor policy denies user namespaces to downloaded
+      # Chromium builds. This ephemeral runner executes trusted fixture pages;
+      # allow the Chromium sandbox itself instead of testing with --no-sandbox.
+      - name: Allow Chromium user-namespace sandbox
+        run: |
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
       - run: pnpm test
 
   build:
