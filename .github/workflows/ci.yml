@@ -120,18 +120,39 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:start
-      - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
-      # The suite serves this build via `next start`, so anything the app reads
+      # Postgres, the browser download and the build are independent, so the job
+      # waits once for the slowest instead of three times in series. Logs go to
+      # files and are replayed grouped, since concurrent stdout interleaves.
+      #
+      # The suite serves the build via `next start`, so anything the app reads
       # at build time has to be set here rather than at run time — mirroring
       # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY and the rest of the
       # runtime config are set by the suite at run time, not here. Invoked
       # directly rather than through turbo, which does not hash NEXT_DIST_DIR
       # and could hand back a `.next` build.
-      - run: pnpm --filter @drop-watch/web exec next build
+      - name: Start database, install browser and build
         env:
           NEXT_DIST_DIR: .next-e2e
           SKIP_ENV_VALIDATION: 1
+        run: |
+          pnpm db:start > "$RUNNER_TEMP/db.log" 2>&1 &
+          db=$!
+          pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium > "$RUNNER_TEMP/browser.log" 2>&1 &
+          browser=$!
+          pnpm --filter @drop-watch/web exec next build > "$RUNNER_TEMP/build.log" 2>&1 &
+          build=$!
+
+          status=0
+          for task in db browser build; do
+            if ! wait "${!task}"; then
+              echo "::error::$task failed"
+              status=1
+            fi
+            echo "::group::$task"
+            cat "$RUNNER_TEMP/$task.log"
+            echo "::endgroup::"
+          done
+          exit $status
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
