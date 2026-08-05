@@ -24,11 +24,17 @@
  *
  * State is in-memory and per-run. Parallel tests stay isolated by using unique
  * slugs, never by clearing shared state.
+ *
+ * One socket, many names: the listen is unbound, so every host in
+ * `FIXTURE_HOSTS` reaches this same process and the same state. Which name a
+ * test scrapes is what gives its worker a fetch queue of its own — see the
+ * comment on `FIXTURE_HOSTS`.
  */
 
+import { lookup } from "node:dns/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import { FIXTURE_PORT } from "../constants";
+import { FIXTURE_HOSTS, FIXTURE_PORT } from "../constants";
 import { type FixtureProductState, renderProductPage } from "./templates";
 
 const products = new Map<string, FixtureProductState>();
@@ -150,12 +156,52 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   sendText(response, NOT_FOUND, "not found", "text/plain");
 }
 
+/** Why `host` cannot be used, or null if it resolves to loopback. */
+async function hostProblem(host: string): Promise<string | null> {
+  try {
+    const addresses = await lookup(host, { all: true });
+    const foreign = addresses.find((entry) => !isLoopback(entry.address));
+    return foreign ? `${host} resolves to ${foreign.address}, which is not loopback` : null;
+  } catch (error) {
+    return `${host} does not resolve (${error instanceof Error ? error.message : String(error)})`;
+  }
+}
+
+function isLoopback(address: string): boolean {
+  return address === "::1" || address.startsWith("127.");
+}
+
+/**
+ * Every worker host has to resolve to this machine before the socket opens.
+ *
+ * `*.localhost` is loopback by RFC 6761 and resolves unaided on macOS and on
+ * the CI runner, but a machine with a stripped-down resolver would answer
+ * nothing — and the symptom would otherwise be scrape failures in whichever
+ * spec happened to land there. Checking before `listen` turns that into one
+ * named failure of Playwright's `webServer` readiness instead. Reachability
+ * needs no check of its own: the listen below is unbound, so anything that
+ * resolves to loopback arrives here.
+ */
+async function verifyHosts(): Promise<void> {
+  const problems = (await Promise.all(FIXTURE_HOSTS.map(hostProblem))).filter(
+    (problem) => problem !== null
+  );
+  if (problems.length > 0) {
+    process.stderr.write(`fixture server host check failed:\n  ${problems.join("\n  ")}\n`);
+    process.exit(1);
+  }
+}
+
 const server = createServer((request, response) => {
   route(request, response).catch((error: unknown) => {
     sendJson(response, BAD_REQUEST, { error: String(error) });
   });
 });
 
+await verifyHosts();
+
 server.listen(FIXTURE_PORT, () => {
-  process.stdout.write(`fixture server listening on :${FIXTURE_PORT}\n`);
+  process.stdout.write(
+    `fixture server listening on :${FIXTURE_PORT} as ${FIXTURE_HOSTS.join(", ")}\n`
+  );
 });
