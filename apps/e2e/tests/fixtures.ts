@@ -64,7 +64,11 @@ interface Fixtures {
   addProduct: AddProductPage;
   dashboard: DashboardPage;
   emailSink: EmailSink;
-  /** This test's own product page on the fixture server, already published. */
+  /**
+   * This test's own product page on the fixture server, already published.
+   * Served on the worker's own fixture host, so one worker's scrapes never
+   * queue behind another's.
+   */
   fixtureProduct: FixtureProduct;
   forgotPassword: ForgotPasswordPage;
   invitePage: InvitePage;
@@ -94,8 +98,8 @@ export const test = base.extend<Fixtures>({
   emailSink: async ({ request }, use) => {
     await use(new EmailSink(request));
   },
-  fixtureProduct: async ({ request }, use) => {
-    const product = new FixtureProduct(request);
+  fixtureProduct: async ({ request }, use, testInfo) => {
+    const product = new FixtureProduct(request, testInfo.parallelIndex);
     await product.publish();
     await use(product);
   },
@@ -117,8 +121,8 @@ export const test = base.extend<Fixtures>({
   resetPassword: async ({ page }, use) => {
     await use(new ResetPasswordPage(page));
   },
-  secondFixtureProduct: async ({ request }, use) => {
-    const product = new FixtureProduct(request);
+  secondFixtureProduct: async ({ request }, use, testInfo) => {
+    const product = new FixtureProduct(request, testInfo.parallelIndex);
     await product.publish();
     await use(product);
   },

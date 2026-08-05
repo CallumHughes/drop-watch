@@ -17,6 +17,42 @@ export const FIXTURE_PORT = 4100;
 export const BASE_URL = `http://localhost:${WEB_PORT}`;
 export const FIXTURE_URL = `http://localhost:${FIXTURE_PORT}`;
 
+/**
+ * How many hostnames the fixture server is addressed by. Must be at least the
+ * `workers` count below, and costs nothing to overshoot — the server binds one
+ * socket and every name reaches it.
+ */
+const FIXTURE_HOST_COUNT = 8;
+
+/**
+ * The fixture server answers on one hostname per worker, and every worker
+ * scrapes only its own.
+ *
+ * The fetch layer serialises requests per hostname (`hostnameKey` in
+ * `packages/core/src/fetch/index.ts`) — deliberate politeness towards a real
+ * retailer, but with every fixture product on `localhost` it made one
+ * concurrency-1 queue the ceiling on the whole suite's parallelism, in the web
+ * process and the worker process alike. Distinct names give each worker a
+ * queue of its own and leave the per-domain limit itself untouched.
+ *
+ * `*.localhost` rather than `127.0.0.2`-style aliases: the whole subdomain is
+ * reserved for loopback by RFC 6761 and resolves out of the box on macOS and
+ * on the CI runner, whereas macOS answers nothing on 127.0.0.0/8 beyond
+ * 127.0.0.1 without a `sudo ifconfig lo0 alias` per address. The fixture
+ * server verifies all of them at startup, so a host that does not resolve
+ * fails the run immediately instead of surfacing as a scrape error later.
+ */
+export const FIXTURE_HOSTS: readonly string[] = Array.from(
+  { length: FIXTURE_HOST_COUNT },
+  (_, index) => `fixture-${index}.localhost`
+);
+
+/** The fixture origin a given Playwright worker scrapes. */
+export function fixtureOrigin(parallelIndex: number): string {
+  const host = FIXTURE_HOSTS[parallelIndex % FIXTURE_HOSTS.length];
+  return `http://${host}:${FIXTURE_PORT}`;
+}
+
 export const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ?? "postgresql://postgres:password@localhost:5432/drop-watch-e2e";
 
@@ -55,8 +91,10 @@ export const SINK_WEBHOOK_ID = "e2e-sink";
 export const appEnv: Record<string, string> = {
   // The fixture server *is* the retailer here, and it lives on loopback, which
   // the SSRF guard blocks by default. This is the same exemption a self-hosted
-  // instance scraping something on its own network would set.
-  ALLOWED_PRIVATE_HOSTS: "localhost",
+  // instance scraping something on its own network would set. Every name the
+  // server answers on has to be listed: `localhost` for the webhook and mail
+  // sinks, the per-worker hosts for the product pages.
+  ALLOWED_PRIVATE_HOSTS: ["localhost", ...FIXTURE_HOSTS].join(","),
   APP_URL: BASE_URL,
   // `next start` runs in production mode, where Better Auth rate-limits
   // sign-in to 3 requests per 10s per address — and every worker here shares

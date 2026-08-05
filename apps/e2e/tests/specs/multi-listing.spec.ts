@@ -40,9 +40,13 @@ test("tracking a second store surfaces two listings, a two-line chart, and the c
   });
 
   await test.step("the chart legend names both stores", async () => {
-    await expect(productDetail.page.getByText(`localhost · ${fixtureProduct.slug}`)).toBeVisible();
+    // Both fixture products sit on this worker's one host, so the legend has
+    // to fall back to the path segment to tell them apart.
     await expect(
-      productDetail.page.getByText(`localhost · ${secondFixtureProduct.slug}`)
+      productDetail.page.getByText(`${fixtureProduct.host} · ${fixtureProduct.slug}`)
+    ).toBeVisible();
+    await expect(
+      productDetail.page.getByText(`${secondFixtureProduct.host} · ${secondFixtureProduct.slug}`)
     ).toBeVisible();
   });
 

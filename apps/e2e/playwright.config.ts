@@ -73,7 +73,8 @@ export default defineConfig({
       url: `${FIXTURE_URL}/__health`,
     },
   ],
-  // One short of the runner's 4 cores, which also host `next start`, the
-  // worker, the fixture server and postgres.
-  workers: process.env.CI ? 3 : undefined,
+  // Above the runner's 4 cores, which also host `next start`, the worker, the
+  // fixture server and postgres — a spec spends most of its time waiting on a
+  // poll or a worker pickup, not on CPU. Measured, not assumed.
+  workers: process.env.CI ? 5 : undefined,
 });
