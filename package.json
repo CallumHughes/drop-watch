@@ -1,46 +1,42 @@
 {
   "name": "drop-watch",
   "private": true,
-  "engines": {
-    "node": "^24",
-    "pnpm": ">=11"
-  },
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "type": "module",
   "scripts": {
-    "dev": "turbo run dev",
     "build": "turbo run build",
+    "check": "ultracite check",
     "check-types": "turbo run check-types",
-    "test": "turbo run test",
-    "test:e2e": "turbo run test:e2e -F @drop-watch/e2e",
-    "test:integration": "turbo run test:integration -F @drop-watch/db",
-    "test:e2e:ui": "pnpm --filter @drop-watch/e2e test:e2e:ui",
-    "dev:web": "turbo run dev -F @drop-watch/web",
-    "dev:worker": "turbo run dev -F @drop-watch/worker",
-    "db:push": "turbo run db:push -F @drop-watch/db",
-    "db:studio": "turbo run db:studio -F @drop-watch/db",
+    "db:down": "docker compose down postgres",
     "db:generate": "turbo run db:generate -F @drop-watch/db",
     "db:migrate": "turbo run db:migrate -F @drop-watch/db",
+    "db:push": "turbo run db:push -F @drop-watch/db",
     "db:seed": "turbo run db:seed -F @drop-watch/db",
-    "db:verify-user": "turbo run db:verify-user -F @drop-watch/db --",
     "db:start": "docker compose up -d --wait postgres",
-    "db:watch": "docker compose up postgres",
     "db:stop": "docker compose stop postgres",
-    "db:down": "docker compose down postgres",
+    "db:studio": "turbo run db:studio -F @drop-watch/db",
+    "db:verify-user": "turbo run db:verify-user -F @drop-watch/db --",
+    "db:watch": "docker compose up postgres",
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev -F @drop-watch/web",
+    "dev:worker": "turbo run dev -F @drop-watch/worker",
     "docker:build": "docker compose build",
-    "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
     "docker:prod:build": "docker compose -f docker-compose.yml -f docker-compose.prod.yml build",
-    "docker:prod:up": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
     "docker:prod:down": "docker compose -f docker-compose.yml -f docker-compose.prod.yml down",
     "docker:prod:logs": "docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f",
-    "check": "ultracite check",
+    "docker:prod:up": "docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
+    "docker:up": "docker compose up -d --build",
     "fix": "ultracite fix",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e -F @drop-watch/e2e",
+    "test:e2e:ui": "pnpm --filter @drop-watch/e2e test:e2e:ui",
+    "test:integration": "turbo run test:integration -F @drop-watch/db"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
@@ -49,7 +45,11 @@
     "husky": "latest",
     "turbo": "^2.10.8",
     "typescript": "catalog:",
-    "ultracite": "7.9.4"
+    "ultracite": "7.10.0"
   },
-  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72"
+  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72",
+  "engines": {
+    "node": "^24",
+    "pnpm": ">=11"
+  }
 }

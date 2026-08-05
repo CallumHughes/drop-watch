@@ -10,9 +10,9 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
+    "check-types": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "check-types": "tsc --noEmit"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@drop-watch/core": "workspace:*",

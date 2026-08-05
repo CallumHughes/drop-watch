@@ -12,14 +12,14 @@
   "scripts": {
     "build": "rolldown -c",
     "check-types": "tsc --noEmit",
-    "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
-    "test:integration": "vitest run",
-    "test:integration:watch": "vitest",
+    "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file-if-exists=../../apps/web/.env src/seed.ts",
-    "db:verify-user": "tsx --env-file-if-exists=../../apps/web/.env src/verify-user.ts"
+    "db:studio": "drizzle-kit studio",
+    "db:verify-user": "tsx --env-file-if-exists=../../apps/web/.env src/verify-user.ts",
+    "test:integration": "vitest run",
+    "test:integration:watch": "vitest"
   },
   "dependencies": {
     "@drop-watch/core": "workspace:*",
