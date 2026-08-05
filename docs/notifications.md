@@ -108,8 +108,8 @@ APP_URL=http://server.local:3001         # optional; links inside the mail
 In development these go in **both** `apps/web/.env` and `apps/worker/.env` —
 auth mail is sent by the web app, alert mail by the worker, and each process
 only reads its own file. In Docker they go in the root `.env` once, which reaches
-both containers. Then restart both `web` and `worker` (in Docker, rebuild — see
-below) and tick **Email alerts** on the settings page.
+both containers. Then restart both `web` and `worker` and tick **Email alerts**
+on the settings page.
 
 Alert recipients are not a field you type into: mail goes to the product owner's
 own account address, and only if that address is **verified**. An unverified
@@ -150,32 +150,22 @@ UPDATE "user" SET email_verified = true WHERE email = 'admin@drop-watch.local';
 `pnpm db:seed` already writes `emailVerified: true`, so a seeded admin never
 needs this.
 
-### Docker: `NEXT_PUBLIC_EMAIL_ENABLED` is a build argument
+### Docker
 
-The browser's copy of "is a mailer configured" — which is all that decides
-whether the *links* and the **Email alerts** tick box are offered — is inlined
-into the bundle by `next build`. The image is built without `RESEND_API_KEY`
-(secrets stay out of image layers), so the value it would derive is always
-`false`, and setting the key on the container at runtime cannot change it. Pass
-it as a build argument instead:
+The same `RESEND_API_KEY` switch, and nothing else. Set it in `.env` — the
+root file if you built from source, or the one next to `docker-compose.yml` if
+you are running the published images — and restart `web` and `worker`:
 
 ```bash
-# in the root .env, which is the file compose interpolates
-RESEND_API_KEY=re_...
-NEXT_PUBLIC_EMAIL_ENABLED=true
+docker compose up -d
 ```
 
-```bash
-pnpm docker:prod:up      # builds, so the flag is baked in
-```
+No rebuild, no build argument: the flag is read at request time, in every
+image, so one published `web` image is correct whether or not a mailer is
+configured. `EMAIL_FROM` and `APP_URL` go in the same file if you are setting
+them.
 
-Two consequences worth knowing. Changing it needs a **rebuild**, not a restart.
-And it is only ever about what is *offered*: the routes and the mailer itself are
-gated server-side on the real key at request time, so if the two disagree the
-worst case is a visible link to a 404 — never a form that silently does nothing,
-and never mail from an instance that was not given a key.
-
-Note also that these variables have to be in the **root `.env`** (or the shell)
-for a container, not only in `apps/web/.env`. Compose interpolates the root file,
+Note that the variable has to be in the **root `.env`** (or the shell) for a
+container, not only in `apps/web/.env`. Compose interpolates the root file,
 and an `environment` key in `docker-compose.yml` overrides `env_file` even when
 it resolves to nothing.

@@ -25,7 +25,7 @@ export default async function ResetPasswordPage({
 }: {
   searchParams: Promise<{ error?: string; token?: string }>;
 }) {
-  requireEmailEnabled();
+  await requireEmailEnabled();
 
   const { token } = await searchParams;
 

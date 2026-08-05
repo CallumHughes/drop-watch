@@ -69,7 +69,6 @@ export const appEnv: Record<string, string> = {
   HA_URL: "",
   HA_WEBHOOK_ID: "",
   NEXT_DIST_DIR: ".next-e2e",
-  NEXT_PUBLIC_EMAIL_ENABLED: "true",
   RESEND_API_KEY: "re-e2e-fixture-key",
   RESEND_BASE_URL: FIXTURE_URL,
 };

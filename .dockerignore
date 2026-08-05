@@ -21,8 +21,14 @@ Dockerfile
 **/Dockerfile
 docker-compose.yml
 
-# Secrets stay out of image layers; runtime env comes from compose env_file,
-# build-time public values come from compose build args
+# Secrets stay out of image layers; runtime env comes from compose env_file
 **/.env
 **/.env.*
 !**/.env.example
+
+# The deployment artefact consumes the published images; it is never built into
+# one. Excluding it keeps an edit to it from invalidating the pruner layer —
+# which is `COPY . .` — in all four builds. Listed after the .env.example
+# re-inclusion above so deploy/.env.example is excluded too.
+deploy
+deploy/**

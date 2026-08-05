@@ -124,15 +124,13 @@ jobs:
       - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
       # The suite serves this build via `next start`, so anything the app reads
       # at build time has to be set here rather than at run time — mirroring
-      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY matters because
-      # /forgot-password is prerendered and requireEmailEnabled() would bake a
-      # 404 into it. Invoked directly rather than through turbo, which does not
-      # hash NEXT_DIST_DIR and could hand back a `.next` build.
+      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY and the rest of the
+      # runtime config are set by the suite at run time, not here. Invoked
+      # directly rather than through turbo, which does not hash NEXT_DIST_DIR
+      # and could hand back a `.next` build.
       - run: pnpm --filter @drop-watch/web exec next build
         env:
           NEXT_DIST_DIR: .next-e2e
-          NEXT_PUBLIC_EMAIL_ENABLED: "true"
-          RESEND_API_KEY: re-e2e-fixture-key
           SKIP_ENV_VALIDATION: 1
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
@@ -141,3 +139,44 @@ jobs:
           name: playwright-report
           path: apps/e2e/playwright-report
           retention-days: 7
+
+  # Both jobs below are conditional, and a job skipped by its own `if:` never
+  # expands its matrix — GitHub then renders the name template verbatim, so a
+  # `name:` containing ${{ matrix.* }} would show up in the checks list as raw
+  # expression text. Neither sets one for that reason.
+  images:
+    # PR gate only: proves the four images still build. Nothing is pushed, so
+    # no registry credentials are needed here.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [web, worker, renderer, migrate]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Three of the four are apps/<name>/Dockerfile; the migration job is
+          # built from the db package.
+          file: ${{ matrix.image == 'migrate' && 'packages/db/Dockerfile' || format('apps/{0}/Dockerfile', matrix.image) }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+
+  publish:
+    # Push-to-main only, and gated on every other job so a red commit — lint,
+    # types, tests, the app build itself — never reaches GHCR.
+    #
+    # The registry scope is declared here rather than in the called workflow: a
+    # called workflow cannot grant itself more than its caller holds.
+    if: github.event_name == 'push'
+    needs: [lint, types, test, build, integration, e2e]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish.yml

@@ -57,20 +57,22 @@ Each store can be paused, or checked on demand, independently of its siblings.
 sign-up closes and people join by invite — single-use links, good for 48 hours.
 Products and alert preferences belong to whoever added them.
 
-**Running it.** Docker Compose and a Postgres. Nothing phones home, and neither
-email nor Home Assistant is needed to get started.
+**Running it.** Docker Compose and a Postgres. The four images are prebuilt and
+published to GitHub Container Registry, so there is nothing to build to get
+started. Nothing phones home, and neither email nor Home Assistant is needed.
 
 **API.** The UI talks to the backend over oRPC. There is an OpenAPI document and
 a reference page at `/api/rpc/api-reference` if you want to script against it.
 
 ## Quick start
 
-Docker Compose, with the bundled Postgres:
+Docker, with the bundled Postgres. No clone needed — the four images are
+pulled prebuilt from GitHub Container Registry:
 
 ```bash
-git clone https://github.com/CallumHughes/drop-watch.git
-cd drop-watch
-cp .env.example .env
+mkdir drop-watch && cd drop-watch
+curl -fsSLO https://raw.githubusercontent.com/CallumHughes/drop-watch/main/deploy/docker-compose.yml
+curl -fsSL  https://raw.githubusercontent.com/CallumHughes/drop-watch/main/deploy/.env.example -o .env
 ```
 
 Set `BETTER_AUTH_SECRET` in `.env` to at least 32 random characters:
@@ -83,7 +85,7 @@ That is the only value you must change — everything else in the file has a
 working default for the local stack. Then:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 Open <http://localhost:3001> and create your account. The sign-up form is served
@@ -92,8 +94,22 @@ people join by invite. Nothing seeds an account for you.
 
 Add a product by pasting a URL, and the first check runs within the minute.
 
-To run against a Postgres you already have, see
-[Installation](docs/installation.md).
+To run against a Postgres you already have, or to pin a version instead of
+tracking `latest`, see [Installation](docs/installation.md).
+
+### Building from source
+
+To build the images yourself instead of pulling them:
+
+```bash
+git clone https://github.com/CallumHughes/drop-watch.git
+cd drop-watch
+cp .env.example .env
+# set BETTER_AUTH_SECRET, as above
+docker compose up -d --build
+```
+
+See [Development](docs/development.md) for running without Docker at all.
 
 ## Configuration
 
