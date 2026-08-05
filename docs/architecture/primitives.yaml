@@ -190,7 +190,9 @@ primitives:
       - packages/config/**
       - turbo.json
       - .github/workflows/**
+      - .github/dependabot.yml
       - "**/Dockerfile"
+      - .dockerignore
       - docker-compose*.yml
       - deploy/**
       - biome.json
