@@ -29,6 +29,7 @@ updates:
     directories:
       - /apps/web
       - /apps/worker
+      - /apps/renderer
       - /packages/db
     schedule:
       interval: weekly
@@ -36,8 +37,8 @@ updates:
     groups:
       docker:
         patterns: ["*"]
-    # Node majors move .nvmrc, engines and @types/node too, and no CI job builds
-    # these images — so they land by hand, on the LTS schedule.
+    # Node majors move .nvmrc, engines and @types/node together, so they still
+    # land by hand, on the LTS schedule, rather than as an independent bump here.
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]

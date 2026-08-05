@@ -8,7 +8,6 @@
     "./email": "./src/email.ts",
     "./seed": "./src/seed.ts",
     "./server": "./src/server.ts",
-    "./web": "./src/web.ts",
     "./worker": "./src/worker.ts"
   },
   "dependencies": {

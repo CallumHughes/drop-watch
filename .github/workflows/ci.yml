@@ -124,15 +124,13 @@ jobs:
       - run: pnpm --filter @drop-watch/e2e exec playwright install --with-deps chromium
       # The suite serves this build via `next start`, so anything the app reads
       # at build time has to be set here rather than at run time — mirroring
-      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY matters because
-      # /forgot-password is prerendered and requireEmailEnabled() would bake a
-      # 404 into it. Invoked directly rather than through turbo, which does not
-      # hash NEXT_DIST_DIR and could hand back a `.next` build.
+      # `appEnv` in apps/e2e/constants.ts. RESEND_API_KEY and the rest of the
+      # runtime config are set by the suite at run time, not here. Invoked
+      # directly rather than through turbo, which does not hash NEXT_DIST_DIR
+      # and could hand back a `.next` build.
       - run: pnpm --filter @drop-watch/web exec next build
         env:
           NEXT_DIST_DIR: .next-e2e
-          NEXT_PUBLIC_EMAIL_ENABLED: "true"
-          RESEND_API_KEY: re-e2e-fixture-key
           SKIP_ENV_VALIDATION: 1
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
@@ -141,3 +139,151 @@ jobs:
           name: playwright-report
           path: apps/e2e/playwright-report
           retention-days: 7
+
+  images:
+    name: Image (${{ matrix.image }})
+    # PR gate only: proves the four images still build. Nothing is pushed, so
+    # no registry credentials are needed here.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: web,      dockerfile: apps/web/Dockerfile }
+          - { image: worker,   dockerfile: apps/worker/Dockerfile }
+          - { image: renderer, dockerfile: apps/renderer/Dockerfile }
+          - { image: migrate,  dockerfile: packages/db/Dockerfile }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+
+  publish:
+    name: Publish ${{ matrix.image }} (${{ matrix.arch }})
+    # Push-to-main only. Gated on every other job so a red commit — lint,
+    # types, tests, the app build itself — never reaches GHCR.
+    if: github.event_name == 'push'
+    needs: [lint, types, test, build, integration, e2e]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [web, worker, renderer, migrate]
+        platform: [linux/amd64, linux/arm64]
+        include:
+          # ubuntu-24.04-arm is a free, native arm64 runner on public repos —
+          # no QEMU, so the arm64 build runs at native speed instead of
+          # emulated.
+          - { platform: linux/amd64, runner: ubuntu-latest,    arch: amd64 }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm, arch: arm64 }
+          - { image: web,      dockerfile: apps/web/Dockerfile }
+          - { image: worker,   dockerfile: apps/worker/Dockerfile }
+          - { image: renderer, dockerfile: apps/renderer/Dockerfile }
+          - { image: migrate,  dockerfile: packages/db/Dockerfile }
+    steps:
+      # GHCR rejects uppercase repository names, and github.repository keeps
+      # the owner's casing (CallumHughes/drop-watch). Lowercasing it here
+      # rather than hardcoding the namespace is what lets a fork publish to
+      # its own namespace with no edit.
+      - id: repo
+        run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          # Push by digest rather than a tag: two arch jobs pushing the same
+          # tag concurrently can clobber each other. publish-manifest below
+          # assembles the multi-arch manifest from these digests afterward.
+          outputs: type=image,name=ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+          # Left off deliberately. When pushing, this action attests by
+          # default, which turns each per-arch push into an index rather than a
+          # single manifest — imagetools then nests them and the package page
+          # grows an `unknown/unknown` entry per image. Nothing here verifies
+          # signatures; the image.source label and the immutable sha- tag are
+          # what give commit-to-image traceability.
+          provenance: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.image }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-manifest:
+    name: Publish manifest (${{ matrix.image }})
+    if: github.event_name == 'push'
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [web, worker, renderer, migrate]
+    steps:
+      - id: repo
+        run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v7
+        with:
+          path: /tmp/digests
+          pattern: digest-${{ matrix.image }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+      # The semver lines are inert today — nothing tags a release yet — and
+      # activate the day a v* tag is pushed, with no release tooling to add.
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}@sha256:%s ' *)
+      - name: Inspect image
+        run: docker buildx imagetools inspect ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}

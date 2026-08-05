@@ -1,7 +1,6 @@
 "use client";
 
 import type { TestResult } from "@drop-watch/api/routers/settings";
-import { env } from "@drop-watch/env/web";
 import { Button } from "@drop-watch/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import { Checkbox } from "@drop-watch/ui/components/checkbox";
@@ -67,15 +66,15 @@ function TestResults({ results }: { results: TestResult[] }) {
  * channels, and a test resolves exactly the channels that account's real
  * alerts would use.
  */
-function Editor({ emailAlertsEnabled: saved }: { emailAlertsEnabled: boolean }) {
+function Editor({
+  emailAlertsEnabled: saved,
+  mailerConfigured,
+}: {
+  emailAlertsEnabled: boolean;
+  mailerConfigured: boolean;
+}) {
   const queryClient = useQueryClient();
   const [emailAlertsEnabled, setEmailAlertsEnabled] = useState(saved);
-
-  // Build-time flag, so it only decides what the page *offers*. Whether a mail
-  // can actually be sent is decided server-side by `emailEnabled()`, which is
-  // authoritative; the worst this can get wrong is offering a tick box on an
-  // install whose key was removed after the image was built.
-  const mailerConfigured = env.NEXT_PUBLIC_EMAIL_ENABLED;
 
   const update = useMutation(
     orpc.settings.updateEmailPrefs.mutationOptions({
@@ -185,6 +184,7 @@ export function EmailPrefsForm() {
     <Editor
       emailAlertsEnabled={prefs.data.emailAlertsEnabled}
       key={String(prefs.data.emailAlertsEnabled)}
+      mailerConfigured={prefs.data.emailConfigured}
     />
   );
 }

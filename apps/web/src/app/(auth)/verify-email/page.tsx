@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * that would offer to resend.
  */
 export default async function VerifyEmailPage() {
-  requireEmailEnabled();
+  await requireEmailEnabled();
 
   const session = await auth.api.getSession({ headers: await headers() });
 

@@ -8,19 +8,20 @@
  * to them disappear, because a dead "forgot password?" link is worse than no
  * link.
  *
- * This is the authoritative half of that gate. It asks `emailEnabled()`, the
- * same predicate `createAuth()` reads, at request time. The client half is
- * `NEXT_PUBLIC_EMAIL_ENABLED`, which only hides links and is baked in at build
- * time; if the two ever disagree — an image built with the flag and run
- * without the key, say — the worst case is a visible link to a 404, never a
- * form that silently does nothing.
+ * This is the authoritative gate. It asks `emailEnabled()`, the same
+ * predicate `createAuth()` reads, at request time — `connection()` opts the
+ * calling route out of static prerendering so the answer can never be a
+ * build artefact baked into one image and wrong for everyone who runs it
+ * without the key.
  */
 
 import { emailEnabled } from "@drop-watch/email";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 /** 404s the current route unless a mailer is configured. */
-export function requireEmailEnabled(): void {
+export async function requireEmailEnabled(): Promise<void> {
+  await connection();
   if (!emailEnabled()) {
     notFound();
   }

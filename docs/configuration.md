@@ -13,6 +13,12 @@ Each process loads its own file; there is no shared development `.env`:
 | `apps/worker/.env` | [`apps/worker/.env.example`](../apps/worker/.env.example) | The worker only. It resolves `.env` from its own directory, so nothing in `apps/web/.env` reaches it — at minimum it needs `DATABASE_URL`. |
 | `.env` (repo root) | [`.env.example`](../.env.example) | **Docker deployments only** — the file compose interpolates and the containers read. Not used by `pnpm dev`. |
 
+If you are running the published images rather than building from source, the
+equivalent file is [`deploy/.env.example`](../deploy/.env.example), copied to
+`.env` next to `deploy/docker-compose.yml`. It is meant to be downloaded on its
+own rather than cloned alongside the rest of the repo, but the variables in it
+are validated by the same schemas and documented by the same table below.
+
 The other workspaces need no file of their own: `packages/db` borrows
 `apps/web/.env` as above, and `apps/e2e` defines its entire environment
 explicitly in `apps/e2e/constants.ts` (a throwaway database, overridable with
@@ -23,9 +29,8 @@ wins in a deployment; `docker-compose.yml` sets `DATABASE_URL`, `NODE_ENV` and
 `TZ` itself.
 
 Anything compose *interpolates* — `POSTGRES_PASSWORD`, `TZ`, `BETTER_AUTH_URL`,
-`CORS_ORIGIN`, `NEXT_PUBLIC_EMAIL_ENABLED`, and the production `DATABASE_URL` —
-has to be in the **root** `.env` or the shell. Compose does not interpolate from
-`apps/web/.env`.
+`CORS_ORIGIN`, and the production `DATABASE_URL` — has to be in the **root**
+`.env` or the shell. Compose does not interpolate from `apps/web/.env`.
 
 ## Variables
 
@@ -37,17 +42,18 @@ has to be in the **root** `.env` or the shell. Compose does not interpolate from
 | `CORS_ORIGIN` | yes (web) | `web` | Normally identical to `BETTER_AUTH_URL`. |
 | `HA_URL` | no | `web`, `worker` | **Seed value only** — see below. Base URL of Home Assistant, e.g. `http://homeassistant:8123`. |
 | `HA_WEBHOOK_ID` | no | `web`, `worker` | **Seed value only.** The webhook id is itself the secret. |
-| `RESEND_API_KEY` | no | `web`, `worker` | The mailer's on/off switch. Unset is a supported configuration: webhook-only alerting, no email auth flows. |
+| `RESEND_API_KEY` | no | `web`, `worker` | The mailer's on/off switch, read at runtime — set it and restart, no rebuild. Unset is a supported configuration: webhook-only alerting, no email auth flows. |
 | `EMAIL_FROM` | no | `web`, `worker` | `From:` address. Defaults to `onboarding@resend.dev`, which needs no verified domain but which Resend only delivers to the address that owns your Resend account. |
 | `APP_URL` | no | `web`, `worker` | Absolute base URL for links inside emails. The worker has no `BETTER_AUTH_URL` of its own; `web` falls back to that. |
 | `AUTH_RATE_LIMIT_ENABLED` | no | `web` | Overrides Better Auth's default of on in production, off in development. Limits are per client address, so set `false` only where every request already shares one — a test run, say. |
 | `RENDER_URL` | no | `worker` | Base URL of the renderer sidecar, e.g. `http://renderer:3002` (compose) or `http://localhost:3002` (local dev). Unset means browser-mode listings record a `network_error` check run rather than the worker crashing. See [Browser render mode](#browser-render-mode) below. |
-| `COMPOSE_PROFILES` | no | compose only | Set to `browser` to bring up the `renderer` service. Root `.env` only — this is a compose-native variable, not read by any app. |
+| `COMPOSE_PROFILES` | no | compose only | Comma-separated. `browser` brings up the `renderer` service, in either compose file. `bundled-db` additionally brings up the bundled `postgres` service in `deploy/docker-compose.yml` (the published-image file) — it is on by default in `deploy/.env.example`; drop it and set `DATABASE_URL` to use a Postgres you already run. Root `.env` only — this is a compose-native variable, not read by any app. |
+| `DROP_WATCH_IMAGE` | no | compose only | `deploy/docker-compose.yml` only. Image namespace to pull from. Defaults to `ghcr.io/callumhughes/drop-watch`; set it to run a fork's own published images. |
+| `DROP_WATCH_VERSION` | no | compose only | `deploy/docker-compose.yml` only. Image tag. Defaults to `latest`, which moves with every push to `main`; pin to a commit's immutable short-SHA tag instead for a reproducible deploy. |
 | `RENDER_CPUS` | no | compose only | Renderer CPU ceiling. Defaults to `2.0`. Prefer reducing render concurrency before raising it. |
 | `RENDER_MEMORY_LIMIT` | no | compose only | Renderer memory ceiling. Defaults to `2g`. |
 | `RENDER_PIDS_LIMIT` | no | compose only | Renderer process ceiling. Defaults to `512`. |
 | `RENDER_TMPFS_LIMIT` | no | compose only | Size of the renderer's writable temporary filesystem. Defaults to `512m`; the rest of its filesystem is read-only. |
-| `NEXT_PUBLIC_EMAIL_ENABLED` | no | `web` **build** | Docker only, and a *build* argument rather than runtime config — see [Notifications](notifications.md#docker-next_public_email_enabled-is-a-build-argument). |
 | `TZ` | no | all | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
 | `POSTGRES_PASSWORD` | no | dev `postgres` | Dev container only. Defaults to `password`. |
 | `NODE_ENV` | no | all | Set to `production` by compose. |

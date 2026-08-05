@@ -10,8 +10,8 @@ import ForgotPasswordForm from "./forgot-password-form";
  * docs/notifications.md. It only exists when a mailer does; without one the
  * route 404s, since the endpoint behind it is not registered either.
  */
-export default function ForgotPasswordPage() {
-  requireEmailEnabled();
+export default async function ForgotPasswordPage() {
+  await requireEmailEnabled();
 
   return (
     <main className="container mx-auto max-w-md overflow-y-auto px-4 py-10">

@@ -1,4 +1,3 @@
-import { env } from "@drop-watch/env/web";
 import { Button } from "@drop-watch/ui/components/button";
 import { Card, CardContent, CardHeader } from "@drop-watch/ui/components/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@drop-watch/ui/components/field";
@@ -23,7 +22,13 @@ const selectSubmitState = (state: { canSubmit: boolean; isSubmitting: boolean })
  * @param onSwitchToSignUp - omitted once an account exists, after which new
  *   accounts arrive by invite rather than self-service signup.
  */
-export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: () => void }) {
+export default function SignInForm({
+  emailEnabled,
+  onSwitchToSignUp,
+}: {
+  emailEnabled: boolean;
+  onSwitchToSignUp?: () => void;
+}) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
 
@@ -114,7 +119,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp?: ()
                        * worse than no link — especially here, where it is the
                        * only route back into a box whose signup has closed.
                        */}
-                      {env.NEXT_PUBLIC_EMAIL_ENABLED ? (
+                      {emailEnabled ? (
                         <Link
                           className="ml-auto text-sm underline-offset-4 hover:underline"
                           href="/forgot-password"

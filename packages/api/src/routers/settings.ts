@@ -50,11 +50,13 @@ function buildPatch(input: z.infer<typeof settingsUpdateInput>): SettingsPatch {
 
 /**
  * The requester's slice of alerting config: whether alerts for their products
- * are emailed to them. A shape rather than a bare boolean so growing it later
- * (digest frequency, quiet hours) is additive.
+ * are emailed to them, plus whether a mailer exists to send them at all. A
+ * shape rather than a bare boolean so growing it later (digest frequency,
+ * quiet hours) is additive.
  */
 export interface EmailPrefs {
   emailAlertsEnabled: boolean;
+  emailConfigured: boolean;
 }
 
 /**
@@ -78,7 +80,7 @@ export const settingsRouter = {
     if (!row) {
       throw new Error("session user row disappeared");
     }
-    return row;
+    return { ...row, emailConfigured: emailEnabled() };
   }),
 
   get: adminProcedure.handler((): Promise<Settings> => loadSettings()),
@@ -166,6 +168,6 @@ export const settingsRouter = {
       if (!updated) {
         throw new Error("session user row disappeared during update");
       }
-      return updated;
+      return { ...updated, emailConfigured: emailEnabled() };
     }),
 };

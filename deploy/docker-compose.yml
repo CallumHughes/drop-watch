@@ -1,28 +1,23 @@
-# Local-development stack: Postgres in a container, alongside the same three
-# app services production runs.
+# DropWatch, from prebuilt images — no clone, no build. Download this file
+# (and, for browser mode, seccomp_profile.json — see the `renderer` service
+# below) alongside an `.env` copied from `.env.example`, then:
 #
-# For a real deployment, layer the production override on top — it points the
-# apps at the Postgres instance already running on the host and switches this
-# file's `postgres` service off:
+#   docker compose up -d
 #
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-#
-# (or `pnpm docker:prod:up`, which is the same thing). See docs/installation.md.
+# Every app service pulls its image from GitHub Container Registry instead of
+# building from source; see the `image:` keys below for the two environment
+# variables that control where from and which version.
 
 name: drop-watch
 
-# `apps/web/.env` is the file the rest of the repo already uses in development.
-# The root `.env` is what a deployment writes, and comes second so it wins when
-# both exist. Neither is required; anything missing falls back to the defaults
-# below, or is simply unset (HA_URL / HA_WEBHOOK_ID are optional by design).
+# Only `.env` exists in a downloaded-file deployment — there is no
+# `apps/web/.env` to layer underneath it, unlike the repo's own compose file.
 x-env-files: &env-files
-  - path: apps/web/.env
-    required: false
   - path: .env
     required: false
 
 x-app-environment: &app-environment
-  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/drop-watch
+  DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/drop-watch}
   NODE_ENV: production
   # Every timestamp the worker schedules and the UI renders is derived from
   # this; leaving containers on UTC while the host is not is a quiet way to
@@ -38,13 +33,13 @@ x-app-environment: &app-environment
   # a browser-mode listing records a `renderer_error` check run rather than the
   # worker crashing (see the `renderer` service and packages/env/src/worker.ts).
   #
-  # Listed with no value, so compose takes them from the shell or from the root
-  # `.env`, and omits them entirely when neither has them. Note the precedence:
-  # an `environment` key overrides `env_file` even when it resolves to nothing,
-  # so for containers these belong in the root `.env` (which compose
-  # interpolates) rather than only in `apps/web/.env` (which it does not).
-  # ALLOWED_PRIVATE_HOSTS rides along for the same reason: the SSRF guard reads
-  # it in whichever process is doing the fetching, and both of these do.
+  # Listed with no value, so compose takes them from the shell or from the
+  # `.env` next to this file, and omits them entirely when neither has them.
+  # Note the precedence: an `environment` key overrides `env_file` even when it
+  # resolves to nothing, so for containers these belong in `.env` (which
+  # compose interpolates). ALLOWED_PRIVATE_HOSTS rides along for the same
+  # reason: the SSRF guard reads it in whichever process is doing the
+  # fetching, and both of these do.
   ALLOWED_PRIVATE_HOSTS:
   APP_URL:
   EMAIL_FROM:
@@ -55,22 +50,28 @@ services:
   # One-shot: applies migrations, then exits. `web` and `worker` are gated
   # behind it completing successfully, so a failed migration stops the whole
   # deployment rather than letting the apps boot against an old schema.
+  #
+  # No depends_on: postgres here, even under the `bundled-db` profile: Compose
+  # auto-starts a profiled service that something `depends_on`, which would
+  # make the profile inert. Safe to omit anyway, and already the production
+  # pattern (docker-compose.prod.yml drops the same dependency) — the job
+  # retries the connection itself, ~30 attempts at 2s intervals
+  # (packages/db/src/migrate.ts), which is also what makes the stack come back
+  # cleanly after a host reboot or against a Postgres that is still starting.
   migrate:
-    build:
-      context: .
-      dockerfile: packages/db/Dockerfile
+    image: ${DROP_WATCH_IMAGE:-ghcr.io/callumhughes/drop-watch}/migrate:${DROP_WATCH_VERSION:-latest}
     init: true
     env_file: *env-files
     environment: *app-environment
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # A no-op on Docker Desktop, which already resolves the name; required on
+    # Linux, where host.docker.internal otherwise does not exist. Needed here
+    # for the external-Postgres case (DATABASE_URL pointing at the host).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: "no"
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ${DROP_WATCH_IMAGE:-ghcr.io/callumhughes/drop-watch}/web:${DROP_WATCH_VERSION:-latest}
     init: true
     ports:
       - "3001:3001"
@@ -79,6 +80,8 @@ services:
       <<: *app-environment
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3001}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -97,12 +100,12 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
+    image: ${DROP_WATCH_IMAGE:-ghcr.io/callumhughes/drop-watch}/worker:${DROP_WATCH_VERSION:-latest}
     init: true
     env_file: *env-files
     environment: *app-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -119,15 +122,14 @@ services:
     # dependency unnecessary.
 
   # Headless-Chromium sidecar for browser-mode listings. Opt-in: gated behind
-  # the `browser` profile so `pnpm docker:up` never pulls a ~2GB image for
-  # someone who will not use it. Enable with `COMPOSE_PROFILES=browser` in the
-  # root `.env` (see .env.example). Reached only by `web` and `worker`, over
-  # the compose network — no published ports.
+  # the `browser` profile so a default `docker compose up` never pulls a
+  # ~2GB image for someone who will not use it. Enable with
+  # `COMPOSE_PROFILES=bundled-db,browser` in `.env` (see .env.example).
+  # Reached only by `web` and `worker`, over the compose network — no
+  # published ports.
   renderer:
     profiles: ["browser"]
-    build:
-      context: .
-      dockerfile: apps/renderer/Dockerfile
+    image: ${DROP_WATCH_IMAGE:-ghcr.io/callumhughes/drop-watch}/renderer:${DROP_WATCH_VERSION:-latest}
     init: true
     # The browser receives hostile page content. These limits contain CPU,
     # memory, process and filesystem amplification even when Chromium itself
@@ -147,8 +149,12 @@ services:
     security_opt:
       - no-new-privileges:true
       # Playwright's Docker seccomp profile is the default Docker profile plus
-      # the user-namespace syscalls Chromium needs for its own sandbox.
-      - seccomp=./apps/renderer/seccomp_profile.json
+      # the user-namespace syscalls Chromium needs for its own sandbox;
+      # Chromium fails closed without them. Download seccomp_profile.json from
+      # the repo (apps/renderer/seccomp_profile.json) and place it next to
+      # this compose file before enabling the `browser` profile — it is not
+      # baked into the image.
+      - seccomp=./seccomp_profile.json
     # Chromium crashes on heavy pages with Docker's default 64MB /dev/shm, and
     # the usual workaround (--disable-dev-shm-usage) only trades crashes for
     # disk I/O. Give it real shared memory instead.
@@ -183,24 +189,31 @@ services:
     networks:
       - renderer-control
 
-  # Development only. The production override disables this service — see
-  # docker-compose.prod.yml.
+  # Bundled Postgres, opt-in via the `bundled-db` profile — the default in
+  # .env.example, so the happy path is zero config. Drop `bundled-db` from
+  # COMPOSE_PROFILES and set DATABASE_URL to point at Postgres you already
+  # run elsewhere; nothing here depends on this service (see `migrate` above),
+  # so leaving the profile off switches it off cleanly.
   postgres:
     image: postgres:18
+    profiles: ["bundled-db"]
     container_name: drop-watch-postgres
     environment:
       POSTGRES_DB: drop-watch
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    # Loopback only. Nothing outside this stack needs the database — the apps
+    # reach it over the compose network — so the published port exists purely
+    # so you can reach it with psql from the host. Binding it to every
+    # interface would put a Postgres whose password defaults to `password` on
+    # the network the host sits on.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - drop-watch_postgres_data:/var/lib/postgresql
     # -d names the target database, not just the server: on a fresh volume
     # `pg_isready` answers on the init-time socket before `POSTGRES_DB` has been
-    # created, so checking the server alone reports ready too early and whatever
-    # runs next (db:push) fails against a database that does not exist yet.
-    # Paired with `--wait` in the db:start script, which is what actually blocks.
+    # created, so checking the server alone reports ready too early.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d drop-watch"]
       start_period: 30s
