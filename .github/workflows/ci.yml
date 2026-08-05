@@ -140,13 +140,10 @@ jobs:
           path: apps/e2e/playwright-report
           retention-days: 7
 
-  # Every job below is conditional, and a job skipped by its own `if:` never
+  # Both jobs below are conditional, and a job skipped by its own `if:` never
   # expands its matrix — GitHub then renders the name template verbatim, so a
-  # `name:` containing ${{ matrix.* }} shows up in the checks list as raw
-  # expression text. None of them set `name:` for that reason; the default
-  # (job id plus the matrix values, once those exist) reads correctly whether
-  # the job ran or was skipped. Keep the matrix to the axes that identify a
-  # job and derive the rest, so the default name stays short.
+  # `name:` containing ${{ matrix.* }} would show up in the checks list as raw
+  # expression text. Neither sets one for that reason.
   images:
     # PR gate only: proves the four images still build. Nothing is pushed, so
     # no registry credentials are needed here.
@@ -172,112 +169,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
 
   publish:
-    # Push-to-main only. Gated on every other job so a red commit — lint,
+    # Push-to-main only, and gated on every other job so a red commit — lint,
     # types, tests, the app build itself — never reaches GHCR.
+    #
+    # The registry scope is declared here rather than in the called workflow: a
+    # called workflow cannot grant itself more than its caller holds.
     if: github.event_name == 'push'
     needs: [lint, types, test, build, integration, e2e]
-    # ubuntu-24.04-arm is a free, native arm64 runner on public repos — no
-    # QEMU, so the arm64 build runs at native speed rather than emulated.
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
-    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [web, worker, renderer, migrate]
-        arch: [amd64, arm64]
-    steps:
-      # GHCR rejects uppercase repository names, and github.repository keeps
-      # the owner's casing (CallumHughes/drop-watch). Lowercasing it here
-      # rather than hardcoding the namespace is what lets a fork publish to
-      # its own namespace with no edit.
-      - id: repo
-        run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.image == 'migrate' && 'packages/db/Dockerfile' || format('apps/{0}/Dockerfile', matrix.image) }}
-          platforms: linux/${{ matrix.arch }}
-          # Push by digest rather than a tag: two arch jobs pushing the same
-          # tag concurrently can clobber each other. publish-manifest below
-          # assembles the multi-arch manifest from these digests afterward.
-          outputs: type=image,name=ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
-          # Left off deliberately. When pushing, this action attests by
-          # default, which turns each per-arch push into an index rather than a
-          # single manifest — imagetools then nests them and the package page
-          # grows an `unknown/unknown` entry per image. Nothing here verifies
-          # signatures; the image.source label and the immutable sha- tag are
-          # what give commit-to-image traceability.
-          provenance: false
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: digest-${{ matrix.image }}-${{ matrix.arch }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  publish-manifest:
-    if: github.event_name == 'push'
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [web, worker, renderer, migrate]
-    steps:
-      - id: repo
-        run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v7
-        with:
-          path: /tmp/digests
-          pattern: digest-${{ matrix.image }}-*
-          merge-multiple: true
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-      # The semver lines are inert today — nothing tags a release yet — and
-      # activate the day a v* tag is pushed, with no release tooling to add.
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}@sha256:%s ' *)
-      - name: Inspect image
-        run: docker buildx imagetools inspect ghcr.io/${{ steps.repo.outputs.lower }}/${{ matrix.image }}:${{ steps.meta.outputs.version }}
+    uses: ./.github/workflows/publish.yml
