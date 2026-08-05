@@ -140,8 +140,14 @@ jobs:
           path: apps/e2e/playwright-report
           retention-days: 7
 
+  # Every job below is conditional, and a job skipped by its own `if:` never
+  # expands its matrix — GitHub then renders the name template verbatim, so a
+  # `name:` containing ${{ matrix.* }} shows up in the checks list as raw
+  # expression text. None of them set `name:` for that reason; the default
+  # (job id plus the matrix values, once those exist) reads correctly whether
+  # the job ran or was skipped. Keep the matrix to the axes that identify a
+  # job and derive the rest, so the default name stays short.
   images:
-    name: Image (${{ matrix.image }})
     # PR gate only: proves the four images still build. Nothing is pushed, so
     # no registry credentials are needed here.
     if: github.event_name == 'pull_request'
@@ -150,30 +156,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { image: web,      dockerfile: apps/web/Dockerfile }
-          - { image: worker,   dockerfile: apps/worker/Dockerfile }
-          - { image: renderer, dockerfile: apps/renderer/Dockerfile }
-          - { image: migrate,  dockerfile: packages/db/Dockerfile }
+        image: [web, worker, renderer, migrate]
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          # Three of the four are apps/<name>/Dockerfile; the migration job is
+          # built from the db package.
+          file: ${{ matrix.image == 'migrate' && 'packages/db/Dockerfile' || format('apps/{0}/Dockerfile', matrix.image) }}
           platforms: linux/amd64
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}-amd64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
 
   publish:
-    name: Publish ${{ matrix.image }} (${{ matrix.arch }})
     # Push-to-main only. Gated on every other job so a red commit — lint,
     # types, tests, the app build itself — never reaches GHCR.
     if: github.event_name == 'push'
     needs: [lint, types, test, build, integration, e2e]
-    runs-on: ${{ matrix.runner }}
+    # ubuntu-24.04-arm is a free, native arm64 runner on public repos — no
+    # QEMU, so the arm64 build runs at native speed rather than emulated.
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -182,17 +187,7 @@ jobs:
       fail-fast: false
       matrix:
         image: [web, worker, renderer, migrate]
-        platform: [linux/amd64, linux/arm64]
-        include:
-          # ubuntu-24.04-arm is a free, native arm64 runner on public repos —
-          # no QEMU, so the arm64 build runs at native speed instead of
-          # emulated.
-          - { platform: linux/amd64, runner: ubuntu-latest,    arch: amd64 }
-          - { platform: linux/arm64, runner: ubuntu-24.04-arm, arch: arm64 }
-          - { image: web,      dockerfile: apps/web/Dockerfile }
-          - { image: worker,   dockerfile: apps/worker/Dockerfile }
-          - { image: renderer, dockerfile: apps/renderer/Dockerfile }
-          - { image: migrate,  dockerfile: packages/db/Dockerfile }
+        arch: [amd64, arm64]
     steps:
       # GHCR rejects uppercase repository names, and github.repository keeps
       # the owner's casing (CallumHughes/drop-watch). Lowercasing it here
@@ -211,8 +206,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platform }}
+          file: ${{ matrix.image == 'migrate' && 'packages/db/Dockerfile' || format('apps/{0}/Dockerfile', matrix.image) }}
+          platforms: linux/${{ matrix.arch }}
           # Push by digest rather than a tag: two arch jobs pushing the same
           # tag concurrently can clobber each other. publish-manifest below
           # assembles the multi-arch manifest from these digests afterward.
@@ -242,7 +237,6 @@ jobs:
           retention-days: 1
 
   publish-manifest:
-    name: Publish manifest (${{ matrix.image }})
     if: github.event_name == 'push'
     needs: publish
     runs-on: ubuntu-latest
