@@ -20,6 +20,11 @@ export const env = createEnv({
     CORS_ORIGIN: z.url(),
     DATABASE_URL: z.string().min(1),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    // Base URL of the renderer sidecar, declared here as well as in `worker`
+    // because the two read it for different reasons: the worker retrieves
+    // through it, while web only reports whether it is set, so the browser
+    // toggle can disable itself. Unset is fully supported.
+    RENDER_URL: z.url().optional(),
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
 });
