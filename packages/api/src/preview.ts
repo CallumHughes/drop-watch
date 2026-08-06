@@ -14,6 +14,22 @@ import type {
   SelectorMatch,
   SelectorTest,
 } from "@drop-watch/core/extract";
+import type { RenderMode } from "./schemas/products";
+
+/**
+ * Decides which transport a preview should use without reaching into runtime
+ * configuration. Keeping this pure makes the missing-renderer branch testable
+ * without a sidecar.
+ */
+export function previewTarget(
+  render: RenderMode,
+  renderUrl: string | undefined
+): "http" | "browser" | "unconfigured" {
+  if (render !== "browser") {
+    return "http";
+  }
+  return renderUrl ? "browser" : "unconfigured";
+}
 
 /** One fetched page, held only long enough to pick a selector against it. */
 export interface PreviewEntry {
@@ -38,7 +54,8 @@ export interface PreviewCacheOptions {
  *
  * Losing an entry is survivable by design: the UI re-previews, which costs one
  * fetch. That is why nothing here is persisted — a restarted web process
- * simply forgets in-progress previews.
+ * simply forgets in-progress previews. Browser-mode entries may contain the
+ * post-JavaScript DOM rather than the origin's initial response body.
  */
 export class PreviewCache {
   private readonly entries = new Map<string, PreviewEntry>();
@@ -129,6 +146,8 @@ export interface PagePreview {
   httpStatus: number;
   /** Handle for later selector tests. Meaningless once the entry expires. */
   previewId: string;
+  /** Transport that produced this body and extraction. */
+  render: RenderMode;
   /** Final URL after redirects. This, not the typed URL, is what gets saved. */
   url: string;
 }

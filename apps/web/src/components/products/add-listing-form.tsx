@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
+import { extractorNote } from "./extractor-note";
 import { PreviewFlow } from "./preview-flow";
 import { usePreviewFlow } from "./use-preview-flow";
 
@@ -49,17 +50,17 @@ export function AddListingForm({
       currency: chosen.currency,
       extractor: savingWithSelector ? "selector" : "auto",
       productId,
+      render: preview.render,
       selector: savingWithSelector ? trimmedSelector : null,
       url: preview.url,
     });
   }, [addListing, chosen, preview, productId, savingWithSelector, trimmedSelector]);
 
-  let extractorNote = "Find a price above before saving.";
-  if (chosen) {
-    extractorNote = savingWithSelector
-      ? `Will be tracked with the selector ${trimmedSelector}.`
-      : "Will be tracked with the automatic extractor chain.";
-  }
+  const note = extractorNote({
+    hasPrice: chosen !== null,
+    render: preview?.render ?? "http",
+    selector: savingWithSelector ? trimmedSelector : null,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,7 +71,7 @@ export function AddListingForm({
             <CardTitle>Save</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <p className="text-muted-foreground text-xs">{extractorNote}</p>
+            <p className="text-muted-foreground text-xs">{note}</p>
             <div>
               <Button disabled={!chosen || addListing.isPending} onClick={onSave} type="button">
                 {addListing.isPending ? "Saving…" : "Add store"}

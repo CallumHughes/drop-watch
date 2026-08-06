@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PreviewCache, type PreviewEntry, toPreviewExtraction } from "./preview";
+import { PreviewCache, type PreviewEntry, previewTarget, toPreviewExtraction } from "./preview";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
@@ -11,6 +11,21 @@ function at(minutes: number): Date {
 function entry(url: string, storedAt = NOW): PreviewEntry {
   return { html: `<html lang="en">${url}</html>`, storedAt, url };
 }
+
+describe("previewTarget", () => {
+  it("uses http for the default mode regardless of renderer configuration", () => {
+    expect(previewTarget("http", undefined)).toBe("http");
+    expect(previewTarget("http", "http://renderer:3002")).toBe("http");
+  });
+
+  it("uses the browser when browser mode has a renderer", () => {
+    expect(previewTarget("browser", "http://renderer:3002")).toBe("browser");
+  });
+
+  it("marks browser mode unconfigured without a renderer", () => {
+    expect(previewTarget("browser", undefined)).toBe("unconfigured");
+  });
+});
 
 describe("PreviewCache", () => {
   it("returns a stored page", () => {

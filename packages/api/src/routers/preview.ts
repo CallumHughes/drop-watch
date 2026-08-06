@@ -15,8 +15,10 @@
 
 import { randomUUID } from "node:crypto";
 import { extract, testSelector } from "@drop-watch/core/extract";
-import type { FetchPageResult } from "@drop-watch/core/fetch";
-import { fetchPage } from "@drop-watch/core/fetch";
+import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
+import { checkUrl } from "@drop-watch/core/net/guard";
+import { type RetrieveResult, renderPage } from "@drop-watch/core/render";
+import { env } from "@drop-watch/env/server";
 import { ORPCError } from "@orpc/server";
 import { createLogger } from "evlog";
 import { z } from "zod";
@@ -26,10 +28,12 @@ import {
   type PagePreview,
   PreviewCache,
   type PreviewEntry,
+  previewTarget,
   type SelectorPreview,
   toPreviewExtraction,
   toSelectorPreview,
 } from "../preview";
+import { RENDER_MODES, type RenderMode } from "../schemas/products";
 
 /**
  * Re-exported so `apps/web` can name these shapes without depending on
@@ -47,6 +51,8 @@ const PREVIEW_TTL_MS = 15 * 60 * 1000;
 const MAX_PREVIEWS = 10;
 /** Previews are interactive — nobody waits 20s at a form. */
 const PREVIEW_TIMEOUT_MS = 15_000;
+/** Browser startup and network-idle settling need their own interactive budget. */
+const PREVIEW_RENDER_TIMEOUT_MS = 20_000;
 /** One retry. A page that is down stays down for the seconds a user will wait. */
 const PREVIEW_MAX_RETRIES = 1;
 
@@ -82,8 +88,11 @@ function previewCache(): PreviewCache {
  * rather than collapsing into one "could not fetch".
  */
 function fetchFailure(
-  result: Exclude<FetchPageResult, { status: "ok" }>
+  result: Exclude<RetrieveResult, { status: "ok" }>
 ): ORPCError<string, unknown> {
+  if (result.status === "renderer_error") {
+    return new ORPCError("SERVICE_UNAVAILABLE", { message: result.error });
+  }
   if (result.status === "timeout") {
     return new ORPCError("GATEWAY_TIMEOUT", { message: `The page timed out: ${result.error}` });
   }
@@ -93,6 +102,41 @@ function fetchFailure(
     return new ORPCError("BAD_GATEWAY", { message: "The page answered 304 with no body" });
   }
   return new ORPCError("BAD_GATEWAY", { message: result.error });
+}
+
+/**
+ * Retrieves a preview through the requested transport. `checkUrl` is a
+ * defence-in-depth preflight and improves the immediate error message; the
+ * renderer owns the authoritative SSRF guard because Chromium resolves and
+ * connects from its own process.
+ */
+async function retrievePreview(url: string, render: RenderMode): Promise<RetrieveResult> {
+  const renderUrl = env.RENDER_URL;
+  const target = previewTarget(render, renderUrl);
+
+  if (target === "http") {
+    return await fetchPage(url, {
+      maxRetries: PREVIEW_MAX_RETRIES,
+      timeoutMs: PREVIEW_TIMEOUT_MS,
+    });
+  }
+
+  if (target === "unconfigured" || renderUrl === undefined) {
+    throw new ORPCError("PRECONDITION_FAILED", {
+      message: "Browser rendering is not configured (RENDER_URL is unset).",
+    });
+  }
+
+  const verdict = await checkUrl(url);
+  if (!verdict.ok) {
+    throw new ORPCError("BAD_REQUEST", { message: verdict.reason });
+  }
+
+  // `renderPage` calls the sidecar instead of the store, so it needs the same
+  // per-domain politeness queue `fetchPage` applies internally.
+  return await withDomainQueue(url, () =>
+    renderPage(renderUrl, url, { timeoutMs: PREVIEW_RENDER_TIMEOUT_MS })
+  );
 }
 
 const urlInput = z
@@ -123,13 +167,10 @@ export const previewRouter = {
    * add flow reads that copy.
    */
   page: protectedProcedure
-    .input(z.object({ url: urlInput }))
+    .input(z.object({ render: z.enum(RENDER_MODES).default("http"), url: urlInput }))
     .handler(async ({ input }): Promise<PagePreview> => {
       const log = createLogger({ action: "preview_page", url: input.url });
-      const fetched = await fetchPage(input.url, {
-        maxRetries: PREVIEW_MAX_RETRIES,
-        timeoutMs: PREVIEW_TIMEOUT_MS,
-      });
+      const fetched = await retrievePreview(input.url, input.render);
       log.set({ durationMs: fetched.durationMs, fetchStatus: fetched.status });
 
       if (fetched.status !== "ok") {
@@ -161,6 +202,7 @@ export const previewRouter = {
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,
         previewId,
+        render: input.render,
         url: fetched.url,
       };
     }),

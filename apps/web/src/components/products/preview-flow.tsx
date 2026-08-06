@@ -37,7 +37,10 @@ export function Field({
 
 /** What the chain found, plus the manual override when one is being worked on. */
 function PreviewPanel({
+  browserRenderAvailable,
   isTesting,
+  isRendering,
+  onRetryWithBrowser,
   onSelectorChange,
   onTogglePicker,
   preview,
@@ -45,7 +48,10 @@ function PreviewPanel({
   test,
   usingSelector,
 }: {
+  browserRenderAvailable: boolean;
   isTesting: boolean;
+  isRendering: boolean;
+  onRetryWithBrowser: () => void;
   onSelectorChange: (selector: string) => void;
   onTogglePicker: () => void;
   preview: PagePreview;
@@ -53,6 +59,11 @@ function PreviewPanel({
   test: SelectorPreview | undefined;
   usingSelector: boolean;
 }) {
+  // An unavailable browser button in this failure state would be noise: the
+  // manual selector remains available below and the person who can configure
+  // RENDER_URL is not necessarily the person trying to add this product.
+  const showBrowserRetry = browserRenderAvailable && preview.render === "http";
+
   return (
     <Card>
       <CardHeader>
@@ -62,6 +73,7 @@ function PreviewPanel({
         <p className="text-muted-foreground text-xs">
           {productHost(preview.url)} · HTTP {preview.httpStatus} ·{" "}
           {preview.htmlBytes.toLocaleString()} bytes cached
+          {preview.render === "browser" ? " · rendered in a browser" : ""}
         </p>
 
         {preview.extraction ? (
@@ -74,10 +86,25 @@ function PreviewPanel({
             </div>
           </>
         ) : (
-          <p className="text-sm">
-            Nothing matched automatically: {preview.extractionError}. Pick the price element
-            yourself below.
-          </p>
+          <>
+            <p className="text-sm">
+              Nothing matched automatically: {preview.extractionError}. Pick the price element
+              yourself below.
+            </p>
+            {showBrowserRetry ? (
+              <div>
+                <Button
+                  disabled={isRendering}
+                  onClick={onRetryWithBrowser}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {isRendering ? "Rendering…" : "Try loading it in a browser"}
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
 
         {usingSelector ? (
@@ -103,6 +130,12 @@ function PreviewPanel({
  */
 export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
   const urlId = useId();
+  const isRendering =
+    flow.fetchPreview.isPending && flow.fetchPreview.variables?.render === "browser";
+  let fetchButtonLabel = "Fetch preview";
+  if (flow.fetchPreview.isPending) {
+    fetchButtonLabel = isRendering ? "Rendering…" : "Fetching…";
+  }
 
   return (
     <>
@@ -115,6 +148,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
           <div className="flex gap-2">
             <Input
               autoComplete="url"
+              disabled={flow.fetchPreview.isPending}
               id={urlId}
               onChange={flow.onUrlChange}
               placeholder="https://example.com/product/thing"
@@ -123,7 +157,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
               value={flow.url}
             />
             <Button disabled={flow.fetchPreview.isPending} type="submit">
-              {flow.fetchPreview.isPending ? "Fetching…" : "Fetch preview"}
+              {fetchButtonLabel}
             </Button>
           </div>
         </Field>
@@ -131,7 +165,10 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
 
       {flow.preview ? (
         <PreviewPanel
+          browserRenderAvailable={flow.browserRenderAvailable}
+          isRendering={isRendering}
           isTesting={flow.isTesting}
+          onRetryWithBrowser={flow.onRetryWithBrowser}
           onSelectorChange={flow.onSelectorChange}
           onTogglePicker={flow.togglePicker}
           preview={flow.preview}

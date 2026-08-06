@@ -2,9 +2,9 @@ import { expect, test } from "../fixtures";
 
 /**
  * The "load in a headless browser" toggle on a listing's settings editor.
- * Persistence only — `RENDER_URL` in the e2e env is a dead address (see
- * `constants.ts`), so nothing here can exercise an actual render. That flow
- * needs a real renderer sidecar and gets its own spec once one exists.
+ * Persistence only — actual browser rendering is exercised separately in
+ * `browser-render.spec.ts` against the renderer Playwright starts for the
+ * suite.
  */
 test("the browser-render toggle survives a save and a reload", async ({
   addProduct,

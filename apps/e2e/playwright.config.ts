@@ -1,6 +1,18 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, devices } from "@playwright/test";
 
-import { ADMIN_STORAGE_STATE, appEnv, BASE_URL, FIXTURE_URL, WEB_PORT } from "./constants";
+import {
+  ADMIN_STORAGE_STATE,
+  appEnv,
+  BASE_URL,
+  FIXTURE_URL,
+  RENDER_PORT,
+  WEB_PORT,
+} from "./constants";
+
+const rendererCwd = path.join(path.dirname(fileURLToPath(import.meta.url)), "../renderer");
 
 /**
  * The suite runs fully parallel against one web server, one worker and one
@@ -73,6 +85,18 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
       url: `${FIXTURE_URL}/__health`,
+    },
+    {
+      command: "pnpm exec tsx src/index.ts",
+      // Run from the renderer package so its source imports and Playwright
+      // browser resolution match the sidecar's normal development command.
+      cwd: rendererCwd,
+      // The renderer needs the same fixture-host exception as web and worker:
+      // its Chromium-side guard otherwise rejects the loopback retailer.
+      env: { ...appEnv, RENDER_PORT: String(RENDER_PORT) },
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+      url: `http://localhost:${RENDER_PORT}/healthz`,
     },
   ],
   // Above the runner's 4 cores, which also host `next start`, the worker, the

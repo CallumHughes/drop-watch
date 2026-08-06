@@ -13,21 +13,22 @@ import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 
+import { extractorNote } from "./extractor-note";
 import { Field, PreviewFlow } from "./preview-flow";
 import { usePreviewFlow } from "./use-preview-flow";
 
 /** The confirm step: an optional target, and what is about to be written. */
 function SavePanel({
   chosen,
-  extractorNote,
   isSaving,
+  note,
   onSave,
   onTargetChange,
   targetPrice,
 }: {
   chosen: PreviewExtraction | null;
-  extractorNote: string;
   isSaving: boolean;
+  note: string;
   onSave: () => void;
   onTargetChange: (event: ChangeEvent<HTMLInputElement>) => void;
   targetPrice: string;
@@ -54,7 +55,7 @@ function SavePanel({
           />
         </Field>
 
-        <p className="text-muted-foreground text-xs">{extractorNote}</p>
+        <p className="text-muted-foreground text-xs">{note}</p>
 
         <div>
           <Button disabled={!chosen || isSaving} onClick={onSave} type="button">
@@ -108,6 +109,7 @@ export function AddProductForm() {
       currency: chosen.currency,
       extractor: savingWithSelector ? "selector" : "auto",
       imageUrl: chosen.imageUrl,
+      render: preview.render,
       selector: savingWithSelector ? trimmedSelector : null,
       targetPrice: targetPrice.trim() === "" ? null : targetPrice.trim(),
       title: chosen.title,
@@ -115,12 +117,11 @@ export function AddProductForm() {
     });
   }, [chosen, create, preview, savingWithSelector, targetPrice, trimmedSelector]);
 
-  let extractorNote = "Find a price above before saving.";
-  if (chosen) {
-    extractorNote = savingWithSelector
-      ? `Will be tracked with the selector ${trimmedSelector}.`
-      : "Will be tracked with the automatic extractor chain.";
-  }
+  const note = extractorNote({
+    hasPrice: chosen !== null,
+    render: preview?.render ?? "http",
+    selector: savingWithSelector ? trimmedSelector : null,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -128,8 +129,8 @@ export function AddProductForm() {
       {preview ? (
         <SavePanel
           chosen={chosen}
-          extractorNote={extractorNote}
           isSaving={create.isPending}
+          note={note}
           onSave={onSave}
           onTargetChange={onTargetChange}
           targetPrice={targetPrice}
