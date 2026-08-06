@@ -1,5 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { ListingSettingsForm } from "./listing-settings";
+
 /**
  * One row in the product detail page's Listings card: one store's price,
  * status and controls.
@@ -49,6 +51,11 @@ export class ListingRow {
   /** Opens the inline per-listing schedule/extraction form. */
   async edit(): Promise<void> {
     await this.editButton.click();
+  }
+
+  /** The settings form, once `edit()` has opened it — scoped to this row. */
+  settings(): ListingSettingsForm {
+    return new ListingSettingsForm(this.row);
   }
 
   /** Remove, through its confirm step. On the last listing this is refused server-side. */

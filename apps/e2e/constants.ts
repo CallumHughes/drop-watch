@@ -13,6 +13,15 @@ import { fileURLToPath } from "node:url";
 
 export const WEB_PORT = 3101;
 export const FIXTURE_PORT = 4100;
+/**
+ * Nothing binds here and nothing connects to it. It exists so `capabilities`
+ * (`packages/api/src/routers/capabilities.ts`) sees `RENDER_URL` set and
+ * reports a renderer as configured, which is what lets the browser-render
+ * checkbox in `ListingSettingsForm` be ticked at all. Covering an actual
+ * render needs a renderer sidecar running as a third `webServer`, pointed
+ * here.
+ */
+export const RENDER_PORT = 4200;
 
 export const BASE_URL = `http://localhost:${WEB_PORT}`;
 export const FIXTURE_URL = `http://localhost:${FIXTURE_PORT}`;
@@ -107,6 +116,8 @@ export const appEnv: Record<string, string> = {
   HA_URL: "",
   HA_WEBHOOK_ID: "",
   NEXT_DIST_DIR: ".next-e2e",
+  // Dead address — nothing connects to it. See the comment on RENDER_PORT.
+  RENDER_URL: `http://localhost:${RENDER_PORT}`,
   RESEND_API_KEY: "re-e2e-fixture-key",
   RESEND_BASE_URL: FIXTURE_URL,
 };
