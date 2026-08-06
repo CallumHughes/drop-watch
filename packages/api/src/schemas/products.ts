@@ -85,6 +85,13 @@ export const productCreateInput = z
     jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
     /** BCP 47 hint for pages whose separators are ambiguous. */
     locale: z.string().max(35).nullable().optional(),
+    /**
+     * Honoured on the first listing, though the add-product form does not yet
+     * send it. No path checks that a renderer exists first: the settings
+     * editor's "already in browser mode, renderer since removed" escape hatch
+     * needs the server to accept that state, so the capability check is
+     * advisory throughout.
+     */
     render: z.enum(RENDER_MODES).default("http"),
     rules: z.array(z.enum(ALERT_RULES)).optional(),
     selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
