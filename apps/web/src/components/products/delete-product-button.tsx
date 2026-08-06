@@ -21,7 +21,9 @@ export function DeleteProductButton({ productId }: { productId: string }) {
       },
       onSuccess: () => {
         toast.success("Product deleted.");
-        router.push("/");
+        // Replace, not push: the page behind us describes a product that no
+        // longer exists, and back would re-render it from cache before 404ing.
+        router.replace("/");
         // Narrower than the usual `orpc.products.key()`: this page's own
         // detail/history/checkRuns/stats queries are still mounted during
         // the navigation away, and invalidating them would 404 a product

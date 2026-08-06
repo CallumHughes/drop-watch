@@ -205,7 +205,9 @@ function ProductDetailView({ productId }: { productId: string }) {
           </div>
           <StoreLocation listingCount={listings.length} primaryListing={primaryListing} />
         </div>
-        <div className="flex items-center gap-2">
+        {/* Its own row on narrow screens: three buttons in the confirm state
+            leave the title nothing to wrap into. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <CheckNowButton
             label={multiStore ? "Check all" : undefined}
             target={{ kind: "product", productId: product.id }}
