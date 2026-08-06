@@ -32,6 +32,8 @@ x-app-environment: &app-environment
   # RENDER_URL is the browser-render switch, on the same footing: unset means
   # a browser-mode listing records a `renderer_error` check run rather than the
   # worker crashing (see the `renderer` service and packages/env/src/worker.ts).
+  # `web` reads it too, but only to report whether a renderer is configured,
+  # so the listing settings editor can enable or disable its browser toggle.
   #
   # Listed with no value, so compose takes them from the shell or from the
   # `.env` next to this file, and omits them entirely when neither has them.

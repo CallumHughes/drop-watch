@@ -2,6 +2,7 @@ import { signupOpen } from "@drop-watch/db/signup";
 import type { RouterClient } from "@orpc/server";
 
 import { protectedProcedure, publicProcedure } from "../index";
+import { capabilities } from "./capabilities";
 import { invitesRouter } from "./invites";
 import { listingsRouter } from "./listings";
 import { previewRouter } from "./preview";
@@ -9,6 +10,8 @@ import { productsRouter } from "./products";
 import { settingsRouter } from "./settings";
 
 export const appRouter = {
+  /** Runtime feature flags, e.g. whether a renderer sidecar is configured. */
+  capabilities,
   healthCheck: publicProcedure.handler(() => "OK"),
   /** Admin-issued invites: the only way in after the bootstrap account. */
   invites: invitesRouter,

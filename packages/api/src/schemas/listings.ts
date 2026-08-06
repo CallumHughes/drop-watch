@@ -17,6 +17,7 @@ import {
   MAX_SELECTOR_LENGTH,
   MAX_URL_LENGTH,
   MIN_INTERVAL_MINUTES,
+  RENDER_MODES,
 } from "./products";
 
 /** BCP 47 hint, same bound as `productCreateInput.locale`. */
@@ -37,6 +38,7 @@ export const listingCreateInput = z
     jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
     locale: z.string().max(MAX_LOCALE_LENGTH).nullable().optional(),
     productId: z.uuid(),
+    render: z.enum(RENDER_MODES).default("http"),
     selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
     url: z.url().max(MAX_URL_LENGTH),
   })
@@ -77,6 +79,7 @@ export const listingUpdateInput = z
       .optional(),
     jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
     locale: z.string().max(MAX_LOCALE_LENGTH).nullable().optional(),
+    render: z.enum(RENDER_MODES).optional(),
     selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
   })
   .refine(

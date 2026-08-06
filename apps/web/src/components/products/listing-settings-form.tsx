@@ -11,11 +11,13 @@ import { Button } from "@drop-watch/ui/components/button";
 import { Checkbox } from "@drop-watch/ui/components/checkbox";
 import { Input } from "@drop-watch/ui/components/input";
 import { Label } from "@drop-watch/ui/components/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
+
+import { browserToggleState } from "./render-mode";
 
 /**
  * A labelled control. The caller owns the id and hands the same one to its
@@ -62,12 +64,33 @@ export function ListingSettingsForm({
   const jitterId = useId();
   const localeId = useId();
   const selectorId = useId();
+  const renderHintId = useId();
 
   const [intervalMinutes, setIntervalMinutes] = useState(String(listing.intervalMinutes));
   const [jitterPercent, setJitterPercent] = useState(String(listing.jitterPercent));
   const [extractor, setExtractor] = useState(listing.extractor);
   const [selector, setSelector] = useState(listing.selector ?? "");
   const [locale, setLocale] = useState(listing.locale ?? "");
+  const [renderMode, setRenderMode] = useState(listing.render);
+
+  // This form only mounts inside the expanded editor, so the query fires on
+  // open rather than paying for it on every dashboard load.
+  const capabilities = useQuery(
+    orpc.capabilities.queryOptions({ staleTime: Number.POSITIVE_INFINITY })
+  );
+  // Unknown only while the query is in flight. A query that has *failed* must
+  // report unavailable rather than unknown: `staleTime` is infinite, so it
+  // will not retry for the life of this mount, and leaving it unknown would
+  // disable the checkbox permanently — trapping a browser-mode listing in a
+  // mode it can no longer be switched out of.
+  // `listing`, not `renderMode`: the question is whether the saved row is
+  // stuck in a mode this instance can no longer run. Answering it from the
+  // draft would grey the checkbox out the moment it is unticked, before the
+  // save, leaving no way to change your mind without reopening the editor.
+  const browserToggle = browserToggleState({
+    available: capabilities.isError ? false : capabilities.data?.browserRender,
+    listing,
+  });
 
   const update = useMutation(orpc.listings.update.mutationOptions());
 
@@ -86,6 +109,9 @@ export function ListingSettingsForm({
   const toggleSelectorMode = useCallback((checked: boolean) => {
     setExtractor(checked ? "selector" : "auto");
   }, []);
+  const toggleBrowserRender = useCallback((checked: boolean) => {
+    setRenderMode(checked ? "browser" : "http");
+  }, []);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -101,6 +127,7 @@ export function ListingSettingsForm({
           intervalMinutes: Number(intervalMinutes),
           jitterPercent: Number(jitterPercent),
           locale: locale.trim() === "" ? null : locale.trim(),
+          render: renderMode,
           selector: extractor === "selector" ? selector.trim() : null,
         },
         {
@@ -123,6 +150,7 @@ export function ListingSettingsForm({
       locale,
       onSaved,
       queryClient,
+      renderMode,
       selector,
       update,
     ]
@@ -176,6 +204,38 @@ export function ListingSettingsForm({
           />
         </Field>
       ) : null}
+
+      <div className="flex flex-col gap-1">
+        <Label className="items-start gap-2">
+          <Checkbox
+            aria-describedby={browserToggle.hint.kind === "none" ? undefined : renderHintId}
+            checked={renderMode === "browser"}
+            disabled={browserToggle.disabled}
+            onCheckedChange={toggleBrowserRender}
+          />
+          <span>
+            Load the page in a headless browser
+            <span className="block text-muted-foreground">
+              For stores that build their price with JavaScript. Slower than a plain fetch.
+            </span>
+          </span>
+        </Label>
+        {/* One id across both: the hints are mutually exclusive, and a
+            disabled checkbox with no stated reason is the case that most
+            needs the reason read out. */}
+        {browserToggle.hint.kind === "unavailable-off" ? (
+          <p className="text-muted-foreground text-xs" id={renderHintId}>
+            No renderer is configured on this instance, so this option is unavailable. Set{" "}
+            <code>RENDER_URL</code> and restart to enable it.
+          </p>
+        ) : null}
+        {browserToggle.hint.kind === "unavailable-on" ? (
+          <p className="text-muted-foreground text-xs" id={renderHintId}>
+            This listing is set to use a browser, but no renderer is configured — its checks are
+            failing. Set <code>RENDER_URL</code> and restart, or untick this.
+          </p>
+        ) : null}
+      </div>
 
       <div>
         <Button disabled={update.isPending} size="sm" type="submit">

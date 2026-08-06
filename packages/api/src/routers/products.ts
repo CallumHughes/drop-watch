@@ -380,30 +380,39 @@ export async function summariseOne(product: Product): Promise<ProductSummary> {
 
 type UpdateInput = z.infer<typeof productUpdateInput>;
 
+/** The keys `products.update` may patch — every settings key except `id`. */
+type ProductPatchKey = Exclude<keyof UpdateInput, "id">;
+
+const PRODUCT_PATCH_KEYS = Object.keys({
+  active: true,
+  dropPercent: true,
+  rules: true,
+  targetPrice: true,
+  title: true,
+} satisfies Record<ProductPatchKey, true>) as ProductPatchKey[];
+
 /** Only the keys actually supplied, routed onto the product row. */
 function buildProductPatch(input: UpdateInput): Partial<Product> {
-  const { active, dropPercent, rules, targetPrice, title } = input;
   const patch: Partial<Product> = {};
-  if (active !== undefined) {
-    patch.active = active;
-  }
-  if (dropPercent !== undefined) {
-    patch.dropPercent = dropPercent;
-  }
-  if (rules !== undefined) {
-    patch.rules = rules;
-  }
-  if (targetPrice !== undefined) {
-    patch.targetPrice = targetPrice;
-  }
-  if (title !== undefined) {
-    patch.title = title;
+  for (const key of PRODUCT_PATCH_KEYS) {
+    const value = input[key];
+    if (value !== undefined) {
+      Object.assign(patch, { [key]: value });
+    }
   }
   return patch;
 }
 
 type CreateInput = z.infer<typeof productCreateInput>;
 
+/**
+ * Deliberately not a `satisfies Record<CreateInputKey, true>` guard like
+ * {@link PRODUCT_PATCH_KEYS}: membership here isn't a type relation over
+ * `productCreateInput` at all, it's "lives on the `products` table, not
+ * `listings`" — `intervalMinutes`, `extractor`, `render`, etc. are equally
+ * valid keys of the same input but belong to `buildListingInsert` instead. A
+ * type-level guard would demand they show up here too, which is wrong.
+ */
 const PRODUCT_INSERT_KEYS = [
   "currency",
   "dropPercent",

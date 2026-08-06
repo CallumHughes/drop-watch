@@ -22,7 +22,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
-import { buildListingInsert } from "../listing-insert";
+import { buildListingInsert, buildListingPatch } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { listingCreateInput, listingUpdateInput } from "../schemas/listings";
 import { type ProductSummary, pulledInNextCheckAt } from "../summary";
@@ -43,36 +43,6 @@ async function loadListing(id: string, ownerId: string): Promise<Listing> {
     throw new ORPCError("NOT_FOUND", { message: "Listing not found" });
   }
   return listing;
-}
-
-type UpdateInput = z.infer<typeof listingUpdateInput>;
-
-/** Only the keys actually supplied, routed onto the listing row. */
-function buildListingPatch(input: UpdateInput): Partial<Listing> {
-  const { active, currency, extractor, intervalMinutes, jitterPercent, locale, selector } = input;
-  const patch: Partial<Listing> = {};
-  if (active !== undefined) {
-    patch.active = active;
-  }
-  if (currency !== undefined) {
-    patch.currency = currency;
-  }
-  if (extractor !== undefined) {
-    patch.extractor = extractor;
-  }
-  if (intervalMinutes !== undefined) {
-    patch.intervalMinutes = intervalMinutes;
-  }
-  if (jitterPercent !== undefined) {
-    patch.jitterPercent = jitterPercent;
-  }
-  if (locale !== undefined) {
-    patch.locale = locale;
-  }
-  if (selector !== undefined) {
-    patch.selector = selector;
-  }
-  return patch;
 }
 
 export const listingsRouter = {
