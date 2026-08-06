@@ -46,7 +46,7 @@ Anything compose *interpolates* — `POSTGRES_PASSWORD`, `TZ`, `BETTER_AUTH_URL`
 | `EMAIL_FROM` | no | `web`, `worker` | `From:` address. Defaults to `onboarding@resend.dev`, which needs no verified domain but which Resend only delivers to the address that owns your Resend account. |
 | `APP_URL` | no | `web`, `worker` | Absolute base URL for links inside emails. The worker has no `BETTER_AUTH_URL` of its own; `web` falls back to that. |
 | `AUTH_RATE_LIMIT_ENABLED` | no | `web` | Overrides Better Auth's default of on in production, off in development. Limits are per client address, so set `false` only where every request already shares one — a test run, say. |
-| `RENDER_URL` | no | `worker` | Base URL of the renderer sidecar, e.g. `http://renderer:3002` (compose) or `http://localhost:3002` (local dev). Unset means browser-mode listings record a `network_error` check run rather than the worker crashing. See [Browser render mode](#browser-render-mode) below. |
+| `RENDER_URL` | no | `web`, `worker` | Base URL of the renderer sidecar, e.g. `http://renderer:3002` (compose) or `http://localhost:3002` (local dev). `worker` calls it; `web` only reports whether it is set, so the browser-mode toggle can disable itself. Unset means browser-mode listings record a `renderer_error` check run rather than the worker crashing. See [Browser render mode](#browser-render-mode) below. |
 | `COMPOSE_PROFILES` | no | compose only | Comma-separated. `browser` brings up the `renderer` service, in either compose file. `bundled-db` additionally brings up the bundled `postgres` service in `deploy/docker-compose.yml` (the published-image file) — it is on by default in `deploy/.env.example`; drop it and set `DATABASE_URL` to use a Postgres you already run. Root `.env` only — this is a compose-native variable, not read by any app. |
 | `DROP_WATCH_IMAGE` | no | compose only | `deploy/docker-compose.yml` only. Image namespace to pull from. Defaults to `ghcr.io/callumhughes/drop-watch`; set it to run a fork's own published images. |
 | `DROP_WATCH_VERSION` | no | compose only | `deploy/docker-compose.yml` only. Image tag. Defaults to `latest`, which moves with every push to `main`; pin to a commit's immutable short-SHA tag instead for a reproducible deploy. |
@@ -75,16 +75,16 @@ them (`packages/core/src/fetch/index.ts:8-10`). A headless browser does not
 change that stance.
 
 It is opt-in, via the `browser` compose profile — see [`.env.example`](../.env.example)
-and `RENDER_URL` above. In this release, `render` is settable only by SQL:
-
-```sql
-UPDATE listings SET render = 'browser' WHERE id = '...';
-```
-
-There is no UI for it yet; that is a deliberate follow-up. When `RENDER_URL`
-is unset, or the sidecar is down or unreachable, the affected listing simply
-records a `network_error` check run — never a crash — the same as any other
-target-side failure.
+and `RENDER_URL` above. Toggle it per listing from the store's settings editor
+on the product's detail page ("Load the page in a headless browser"). When
+`RENDER_URL` is unset the toggle is disabled and names `RENDER_URL` as the
+reason — unless the listing is already in browser mode, in which case it stays
+enabled so the listing can be switched back. When `RENDER_URL` is unset, or the
+sidecar is down or unreachable, the affected listing simply records a
+`renderer_error` check run — never a crash. That status is deliberately not
+`network_error`: a sidecar at capacity, shutting down or unconfigured is a fault
+in your own deployment, and the check log should point you at your container
+rather than at the retailer.
 
 ## `HA_URL` / `HA_WEBHOOK_ID` are seed values, not runtime config
 
