@@ -19,6 +19,16 @@ export const MIN_DROP_PERCENT = 1;
 export const MAX_DROP_PERCENT = 99;
 
 /**
+ * Declared here, not in `./listings`, to avoid an import cycle: `./listings`
+ * already imports bounds from this file, so it imports this one too rather
+ * than the reverse. Spelled out rather than imported from `@drop-watch/db` for
+ * the same reason as every other bound in this file — these schemas are
+ * reachable from the browser bundle, and the db package is not.
+ */
+export const RENDER_MODES = ["http", "browser"] as const;
+export type RenderMode = (typeof RENDER_MODES)[number];
+
+/**
  * Matches what `numeric(12,2)` accepts, so a bad target never reaches
  * Postgres. The unanchored source is exported on its own because the HTML
  * `pattern` attribute anchors implicitly and rejects a value with `^`/`$` in
@@ -75,6 +85,7 @@ export const productCreateInput = z
     jitterPercent: z.number().int().min(0).max(MAX_JITTER_PERCENT).optional(),
     /** BCP 47 hint for pages whose separators are ambiguous. */
     locale: z.string().max(35).nullable().optional(),
+    render: z.enum(RENDER_MODES).default("http"),
     rules: z.array(z.enum(ALERT_RULES)).optional(),
     selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
     targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),

@@ -13,11 +13,23 @@
  * as a `Record` over every settings key of `listingCreateInput`, so adding a
  * setting to the schema without adding it here is a type error rather than a
  * lost column.
+ *
+ * `buildListingPatch` (for `listings.update`) lives here too now, guarded the
+ * same way, for three reasons:
+ * - The insert and patch key sets legitimately differ (`active` is patch-only,
+ *   `url`/`productId` are create-only), so one shared runtime list is not
+ *   expressible — two `satisfies Record<K, true>` guards a reader sees
+ *   together is the only way both can be "cannot diverge" simultaneously.
+ * - `routers/listings.ts` imports `@drop-watch/db` at module scope, which made
+ *   `buildListingPatch` untestable where it lived. This module has no server
+ *   imports.
+ * - It exists to stop a new listing setting being silently dropped on the path
+ *   its author forgot — exactly the update path's bug.
  */
 
-import type { NewListing } from "@drop-watch/db/schema/products";
+import type { Listing, NewListing } from "@drop-watch/db/schema/products";
 
-import type { ListingCreateInput } from "./schemas/listings";
+import type { ListingCreateInput, ListingUpdateInput } from "./schemas/listings";
 
 /**
  * The settings a create input carries. `productId` and `url` are excluded
@@ -32,6 +44,7 @@ const LISTING_INSERT_KEYS = Object.keys({
   intervalMinutes: true,
   jitterPercent: true,
   locale: true,
+  render: true,
   selector: true,
 } satisfies Record<ListingSettingKey, true>) as ListingSettingKey[];
 
@@ -62,4 +75,30 @@ export function buildListingInsert(
     }
   }
   return values;
+}
+
+/** The keys `listings.update` may patch — every settings key except `id`. */
+type ListingPatchKey = Exclude<keyof ListingUpdateInput, "id">;
+
+const LISTING_PATCH_KEYS = Object.keys({
+  active: true,
+  currency: true,
+  extractor: true,
+  intervalMinutes: true,
+  jitterPercent: true,
+  locale: true,
+  render: true,
+  selector: true,
+} satisfies Record<ListingPatchKey, true>) as ListingPatchKey[];
+
+/** Only the keys actually supplied, routed onto the listing row. */
+export function buildListingPatch(input: ListingUpdateInput): Partial<Listing> {
+  const patch: Partial<Listing> = {};
+  for (const key of LISTING_PATCH_KEYS) {
+    const value = input[key];
+    if (value !== undefined) {
+      Object.assign(patch, { [key]: value });
+    }
+  }
+  return patch;
 }
