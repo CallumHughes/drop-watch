@@ -26,7 +26,7 @@ import { buildListingInsert } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { listingCreateInput, listingUpdateInput } from "../schemas/listings";
 import { type ProductSummary, pulledInNextCheckAt } from "../summary";
-import { loadProduct, summariseOne } from "./products";
+import { type CheckNowResult, loadProduct, summariseOne } from "./products";
 
 /**
  * A listing *belonging to the requester*, or NOT_FOUND. Same rationale as
@@ -105,17 +105,15 @@ export const listingsRouter = {
    */
   checkNow: protectedProcedure
     .input(z.object({ listingId: z.uuid() }))
-    .handler(
-      async ({
-        context,
-        input,
-      }): Promise<{ jobId: string | null; status: "already_checking" | "queued" }> => {
-        const listing = await loadListing(input.listingId, context.session.user.id);
-        const boss = await getSenderBoss();
-        const jobId = await sendCheckNow(boss, listing.id);
-        return jobId ? { jobId, status: "queued" } : { jobId: null, status: "already_checking" };
-      }
-    ),
+    .handler(async ({ context, input }): Promise<CheckNowResult> => {
+      const listing = await loadListing(input.listingId, context.session.user.id);
+      const boss = await getSenderBoss();
+      const queuedAt = new Date();
+      const jobId = await sendCheckNow(boss, listing.id);
+      return jobId
+        ? { jobId, queuedAt, status: "queued" }
+        : { jobId: null, queuedAt, status: "already_checking" };
+    }),
 
   /**
    * Drops a listing — cascades remove its price points, check runs, and

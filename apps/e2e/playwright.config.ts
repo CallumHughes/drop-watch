@@ -16,8 +16,10 @@ import { ADMIN_STORAGE_STATE, appEnv, BASE_URL, FIXTURE_URL, WEB_PORT } from "./
  */
 export default defineConfig({
   expect: {
-    // The dashboard and product pages poll every 15s (LIVE_REFETCH_MS), so
-    // assertions that wait on the worker must survive one full poll cycle.
+    // The dashboard polls every 15s (LIVE_REFETCH_MS), so an assertion
+    // waiting on it must survive one full cycle. The product page is quicker —
+    // it drops to ~1s while a check it requested is outstanding — but this
+    // ceiling covers the slower of the two.
     timeout: 20_000,
   },
   forbidOnly: !!process.env.CI,

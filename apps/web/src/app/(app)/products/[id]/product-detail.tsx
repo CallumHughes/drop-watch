@@ -7,12 +7,14 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import Image from "next/image";
 
+import { CheckActivityProvider, useCheckActivity } from "@/components/products/check-activity";
 import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
 import { ListingsCard } from "@/components/products/listings-card";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { StatusBadge } from "@/components/products/status-badge";
 import { WatchSettingsForm } from "@/components/products/watch-settings-form";
+import { CHECK_REFETCH_MS, checkRefetchInterval } from "@/lib/check-refetch";
 import {
   formatAvailability,
   formatPrice,
@@ -120,29 +122,49 @@ function StoreLocation({
  * recorded history, every check attempt, and the controls to change how it is
  * tracked.
  *
- * All three live queries poll on the same interval, so pressing "check now"
- * shows up here within a tick without any invalidation gymnastics.
+ * The live queries all poll on one interval, and on the *same* interval, so a
+ * check lands across the page at once rather than a field at a time. That
+ * interval is normally {@link LIVE_REFETCH_MS} and drops to a second while a
+ * check this page asked for is outstanding — `@/lib/check-refetch` explains
+ * why the press itself cannot just wait for the answer.
  */
-export default function ProductDetail({ productId }: { productId: string }) {
+function ProductDetailView({ productId }: { productId: string }) {
   const input = { id: productId };
+  const { pending } = useCheckActivity();
+  // The function form, because this query's own data is what says whether the
+  // wait is over — the other two have to read it second-hand from here.
   const detail = useQuery(
-    orpc.products.detail.queryOptions({ input, refetchInterval: LIVE_REFETCH_MS })
+    orpc.products.detail.queryOptions({
+      input,
+      refetchInterval: (query) =>
+        checkRefetchInterval(query.state.data?.listings, pending, Date.now()),
+    })
   );
+  const refetchInterval = checkRefetchInterval(detail.data?.listings, pending, Date.now());
+  const awaitingCheck = refetchInterval === CHECK_REFETCH_MS;
   const history = useQuery(
     orpc.products.history.queryOptions({
       input: { ...input, limit: HISTORY_POINTS },
-      refetchInterval: LIVE_REFETCH_MS,
+      refetchInterval,
     })
   );
   const runs = useQuery(
     orpc.products.checkRuns.queryOptions({
       input: { ...input, limit: LOG_ROWS },
-      refetchInterval: LIVE_REFETCH_MS,
+      refetchInterval,
     })
   );
   // No live polling: a whole-history aggregate is too heavy to re-run every
-  // 15s for numbers that move once per check.
-  const stats = useQuery(orpc.products.stats.queryOptions({ input, staleTime: LIVE_REFETCH_MS }));
+  // 15s for numbers that move once per check. The exception is the wait
+  // itself — otherwise the page would show a new price beside observation
+  // counts that had not noticed it — and that window closes on its own.
+  const stats = useQuery(
+    orpc.products.stats.queryOptions({
+      input,
+      refetchInterval: awaitingCheck ? CHECK_REFETCH_MS : false,
+      staleTime: LIVE_REFETCH_MS,
+    })
+  );
 
   if (detail.isPending) {
     return <Skeleton className="h-96 w-full" />;
@@ -260,5 +282,18 @@ export default function ProductDetail({ productId }: { productId: string }) {
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * The provider has to sit outside the component holding the queries: the
+ * check-now buttons that report into it are rendered by that same component,
+ * and a component cannot consume a context it provides.
+ */
+export default function ProductDetail({ productId }: { productId: string }) {
+  return (
+    <CheckActivityProvider>
+      <ProductDetailView productId={productId} />
+    </CheckActivityProvider>
   );
 }
