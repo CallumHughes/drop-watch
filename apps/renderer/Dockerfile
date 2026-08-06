@@ -47,6 +47,12 @@ ARG PLAYWRIGHT_VERSION
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN npm install --omit=dev playwright@${PLAYWRIGHT_VERSION}
 
+# That install writes the only package.json in this stage — the app's own,
+# which declares `"type": "module"`, is never copied here (only `dist` is).
+# Without this, Node finds no module type beside the ESM bundle, tries
+# CommonJS, fails, and reparses on every boot with a warning.
+RUN npm pkg set type=module
+
 # Drop to the non-root account Microsoft's image already ships for exactly
 # this. The bundle and node_modules are read-only; Chromium's temporary profile
 # lives in the bounded /tmp tmpfs configured by compose.
