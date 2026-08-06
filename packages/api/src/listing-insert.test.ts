@@ -59,4 +59,9 @@ describe("buildListingPatch", () => {
     });
     expect(patch).toEqual({ active: false, intervalMinutes: 45 });
   });
+
+  it("carries an explicit null through, distinct from an omitted key", () => {
+    const patch = buildListingPatch({ ...baseUpdate, currency: null });
+    expect(patch).toEqual({ currency: null });
+  });
 });
