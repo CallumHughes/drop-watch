@@ -64,6 +64,7 @@ export function ListingSettingsForm({
   const jitterId = useId();
   const localeId = useId();
   const selectorId = useId();
+  const renderHintId = useId();
 
   const [intervalMinutes, setIntervalMinutes] = useState(String(listing.intervalMinutes));
   const [jitterPercent, setJitterPercent] = useState(String(listing.jitterPercent));
@@ -82,9 +83,13 @@ export function ListingSettingsForm({
   // will not retry for the life of this mount, and leaving it unknown would
   // disable the checkbox permanently — trapping a browser-mode listing in a
   // mode it can no longer be switched out of.
+  // `listing`, not `renderMode`: the question is whether the saved row is
+  // stuck in a mode this instance can no longer run. Answering it from the
+  // draft would grey the checkbox out the moment it is unticked, before the
+  // save, leaving no way to change your mind without reopening the editor.
   const browserToggle = browserToggleState({
     available: capabilities.isError ? false : capabilities.data?.browserRender,
-    mode: renderMode,
+    listing,
   });
 
   const update = useMutation(orpc.listings.update.mutationOptions());
@@ -203,6 +208,7 @@ export function ListingSettingsForm({
       <div className="flex flex-col gap-1">
         <Label className="items-start gap-2">
           <Checkbox
+            aria-describedby={browserToggle.hint.kind === "none" ? undefined : renderHintId}
             checked={renderMode === "browser"}
             disabled={browserToggle.disabled}
             onCheckedChange={toggleBrowserRender}
@@ -214,14 +220,17 @@ export function ListingSettingsForm({
             </span>
           </span>
         </Label>
+        {/* One id across both: the hints are mutually exclusive, and a
+            disabled checkbox with no stated reason is the case that most
+            needs the reason read out. */}
         {browserToggle.hint.kind === "unavailable-off" ? (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-xs" id={renderHintId}>
             No renderer is configured on this instance, so this option is unavailable. Set{" "}
             <code>RENDER_URL</code> and restart to enable it.
           </p>
         ) : null}
         {browserToggle.hint.kind === "unavailable-on" ? (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-muted-foreground text-xs" id={renderHintId}>
             This listing is set to use a browser, but no renderer is configured — its checks are
             failing. Set <code>RENDER_URL</code> and restart, or untick this.
           </p>
