@@ -77,10 +77,13 @@ export function ListingSettingsForm({
   const capabilities = useQuery(
     orpc.capabilities.queryOptions({ staleTime: Number.POSITIVE_INFINITY })
   );
-  // Undefined until it settles, which `browserToggleState` treats as "unknown"
-  // rather than "unavailable" — disabled either way, but silent about why.
+  // Unknown only while the query is in flight. A query that has *failed* must
+  // report unavailable rather than unknown: `staleTime` is infinite, so it
+  // will not retry for the life of this mount, and leaving it unknown would
+  // disable the checkbox permanently — trapping a browser-mode listing in a
+  // mode it can no longer be switched out of.
   const browserToggle = browserToggleState({
-    available: capabilities.data?.browserRender,
+    available: capabilities.isError ? false : capabilities.data?.browserRender,
     mode: renderMode,
   });
 

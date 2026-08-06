@@ -11,11 +11,15 @@ import type { RenderMode } from "@drop-watch/api/schemas/products";
  * disabling the checkbox would trap the user in a failing mode with no way
  * to untick it. Un-ticking must always stay possible.
  *
- * `available: undefined` is the capability query still in flight, and is not
- * the same as `false`. Both disable the checkbox — starting locked and
+ * `available: undefined` means the capability query is still in flight, and is
+ * not the same as `false`. Both disable the checkbox — starting locked and
  * unlocking a beat later is the safe direction — but only a settled `false`
  * may claim no renderer is configured, or every open of the editor would
  * flash that claim on instances that have one.
+ *
+ * A query that has failed is `false`, not `undefined`: it will not answer on
+ * its own, and treating it as unknown would disable the checkbox with no way
+ * back — the very trap described above. Callers must map their error state.
  */
 
 export type BrowserToggleHint =
