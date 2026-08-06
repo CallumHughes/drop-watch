@@ -24,6 +24,10 @@ export class ProductDetailPage {
   readonly storeCount: Locator;
   /** The Listings card's own trigger, opening the add-store sheet. */
   readonly addStoreTrigger: Locator;
+  /** The header's two-step delete trigger — not the per-listing "Remove". */
+  readonly deleteProductButton: Locator;
+  readonly confirmDeleteButton: Locator;
+  readonly cancelDeleteButton: Locator;
   readonly page: Page;
 
   constructor(page: Page) {
@@ -41,6 +45,9 @@ export class ProductDetailPage {
     this.settingsSavedToast = page.getByText("Watch settings saved.");
     this.storeCount = page.getByText(STORE_COUNT_PATTERN);
     this.addStoreTrigger = page.getByRole("button", { exact: true, name: "Add store" });
+    this.deleteProductButton = page.getByRole("button", { exact: true, name: "Delete product" });
+    this.confirmDeleteButton = page.getByRole("button", { name: "Confirm delete" });
+    this.cancelDeleteButton = page.getByRole("button", { exact: true, name: "Cancel" });
   }
 
   async goto(productId: string): Promise<void> {
@@ -63,6 +70,12 @@ export class ProductDetailPage {
   /** Queues an immediate check via the UI button. */
   async checkNow(): Promise<void> {
     await this.checkNowButton.click();
+  }
+
+  /** Delete, through its confirm step. */
+  async deleteProduct(): Promise<void> {
+    await this.deleteProductButton.click();
+    await this.confirmDeleteButton.click();
   }
 
   /**

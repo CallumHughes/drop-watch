@@ -10,6 +10,7 @@ import Image from "next/image";
 import { CheckActivityProvider, useCheckActivity } from "@/components/products/check-activity";
 import { CheckNowButton } from "@/components/products/check-now-button";
 import { CheckRunLog } from "@/components/products/check-run-log";
+import { DeleteProductButton } from "@/components/products/delete-product-button";
 import { ListingsCard } from "@/components/products/listings-card";
 import { PriceHistoryChart } from "@/components/products/price-history-chart";
 import { StatusBadge } from "@/components/products/status-badge";
@@ -204,10 +205,15 @@ function ProductDetailView({ productId }: { productId: string }) {
           </div>
           <StoreLocation listingCount={listings.length} primaryListing={primaryListing} />
         </div>
-        <CheckNowButton
-          label={multiStore ? "Check all" : undefined}
-          target={{ kind: "product", productId: product.id }}
-        />
+        {/* Its own row on narrow screens: three buttons in the confirm state
+            leave the title nothing to wrap into. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <CheckNowButton
+            label={multiStore ? "Check all" : undefined}
+            target={{ kind: "product", productId: product.id }}
+          />
+          <DeleteProductButton productId={product.id} />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

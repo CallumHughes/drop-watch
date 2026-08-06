@@ -150,9 +150,6 @@ changed in the UI takes effect on the next check without restarting anything.
   fetch layer is deliberately polite — a realistic user agent and conditional
   requests, but no escalation beyond that. If a shop is determined to block
   scripted access, DropWatch will not fight it.
-- **Products cannot be deleted, only paused.** Un-ticking "actively tracked"
-  stops the checks and keeps the history; there is no delete in the UI or the
-  API yet.
 - **One `web` replica.** The add-product preview caches the fetched page in
   memory per process, so behind a load balancer the selector picker would test
   against a page a different replica holds.
