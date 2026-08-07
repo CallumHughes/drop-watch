@@ -153,6 +153,13 @@ jobs:
             echo "::endgroup::"
           done
           exit $status
+      # The E2E renderer launches the same sandboxed downloaded Chromium as
+      # its unit suite, so it needs the same Ubuntu 24.04 user-namespace setup.
+      - name: Allow Chromium user-namespace sandbox
+        run: |
+          if [[ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
