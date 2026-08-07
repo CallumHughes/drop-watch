@@ -17,7 +17,7 @@ export const appRouter = {
   invites: invitesRouter,
   /** Per-listing management: add a store, tune its schedule, drop it. */
   listings: listingsRouter,
-  /** The add-product flow's read-only half: fetch once, then test selectors. */
+  /** The add-product flow's read-only half: load a preview, then test selectors. */
   preview: previewRouter,
   privateData: protectedProcedure.handler(({ context }) => ({
     message: "This is private",

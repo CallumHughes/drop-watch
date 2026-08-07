@@ -29,7 +29,9 @@ describe("testSelector", () => {
     expect(test.invalidSelector).toBe(false);
     expect(test.matchCount).toBe(2);
     expect(test.result).toEqual({
+      confidence: "high",
       currency: "GBP",
+      evidence: { matchCount: 2, type: "selector:configured" },
       // Backfilled from page metadata, resolved against the page URL — a price
       // span knows nothing about the product, but the document does.
       imageUrl: "https://books.toscrape.com/media/cover.jpg",

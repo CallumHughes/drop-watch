@@ -7,14 +7,12 @@ const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {
   readonly urlInput: Locator;
-  readonly fetchPreviewButton: Locator;
+  readonly loadPreviewButton: Locator;
   /** "found by schema.org JSON-LD" etc — proof of which strategy won. */
   readonly strategyNote: Locator;
   readonly pickMyselfButton: Locator;
   /** Shown when the automatic chain found nothing and the picker is the next step. */
   readonly noAutoMatchNote: Locator;
-  /** The browser-render retry offered after an HTTP preview finds no price. */
-  readonly retryWithBrowserButton: Locator;
   /** Provenance displayed when the successful preview came from the renderer sidecar. */
   readonly browserRenderProvenance: Locator;
   readonly selectorInput: Locator;
@@ -24,13 +22,10 @@ export class AddProductPage {
   constructor(page: Page) {
     this.page = page;
     this.urlInput = page.getByLabel("Product URL");
-    this.fetchPreviewButton = page.getByRole("button", { name: "Fetch preview" });
+    this.loadPreviewButton = page.getByRole("button", { name: "Load preview" });
     this.strategyNote = page.getByText(STRATEGY_NOTE_PATTERN);
     this.pickMyselfButton = page.getByRole("button", { name: "Pick the price myself" });
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
-    this.retryWithBrowserButton = page.getByRole("button", {
-      name: "Try loading it in a browser",
-    });
     this.browserRenderProvenance = page.getByText("rendered in a browser");
     this.selectorInput = page.getByLabel("CSS selector for the price");
     this.trackButton = page.getByRole("button", { name: "Track this product" });
@@ -40,9 +35,9 @@ export class AddProductPage {
     await this.page.goto("/products/new");
   }
 
-  async fetchPreview(url: string): Promise<void> {
+  async loadPreview(url: string): Promise<void> {
     await this.urlInput.fill(url);
-    await this.fetchPreviewButton.click();
+    await this.loadPreviewButton.click();
   }
 
   /**

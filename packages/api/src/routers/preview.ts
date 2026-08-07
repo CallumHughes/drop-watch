@@ -1,11 +1,11 @@
 /**
- * The add-product preview: fetch a URL once, run the identical extraction chain
- * the worker runs, and hold the body in memory so a selector can be picked
- * against it without touching the network again.
+ * The add-product preview: load a URL through the automatic transport policy,
+ * run the identical extraction chain the worker runs, and hold the winning body
+ * in memory so a selector can be picked without touching the network again.
  *
- * "Once" is the whole design. `page` is the only procedure here that reaches
- * out to the internet; `testSelector` and `source` are pure reads of the cached
- * body, which is what makes the picker safe to drive from every keystroke
+ * `page` is the only procedure here that reaches out to the internet;
+ * `testSelector` and `source` are pure reads of the cached body, which is what
+ * makes the picker safe to drive from every keystroke.
  * The chain itself is `@drop-watch/core/extract` — the same
  * module `apps/worker` calls — so the preview cannot drift from what a
  * scheduled check will later record.
@@ -25,15 +25,20 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import {
+  orchestratePreview,
   type PagePreview,
+  PREVIEW_REQUEST_MODES,
   PreviewCache,
   type PreviewEntry,
-  previewTarget,
+  previewConfigurationRejection,
+  previewFailure,
+  previewTransports,
+  previewUrlRejection,
   type SelectorPreview,
   toPreviewExtraction,
   toSelectorPreview,
 } from "../preview";
-import { RENDER_MODES, type RenderMode } from "../schemas/products";
+import type { RenderMode } from "../schemas/products";
 
 /**
  * Re-exported so `apps/web` can name these shapes without depending on
@@ -55,6 +60,12 @@ const PREVIEW_TIMEOUT_MS = 15_000;
 const PREVIEW_RENDER_TIMEOUT_MS = 20_000;
 /** One retry. A page that is down stays down for the seconds a user will wait. */
 const PREVIEW_MAX_RETRIES = 1;
+/**
+ * None when a browser leg follows: that escalation is already the retry, and
+ * one "Load preview" click must not stack two HTTP attempts in front of a
+ * 20-second render before anything reaches the screen.
+ */
+const PREVIEW_ESCALATING_RETRIES = 0;
 
 /**
  * Enough markup to find a price by eye without shipping a 5MB body into the
@@ -82,54 +93,29 @@ function previewCache(): PreviewCache {
 }
 
 /**
- * Turns a transport failure into a client-visible error. The distinction the
- * fetch layer draws — timeout vs. bad response vs. unreachable — is exactly
- * what tells a user whether to retry or to fix the URL, so it survives here
- * rather than collapsing into one "could not fetch".
+ * Retrieves a preview through one requested transport after the handler's
+ * common initial-URL preflight. The renderer and `fetchPage` still own the
+ * authoritative connection and redirect guards.
  */
-function fetchFailure(
-  result: Exclude<RetrieveResult, { status: "ok" }>
-): ORPCError<string, unknown> {
-  if (result.status === "renderer_error") {
-    return new ORPCError("SERVICE_UNAVAILABLE", { message: result.error });
-  }
-  if (result.status === "timeout") {
-    return new ORPCError("GATEWAY_TIMEOUT", { message: `The page timed out: ${result.error}` });
-  }
-  if (result.status === "not_modified") {
-    // No validators are sent on a preview, so a 304 means the origin is
-    // misbehaving rather than that we already hold the body.
-    return new ORPCError("BAD_GATEWAY", { message: "The page answered 304 with no body" });
-  }
-  return new ORPCError("BAD_GATEWAY", { message: result.error });
-}
-
-/**
- * Retrieves a preview through the requested transport. `checkUrl` is a
- * defence-in-depth preflight and improves the immediate error message; the
- * renderer owns the authoritative SSRF guard because Chromium resolves and
- * connects from its own process.
- */
-async function retrievePreview(url: string, render: RenderMode): Promise<RetrieveResult> {
-  const renderUrl = env.RENDER_URL;
-  const target = previewTarget(render, renderUrl);
-
-  if (target === "http") {
+async function retrievePreview(
+  url: string,
+  render: RenderMode,
+  renderUrl: string | undefined,
+  httpRetries: number
+): Promise<RetrieveResult> {
+  if (render === "http") {
     return await fetchPage(url, {
-      maxRetries: PREVIEW_MAX_RETRIES,
+      maxRetries: httpRetries,
       timeoutMs: PREVIEW_TIMEOUT_MS,
     });
   }
 
-  if (target === "unconfigured" || renderUrl === undefined) {
-    throw new ORPCError("PRECONDITION_FAILED", {
-      message: "Browser rendering is not configured (RENDER_URL is unset).",
-    });
-  }
-
-  const verdict = await checkUrl(url);
-  if (!verdict.ok) {
-    throw new ORPCError("BAD_REQUEST", { message: verdict.reason });
+  if (!renderUrl) {
+    return {
+      durationMs: 0,
+      error: "Browser rendering is not configured (RENDER_URL is unset).",
+      status: "renderer_error",
+    };
   }
 
   // `renderPage` calls the sidecar instead of the store, so it needs the same
@@ -161,25 +147,64 @@ function requireEntry(previewId: string): PreviewEntry {
 
 export const previewRouter = {
   /**
-   * Fetches a URL once and runs the full fallback chain over it.
+   * Loads a URL through the requested transport policy and runs the extraction
+   * chain over each retrieved body until one succeeds.
    *
    * The body is cached under the returned `previewId`; every later step of the
    * add flow reads that copy.
    */
   page: protectedProcedure
-    .input(z.object({ render: z.enum(RENDER_MODES).default("http"), url: urlInput }))
+    .input(z.object({ render: z.enum(PREVIEW_REQUEST_MODES).default("auto"), url: urlInput }))
     .handler(async ({ input }): Promise<PagePreview> => {
       const log = createLogger({ action: "preview_page", url: input.url });
-      const fetched = await retrievePreview(input.url, input.render);
-      log.set({ durationMs: fetched.durationMs, fetchStatus: fetched.status });
-
-      if (fetched.status !== "ok") {
-        log.warn("preview fetch failed");
-        log.emit();
-        throw fetchFailure(fetched);
+      const configurationRejection = previewConfigurationRejection(input.render, env.RENDER_URL);
+      if (configurationRejection) {
+        throw new ORPCError(configurationRejection.code, {
+          message: configurationRejection.message,
+        });
       }
 
-      const result = extract(fetched.body, { url: fetched.url });
+      const urlRejection = previewUrlRejection(await checkUrl(input.url));
+      if (urlRejection) {
+        throw new ORPCError(urlRejection.code, { message: urlRejection.message });
+      }
+
+      const httpRetries =
+        previewTransports(input.render, env.RENDER_URL).length > 1
+          ? PREVIEW_ESCALATING_RETRIES
+          : PREVIEW_MAX_RETRIES;
+      const outcome = await orchestratePreview({
+        extractPage: (html, url) => extract(html, { url }),
+        render: input.render,
+        renderUrl: env.RENDER_URL,
+        retrieve: async (transport) =>
+          await retrievePreview(input.url, transport, env.RENDER_URL, httpRetries),
+      });
+      const attemptLog = outcome.attempts.map((attempt) => ({
+        confidence: attempt.extraction?.ok ? attempt.extraction.confidence : null,
+        durationMs: attempt.result.durationMs,
+        evidence: attempt.extraction?.ok ? attempt.extraction.evidence : null,
+        extraction: attempt.extraction?.ok ?? null,
+        status: attempt.result.status,
+        transport: attempt.transport,
+      }));
+      const fallback = outcome.fallbackReason !== null;
+
+      if (outcome.kind === "failed") {
+        const failure = previewFailure(outcome.attempts);
+        log.set({
+          attempts: attemptLog,
+          fallback,
+          fallbackReason: outcome.fallbackReason,
+          winner: null,
+        });
+        log.warn("preview fetch failed");
+        log.emit();
+        throw new ORPCError(failure.code, { message: failure.message });
+      }
+
+      const fetched = outcome.attempt.result;
+      const result = outcome.attempt.extraction;
       const previewId = randomUUID();
       previewCache().set(previewId, {
         html: fetched.body,
@@ -188,12 +213,24 @@ export const previewRouter = {
       });
 
       log.set({
+        attempts: attemptLog,
+        confidence: result.ok ? result.confidence : null,
+        durationMs: fetched.durationMs,
+        evidence: result.ok ? result.evidence : null,
+        fallback,
+        fallbackReason: outcome.fallbackReason,
+        fetchStatus: fetched.status,
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,
         previewId,
         strategy: result.ok ? result.strategy : null,
+        winner: outcome.attempt.transport,
       });
-      log.info("preview fetched");
+      log.info(
+        outcome.kind === "extracted"
+          ? "preview extracted"
+          : "preview body fetched without extraction"
+      );
       log.emit();
 
       return {
@@ -202,7 +239,7 @@ export const previewRouter = {
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,
         previewId,
-        render: input.render,
+        render: outcome.attempt.transport,
         url: fetched.url,
       };
     }),

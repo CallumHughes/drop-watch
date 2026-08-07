@@ -14,21 +14,308 @@ import type {
   SelectorMatch,
   SelectorTest,
 } from "@drop-watch/core/extract";
+import type { UrlVerdict } from "@drop-watch/core/net/guard";
+import type { RetrieveResult } from "@drop-watch/core/render";
 import type { RenderMode } from "./schemas/products";
 
+/** A one-off preview may choose a transport; saved listings cannot use `auto`. */
+export const PREVIEW_REQUEST_MODES = ["auto", "browser", "http"] as const;
+export type PreviewRequestMode = (typeof PREVIEW_REQUEST_MODES)[number];
+
+export interface PreviewRejection {
+  code: "BAD_REQUEST" | "PRECONDITION_FAILED";
+  message: string;
+}
+
 /**
- * Decides which transport a preview should use without reaching into runtime
- * configuration. Keeping this pure makes the missing-renderer branch testable
- * without a sidecar.
+ * Checked first, and before any DNS work, so that asking for a transport the
+ * deployment does not have fails the same way whatever the URL is.
  */
-export function previewTarget(
-  render: RenderMode,
+export function previewConfigurationRejection(
+  render: PreviewRequestMode,
   renderUrl: string | undefined
-): "http" | "browser" | "unconfigured" {
-  if (render !== "browser") {
-    return "http";
+): PreviewRejection | null {
+  if (render === "browser" && !renderUrl) {
+    return {
+      code: "PRECONDITION_FAILED",
+      message: "Browser rendering is not configured (RENDER_URL is unset).",
+    };
   }
-  return renderUrl ? "browser" : "unconfigured";
+  return null;
+}
+
+/**
+ * One common URL check for every mode. Defence in depth and a better immediate
+ * message — `fetchPage` and the renderer own the authoritative guards, because
+ * each resolves and connects from its own process.
+ */
+export function previewUrlRejection(verdict: UrlVerdict): PreviewRejection | null {
+  return verdict.ok ? null : { code: "BAD_REQUEST", message: verdict.reason };
+}
+
+/**
+ * Lists the transports a preview should try without reaching into runtime
+ * configuration. An automatic preview starts with the cheaper origin response
+ * and consults the rendered DOM only when the HTTP evidence is not decisive.
+ */
+export function previewTransports(
+  render: PreviewRequestMode,
+  renderUrl: string | undefined
+): readonly RenderMode[] {
+  if (render === "auto") {
+    return renderUrl ? ["http", "browser"] : ["http"];
+  }
+  if (render === "browser") {
+    return renderUrl ? ["browser"] : [];
+  }
+  return ["http"];
+}
+
+export interface PreviewAttempt {
+  extraction: ExtractionResult | null;
+  result: RetrieveResult;
+  transport: RenderMode;
+}
+
+type RetrievedPreviewAttempt = Omit<PreviewAttempt, "extraction" | "result"> & {
+  extraction: ExtractionResult;
+  result: Extract<RetrieveResult, { status: "ok" }>;
+};
+
+type ExtractedPreviewAttempt = Omit<RetrievedPreviewAttempt, "extraction"> & {
+  extraction: Extract<ExtractionResult, { ok: true }>;
+};
+
+export type PreviewFallbackReason = "http_failed" | "http_low_confidence" | "http_no_extraction";
+
+export type PreviewOrchestration =
+  | {
+      attempt: ExtractedPreviewAttempt;
+      attempts: readonly PreviewAttempt[];
+      fallbackReason: PreviewFallbackReason | null;
+      kind: "extracted";
+    }
+  | {
+      attempt: RetrievedPreviewAttempt;
+      attempts: readonly PreviewAttempt[];
+      fallbackReason: PreviewFallbackReason | null;
+      kind: "no_extraction";
+    }
+  | {
+      attempts: readonly PreviewAttempt[];
+      fallbackReason: PreviewFallbackReason | null;
+      kind: "failed";
+    };
+
+export interface PreviewOrchestrationOptions {
+  extractPage: (html: string, url: string) => ExtractionResult;
+  render: PreviewRequestMode;
+  renderUrl: string | undefined;
+  retrieve: (transport: RenderMode) => Promise<RetrieveResult>;
+}
+
+/**
+ * Retrieves and extracts a page according to the request mode. Automatic mode
+ * only pays for a browser when HTTP is inconclusive, then chooses the stronger
+ * observation without discarding a usable HTTP fallback.
+ */
+export async function orchestratePreview({
+  extractPage,
+  render,
+  renderUrl,
+  retrieve,
+}: PreviewOrchestrationOptions): Promise<PreviewOrchestration> {
+  const transports = previewTransports(render, renderUrl);
+  const [firstTransport, secondTransport] = transports;
+  if (!firstTransport) {
+    return { attempts: [], fallbackReason: null, kind: "failed" };
+  }
+
+  const firstAttempt = await runPreviewAttempt(firstTransport, retrieve, extractPage);
+  if (!secondTransport) {
+    return singleAttemptOutcome(firstAttempt);
+  }
+  if (isExtractedAttempt(firstAttempt) && firstAttempt.extraction.confidence === "high") {
+    return {
+      attempt: firstAttempt,
+      attempts: [firstAttempt],
+      fallbackReason: null,
+      kind: "extracted",
+    };
+  }
+
+  const fallbackReason = httpFallbackReason(firstAttempt);
+  const secondAttempt = await runPreviewAttempt(secondTransport, retrieve, extractPage);
+  const attempts = [firstAttempt, secondAttempt];
+
+  if (isExtractedAttempt(secondAttempt)) {
+    if (!isExtractedAttempt(firstAttempt)) {
+      return { attempt: secondAttempt, attempts, fallbackReason, kind: "extracted" };
+    }
+    if (browserShouldWin(firstAttempt, secondAttempt)) {
+      const selectedBrowserAttempt = withHttpFallbackCurrency(firstAttempt, secondAttempt);
+      return { attempt: selectedBrowserAttempt, attempts, fallbackReason, kind: "extracted" };
+    }
+    return { attempt: firstAttempt, attempts, fallbackReason, kind: "extracted" };
+  }
+
+  if (isExtractedAttempt(firstAttempt)) {
+    return { attempt: firstAttempt, attempts, fallbackReason, kind: "extracted" };
+  }
+
+  let selectedAttempt: RetrievedPreviewAttempt | null = null;
+  if (isRetrievedAttempt(secondAttempt)) {
+    selectedAttempt = secondAttempt;
+  } else if (isRetrievedAttempt(firstAttempt)) {
+    selectedAttempt = firstAttempt;
+  }
+
+  if (selectedAttempt) {
+    return { attempt: selectedAttempt, attempts, fallbackReason, kind: "no_extraction" };
+  }
+  return { attempts, fallbackReason, kind: "failed" };
+}
+
+async function runPreviewAttempt(
+  transport: RenderMode,
+  retrieve: PreviewOrchestrationOptions["retrieve"],
+  extractPage: PreviewOrchestrationOptions["extractPage"]
+): Promise<PreviewAttempt> {
+  const result = await retrieve(transport);
+  const extraction = result.status === "ok" ? extractPage(result.body, result.url) : null;
+  return { extraction, result, transport };
+}
+
+function singleAttemptOutcome(attempt: PreviewAttempt): PreviewOrchestration {
+  if (isExtractedAttempt(attempt)) {
+    return { attempt, attempts: [attempt], fallbackReason: null, kind: "extracted" };
+  }
+  if (isRetrievedAttempt(attempt)) {
+    return { attempt, attempts: [attempt], fallbackReason: null, kind: "no_extraction" };
+  }
+  return { attempts: [attempt], fallbackReason: null, kind: "failed" };
+}
+
+function isRetrievedAttempt(attempt: PreviewAttempt): attempt is RetrievedPreviewAttempt {
+  return attempt.result.status === "ok" && attempt.extraction !== null;
+}
+
+function isExtractedAttempt(attempt: PreviewAttempt): attempt is ExtractedPreviewAttempt {
+  return isRetrievedAttempt(attempt) && attempt.extraction.ok;
+}
+
+function httpFallbackReason(attempt: PreviewAttempt): PreviewFallbackReason {
+  if (isExtractedAttempt(attempt)) {
+    return "http_low_confidence";
+  }
+  if (isRetrievedAttempt(attempt)) {
+    return "http_no_extraction";
+  }
+  return "http_failed";
+}
+
+function browserShouldWin(
+  httpAttempt: ExtractedPreviewAttempt,
+  browserAttempt: ExtractedPreviewAttempt
+): boolean {
+  if (browserAttempt.extraction.confidence !== httpAttempt.extraction.confidence) {
+    return browserAttempt.extraction.confidence === "high";
+  }
+  if (browserAttempt.extraction.confidence === "low") {
+    return materiallyChangesTrackedObservation(httpAttempt.extraction, browserAttempt.extraction);
+  }
+  return false;
+}
+
+/**
+ * Currency describes the price rather than page state, so an otherwise-winning
+ * browser observation may inherit it from HTTP. Availability and stock are not
+ * inherited on purpose: the rendered document is the newer observation of page
+ * state, and silently carrying "in stock" forward would outlive its evidence.
+ * The attempt list keeps the original browser extraction for faithful
+ * confidence/evidence logging.
+ */
+function withHttpFallbackCurrency(
+  httpAttempt: ExtractedPreviewAttempt,
+  browserAttempt: ExtractedPreviewAttempt
+): ExtractedPreviewAttempt {
+  if (
+    browserAttempt.extraction.currency !== undefined ||
+    httpAttempt.extraction.currency === undefined
+  ) {
+    return browserAttempt;
+  }
+  return {
+    ...browserAttempt,
+    extraction: {
+      ...browserAttempt.extraction,
+      currency: httpAttempt.extraction.currency,
+    },
+  };
+}
+
+function materiallyChangesTrackedObservation(
+  httpExtraction: ExtractedPreviewAttempt["extraction"],
+  browserExtraction: ExtractedPreviewAttempt["extraction"]
+): boolean {
+  if (httpExtraction.price !== browserExtraction.price) {
+    return true;
+  }
+
+  const optionalFields = ["currency", "availability", "inStock"] as const;
+  let browserAddsOrChangesValue = false;
+  for (const field of optionalFields) {
+    const httpValue = httpExtraction[field];
+    const browserValue = browserExtraction[field];
+    if (httpValue !== undefined && browserValue === undefined) {
+      return false;
+    }
+    if (browserValue !== undefined && browserValue !== httpValue) {
+      browserAddsOrChangesValue = true;
+    }
+  }
+  return browserAddsOrChangesValue;
+}
+
+export interface PreviewFailure {
+  code: "BAD_GATEWAY" | "GATEWAY_TIMEOUT" | "SERVICE_UNAVAILABLE";
+  message: string;
+}
+
+/** Summarizes every failed transport so an automatic fallback is diagnosable. */
+export function previewFailure(attempts: readonly PreviewAttempt[]): PreviewFailure {
+  const failures = attempts.filter(
+    (attempt): attempt is PreviewAttempt & { result: Exclude<RetrieveResult, { status: "ok" }> } =>
+      attempt.result.status !== "ok"
+  );
+  if (failures.length === 0) {
+    // No transport ran at all, so no transport is at fault; `every` over an
+    // empty list would otherwise blame the renderer.
+    return { code: "BAD_GATEWAY", message: "Unable to retrieve the page (no transport ran)." };
+  }
+  const allRendererFaults = failures.every((attempt) => attempt.result.status === "renderer_error");
+  const allTimeouts = failures.every((attempt) => attempt.result.status === "timeout");
+  let code: PreviewFailure["code"] = "BAD_GATEWAY";
+  if (allRendererFaults) {
+    code = "SERVICE_UNAVAILABLE";
+  } else if (allTimeouts) {
+    code = "GATEWAY_TIMEOUT";
+  }
+  const details = failures
+    .map((attempt) => `${attempt.transport}: ${failureDescription(attempt.result)}`)
+    .join("; ");
+
+  return { code, message: `Unable to retrieve the page (${details}).` };
+}
+
+function failureDescription(result: Exclude<RetrieveResult, { status: "ok" }>): string {
+  if (result.status === "not_modified") {
+    return "the page answered 304 with no body";
+  }
+  if (result.status === "timeout") {
+    return `timed out: ${result.error}`;
+  }
+  return result.error;
 }
 
 /** One fetched page, held only long enough to pick a selector against it. */

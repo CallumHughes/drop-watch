@@ -21,7 +21,7 @@ test("a price drop alerts both channels with the right numbers", async ({
 }) => {
   await test.step("track the product and record the starting price", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.track();
     await productDetail.checkNow();
     await expect(productDetail.currentPrice).toHaveText("£100.00", {

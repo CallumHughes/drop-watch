@@ -12,7 +12,9 @@ const okFetch: FetchPageResult = {
 };
 
 const okExtraction: ExtractionResult = {
+  confidence: "high",
   currency: "GBP",
+  evidence: { candidateCount: 1, type: "jsonld:singleton" },
   ok: true,
   price: "51.77",
   strategy: "jsonld",
@@ -61,7 +63,13 @@ describe("toCheckOutcome", () => {
   });
 
   it("refuses a price with no currency from either the page or the product", () => {
-    const noCurrency: ExtractionResult = { ok: true, price: "12.00", strategy: "selector" };
+    const noCurrency: ExtractionResult = {
+      confidence: "high",
+      evidence: { matchCount: 1, type: "selector:configured" },
+      ok: true,
+      price: "12.00",
+      strategy: "selector",
+    };
     const outcome = toCheckOutcome(okFetch, noCurrency, null);
     expect(outcome.status).toBe("extract_failed");
     expect(outcome.recordPricePoint).toBe(false);

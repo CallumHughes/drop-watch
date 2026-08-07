@@ -1,11 +1,12 @@
 /**
  * HTML for the fake retailer pages the fixture server serves.
  *
- * Three variants, matching the halves of the app's extraction chain:
- * `jsonld` exercises the automatic path (schema.org/Product structured data),
- * `selector` has no structured data at all so only a hand-picked CSS selector
- * (`.price`) can find the price, and `js` injects JSON-LD after the initial
- * document has loaded for the browser-render retry flow.
+ * Five variants cover the automatic preview's transport decisions: `jsonld`
+ * is confident in the HTTP response, `js` only gains JSON-LD after rendering,
+ * and `rendered-selected-sku` starts ambiguous before the rendered DOM marks
+ * one variant as selected. `browser-no-match` starts with the same usable
+ * ambiguity but removes it when rendered, while `selector` exercises the
+ * hand-picked fallback.
  */
 
 export interface FixtureProductState {
@@ -14,7 +15,7 @@ export interface FixtureProductState {
   currency: string;
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
-  template: "js" | "jsonld" | "selector";
+  template: "browser-no-match" | "js" | "jsonld" | "rendered-selected-sku" | "selector";
   title: string;
 }
 
@@ -66,6 +67,67 @@ function jsonLdPage(state: FixtureProductState, url: string): string {
     <h1>${escapeHtml(state.title)}</h1>
     <p>${displayPrice(state)}</p>
   </main>
+</body>
+</html>
+`;
+}
+
+const ALTERNATE_VARIANT_PRICE = "75.00";
+const ALTERNATE_VARIANT_SKU = "blue";
+const DEFAULT_VARIANT_SKU = "red";
+
+function variantJsonLd(state: FixtureProductState, price: string, sku: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: `${state.title} ${sku}`,
+    offers: {
+      "@type": "Offer",
+      availability: `https://schema.org/${state.availability}`,
+      price,
+      priceCurrency: state.currency,
+      sku,
+    },
+    sku,
+  };
+}
+
+/**
+ * Raw HTML deliberately contains two usable prices with no URL evidence, so
+ * HTTP extraction is ambiguous. Rendering either selects the blue SKU or
+ * removes both candidates, exercising browser confirmation and HTTP salvage.
+ */
+function ambiguousVariantPage(
+  state: FixtureProductState,
+  renderedBehavior: "remove" | "select"
+): string {
+  const data = [
+    variantJsonLd(state, state.price, DEFAULT_VARIANT_SKU),
+    variantJsonLd(state, ALTERNATE_VARIANT_PRICE, ALTERNATE_VARIANT_SKU),
+  ];
+  const browserMutation =
+    renderedBehavior === "select"
+      ? `const selected = document.createElement("span");
+    selected.dataset.sku = "${ALTERNATE_VARIANT_SKU}";
+    selected.dataset.skuSelected = "true";
+    document.body.append(selected);`
+      : `for (const candidate of document.querySelectorAll('script[type="application/ld+json"]')) {
+      candidate.remove();
+    }`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <script type="application/ld+json">${JSON.stringify(data)}</script>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+  </main>
+  <script>
+    ${browserMutation}
+  </script>
 </body>
 </html>
 `;
@@ -124,6 +186,12 @@ function selectorPage(state: FixtureProductState): string {
 export function renderProductPage(state: FixtureProductState, url: string): string {
   if (state.template === "jsonld") {
     return jsonLdPage(state, url);
+  }
+  if (state.template === "browser-no-match") {
+    return ambiguousVariantPage(state, "remove");
+  }
+  if (state.template === "rendered-selected-sku") {
+    return ambiguousVariantPage(state, "select");
   }
   return state.template === "js" ? javascriptPage(state, url) : selectorPage(state);
 }

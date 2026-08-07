@@ -20,7 +20,7 @@ test("tracking a second store surfaces two listings, a two-line chart, and the c
 }) => {
   await test.step("track store A and check it", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.track();
     await productDetail.checkNow();
     await expect(productDetail.currentPrice).toHaveText("£100.00", {
@@ -71,7 +71,7 @@ test("a target alert names the cheapest listing, and a pricier store checked aft
 
   await test.step("track store A and add a cheaper store B", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     productId = await addProduct.track();
 
     await secondFixtureProduct.setPrice("90.00");
@@ -122,7 +122,7 @@ test("pausing the cheaper store falls the product's price back to the other", as
   secondFixtureProduct,
 }) => {
   await addProduct.goto();
-  await addProduct.fetchPreview(fixtureProduct.url);
+  await addProduct.loadPreview(fixtureProduct.url);
   await addProduct.track();
   await productDetail.checkNow();
   await expect(productDetail.currentPrice).toHaveText("£100.00", { timeout: CHECK_TIMEOUT_MS });
@@ -147,7 +147,7 @@ test("removing a product's only listing is refused", async ({
   productDetail,
 }) => {
   await addProduct.goto();
-  await addProduct.fetchPreview(fixtureProduct.url);
+  await addProduct.loadPreview(fixtureProduct.url);
   await addProduct.track();
 
   const onlyStore = productDetail.listingRow(fixtureProduct.url);

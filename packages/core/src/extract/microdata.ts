@@ -8,6 +8,7 @@
  */
 
 import { parseAvailability } from "./availability";
+import { urlIdentity } from "./page-url";
 import { parsePrice } from "./price";
 import type { CheerioElement, CheerioSelection, PriceCandidate, StrategyContext } from "./types";
 
@@ -22,6 +23,8 @@ const CURRENCY_SELECTOR = '[itemprop="priceCurrency"], [property="priceCurrency"
 const AVAILABILITY_SELECTOR = '[itemprop="availability"], [property="availability"]';
 const NAME_SELECTOR = '[itemprop="name"], [property="name"]';
 const IMAGE_SELECTOR = '[itemprop="image"], [property="image"]';
+
+type CandidateFields = Omit<PriceCandidate, "confidence" | "evidence">;
 
 /**
  * Microdata puts its machine-readable value in `content` (or `value` on an
@@ -60,7 +63,7 @@ function firstValue(
 function candidateFromScope(
   { $, locale }: StrategyContext,
   root: CheerioSelection
-): PriceCandidate | null {
+): CandidateFields | null {
   const rawPrice = firstValue($, root, PRICE_SELECTOR);
   if (!rawPrice) {
     return null;
@@ -73,7 +76,7 @@ function candidateFromScope(
     return null;
   }
 
-  const candidate: PriceCandidate = { price: parsed.amount };
+  const candidate: CandidateFields = { price: parsed.amount };
   if (parsed.currency) {
     candidate.currency = parsed.currency;
   }
@@ -97,14 +100,76 @@ function candidateFromScope(
   return candidate;
 }
 
-export function extractMicrodata(context: StrategyContext): PriceCandidate | null {
-  const { $ } = context;
-
-  for (const scope of $(SCOPE_SELECTOR).toArray()) {
-    const candidate = candidateFromScope(context, $(scope));
-    if (candidate) {
-      return candidate;
+function priceCount({ $, locale }: StrategyContext, root: CheerioSelection): number {
+  const currency = firstValue($, root, CURRENCY_SELECTOR);
+  let count = 0;
+  for (const element of root.find(PRICE_SELECTOR).addBack(PRICE_SELECTOR).toArray()) {
+    const rawPrice = readValue($, element);
+    if (rawPrice && parsePrice(rawPrice, { currency, locale })) {
+      count += 1;
     }
   }
-  return candidateFromScope(context, $.root());
+  return count;
+}
+
+export function extractMicrodata(context: StrategyContext): PriceCandidate | null {
+  const { $, url } = context;
+  const scopedCandidates: Array<{
+    candidate: CandidateFields;
+    isProduct: boolean;
+    priceCount: number;
+  }> = [];
+
+  for (const scope of $(SCOPE_SELECTOR)
+    .toArray()
+    .filter((element) => $(element).parents(SCOPE_SELECTOR).length === 0)) {
+    const candidate = candidateFromScope(context, $(scope));
+    if (candidate) {
+      const schemaType = `${$(scope).attr("itemtype") ?? ""} ${$(scope).attr("typeof") ?? ""}`;
+      scopedCandidates.push({
+        candidate,
+        isProduct: schemaType.toLowerCase().includes("product"),
+        priceCount: priceCount(context, $(scope)),
+      });
+    }
+  }
+
+  const [winning] = scopedCandidates;
+  if (winning) {
+    let candidateCount = 0;
+    for (const scopedCandidate of scopedCandidates) {
+      candidateCount += scopedCandidate.priceCount;
+    }
+    // A missing or malformed final URL cannot establish that there is no
+    // unresolved variant query, so it stays `undefined` rather than `false`.
+    const pageHasQuery = urlIdentity(url)?.hasQuery;
+    if (candidateCount === 1 && winning.isProduct && pageHasQuery === false) {
+      return {
+        ...winning.candidate,
+        confidence: "high",
+        evidence: { candidateCount, type: "microdata:single-product-price" },
+      };
+    }
+    return {
+      ...winning.candidate,
+      confidence: "low",
+      evidence: {
+        candidateCount,
+        type:
+          candidateCount === 1 && winning.isProduct && pageHasQuery
+            ? "microdata:queried-url"
+            : "microdata:ambiguous",
+      },
+    };
+  }
+
+  const documentCandidate = candidateFromScope(context, $.root());
+  if (!documentCandidate) {
+    return null;
+  }
+  return {
+    ...documentCandidate,
+    confidence: "low",
+    evidence: { candidateCount: 1, type: "microdata:document-price" },
+  };
 }

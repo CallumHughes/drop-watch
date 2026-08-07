@@ -109,9 +109,9 @@ export const appEnv: Record<string, string> = {
   HA_URL: "",
   HA_WEBHOOK_ID: "",
   NEXT_DIST_DIR: ".next-e2e",
-  // The third Playwright web server starts the renderer here. `web` reads it
-  // for capabilities and its API route uses it for browser previews; browser-
-  // mode worker checks connect to it too.
+  // The third Playwright web server starts the renderer here. `web` consults
+  // it when an automatic HTTP preview needs more confidence; browser-mode
+  // worker checks connect to it too.
   RENDER_URL: `http://localhost:${RENDER_PORT}`,
   RESEND_API_KEY: "re-e2e-fixture-key",
   RESEND_BASE_URL: FIXTURE_URL,
