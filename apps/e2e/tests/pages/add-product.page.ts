@@ -13,6 +13,10 @@ export class AddProductPage {
   readonly pickMyselfButton: Locator;
   /** Shown when the automatic chain found nothing and the picker is the next step. */
   readonly noAutoMatchNote: Locator;
+  /** The browser-render retry offered after an HTTP preview finds no price. */
+  readonly retryWithBrowserButton: Locator;
+  /** Provenance displayed when the successful preview came from the renderer sidecar. */
+  readonly browserRenderProvenance: Locator;
   readonly selectorInput: Locator;
   readonly trackButton: Locator;
   readonly page: Page;
@@ -24,6 +28,10 @@ export class AddProductPage {
     this.strategyNote = page.getByText(STRATEGY_NOTE_PATTERN);
     this.pickMyselfButton = page.getByRole("button", { name: "Pick the price myself" });
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
+    this.retryWithBrowserButton = page.getByRole("button", {
+      name: "Try loading it in a browser",
+    });
+    this.browserRenderProvenance = page.getByText("rendered in a browser");
     this.selectorInput = page.getByLabel("CSS selector for the price");
     this.trackButton = page.getByRole("button", { name: "Track this product" });
   }

@@ -13,20 +13,7 @@ import { fileURLToPath } from "node:url";
 
 export const WEB_PORT = 3101;
 export const FIXTURE_PORT = 4100;
-/**
- * Nothing serves here. It exists so `capabilities`
- * (`packages/api/src/routers/capabilities.ts`) sees `RENDER_URL` set and
- * reports a renderer as configured, which is what lets the browser-render
- * checkbox in `ListingSettingsForm` be ticked at all.
- *
- * The worker gets `appEnv` too (`global/setup.ts`), so it really will dial
- * this port once a spec puts a listing in browser mode, and really will record
- * a `renderer_error` check run when the connection is refused. That is the
- * documented degradation rather than a broken fixture — a stray
- * `renderer_error` in the e2e logs is expected, not a lead. Covering an actual
- * render needs a renderer sidecar running as a third `webServer`, pointed
- * here.
- */
+/** The renderer sidecar's e2e port, separate from the production default. */
 export const RENDER_PORT = 4200;
 
 export const BASE_URL = `http://localhost:${WEB_PORT}`;
@@ -122,8 +109,9 @@ export const appEnv: Record<string, string> = {
   HA_URL: "",
   HA_WEBHOOK_ID: "",
   NEXT_DIST_DIR: ".next-e2e",
-  // Nothing serves this — a browser-mode listing records a `renderer_error`.
-  // See the comment on RENDER_PORT.
+  // The third Playwright web server starts the renderer here. `web` reads it
+  // for capabilities and its API route uses it for browser previews; browser-
+  // mode worker checks connect to it too.
   RENDER_URL: `http://localhost:${RENDER_PORT}`,
   RESEND_API_KEY: "re-e2e-fixture-key",
   RESEND_BASE_URL: FIXTURE_URL,

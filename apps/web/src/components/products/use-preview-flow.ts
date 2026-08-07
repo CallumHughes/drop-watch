@@ -1,6 +1,7 @@
 "use client";
 
 import type { PagePreview } from "@drop-watch/api/routers/preview";
+import type { RenderMode } from "@drop-watch/api/schemas/products";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ChangeEvent, FormEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -45,6 +46,9 @@ export function usePreviewFlow() {
       },
       onSuccess: (data) => {
         setPreview(data);
+        // A successful browser retry clears selector state. If its automatic
+        // extraction finds a price, the picker auto-closes below; a selector
+        // from pre-JavaScript markup may not match the rendered document.
         setSelector("");
         setSettledSelector("");
         // Nothing matched automatically, so the selector picker is the next
@@ -66,20 +70,46 @@ export function usePreviewFlow() {
     })
   );
 
+  // Both add flows share this hook, so this is one capability query per
+  // mounted preview flow rather than a separate query in each presentation
+  // component.
+  const capabilities = useQuery(
+    orpc.capabilities.queryOptions({ staleTime: Number.POSITIVE_INFINITY })
+  );
+  const browserRenderAvailable = capabilities.data?.browserRender ?? false;
+
   const onUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setUrl(event.target.value);
+    // A preview belongs to the exact URL that produced it. Dropping it here
+    // prevents browser retry and save actions from combining stale markup
+    // with a newly typed URL.
+    setPreview(null);
   }, []);
   const togglePicker = useCallback(() => {
     setUsingSelector((current) => !current);
   }, []);
-  const onFetch = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setPreview(null);
-      fetchPreview.mutate({ url: url.trim() });
+  const runFetch = useCallback(
+    (render: RenderMode) => {
+      // A fresh HTTP fetch starts a new flow. Browser retry keeps the HTTP
+      // no-match preview available while rendering and if rendering fails, so
+      // the manual selector fallback never disappears.
+      if (render === "http") {
+        setPreview(null);
+      }
+      fetchPreview.mutate({ render, url: url.trim() });
     },
     [fetchPreview, url]
   );
+  const onFetch = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      runFetch("http");
+    },
+    [runFetch]
+  );
+  const onRetryWithBrowser = useCallback(() => {
+    runFetch("browser");
+  }, [runFetch]);
 
   // Whichever half of the flow produced a price is what gets saved. The picker
   // wins when it is open and working, so a page whose JSON-LD quotes the wrong
@@ -89,10 +119,12 @@ export function usePreviewFlow() {
   const savingWithSelector = selectorExtraction !== null;
 
   return {
+    browserRenderAvailable,
     chosen,
     fetchPreview,
     isTesting: trimmedSelector.length > 0 && selectorTest.isFetching,
     onFetch,
+    onRetryWithBrowser,
     onSelectorChange: setSelector,
     onUrlChange,
     preview,
