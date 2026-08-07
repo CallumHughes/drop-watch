@@ -207,17 +207,23 @@ export function createAuth() {
            * one created while the user table is still empty — is the admin;
            * the admin plugin's own before-hook runs first (plugin database
            * hooks precede config ones), so this `role` override wins over its
-           * default. An invited account instead arrives already verified: a
-           * valid token proves the admin addressed that inbox, which is the
-           * user's accepted standard of proof, and its role falls through to
-           * the plugin's default "user".
+           * default. It is also born verified, for the same reason the signup
+           * was allowed at all: reaching an unclaimed install *is* the proof,
+           * and there is nothing else to check it against. Leaving it
+           * unverified locks the admin out the moment they configure a mailer
+           * — `requireEmailVerification` flips on and the one account that can
+           * turn email off is the one that can no longer sign in.
+           *
+           * An invited account arrives verified too: a valid token proves the
+           * admin addressed that inbox, which is the accepted standard of
+           * proof, and its role falls through to the plugin's default "user".
            */
           before: async (userData, ctx) => {
             if (ctx?.path !== SIGN_UP_PATH) {
               return;
             }
             if (await signupOpen()) {
-              return { data: { ...userData, role: "admin" } };
+              return { data: { ...userData, emailVerified: true, role: "admin" } };
             }
             const token = inviteTokenFrom(ctx.body);
             if (token && (await findPendingInvite(token))) {

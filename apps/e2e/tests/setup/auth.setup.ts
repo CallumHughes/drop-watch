@@ -7,25 +7,23 @@ import {
   SINK_WEBHOOK_ID,
 } from "../../constants";
 import { expect, test } from "../fixtures";
-import { type CapturedEmail, extractAuthLink } from "../support/email-sink";
 
 const VERIFY_SUBJECT_PATTERN = /^Verify your .* email address$/;
-const EMAIL_TIMEOUT_MS = 15_000;
 
 /**
  * The storageState producer, and the one test that sees the instance before it
  * has an account.
  *
- * Global setup hands this a completely empty database, so signup is open —
- * and because the suite runs the app email-enabled, signing up requires
- * verification: the account cannot sign in until the link from the captured
- * verification mail has been opened. Walking that whole loop here both covers
- * it and bootstraps the verified admin every other test signs in as. The alert
- * sink and the email channel are configured here too, so the parallel specs
- * that read alert payloads never have to write the singleton settings row
- * themselves.
+ * Global setup hands this a completely empty database, so signup is open. The
+ * suite runs the app email-enabled, which is the configuration that used to
+ * strand this account: `requireEmailVerification` is on, so an unverified
+ * bootstrap admin could never sign in. The admin is born verified instead —
+ * asserted here by landing straight on the dashboard with no mail to open —
+ * and every other test signs in as it. The alert sink and the email channel
+ * are configured here too, so the parallel specs that read alert payloads
+ * never have to write the singleton settings row themselves.
  */
-test("bootstrap: sign up, verify by email, point alerts at the sinks", async ({
+test("bootstrap: sign up as the verified admin, point alerts at the sinks", async ({
   emailSink,
   loginPage,
   page,
@@ -37,28 +35,15 @@ test("bootstrap: sign up, verify by email, point alerts at the sinks", async ({
     await expect(loginPage.signUpSwitch).toBeVisible();
   });
 
-  let verificationMail: CapturedEmail | undefined;
-  await test.step("signing up sends a verification mail, not a session", async () => {
+  await test.step("signing up lands on the dashboard, signed in", async () => {
     await loginPage.signUp(ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD);
-    await expect
-      .poll(
-        async () => {
-          const mails = await emailSink.messagesWithSubject(VERIFY_SUBJECT_PATTERN);
-          verificationMail = mails.find((mail) => mail.to.includes(ADMIN_EMAIL));
-          return verificationMail !== undefined;
-        },
-        { timeout: EMAIL_TIMEOUT_MS }
-      )
-      .toBe(true);
+    await page.waitForURL((url) => url.pathname === "/");
+    await expect(sidebar.userMenuButton).toBeVisible();
   });
 
-  await test.step("opening the link verifies the address and signs in", async () => {
-    if (!verificationMail) {
-      throw new Error("verification mail never captured");
-    }
-    await page.goto(extractAuthLink(verificationMail, "/api/auth/verify-email"));
-    await page.goto("/");
-    await expect(sidebar.userMenuButton).toBeVisible();
+  await test.step("nothing was sent to verify an address already trusted", async () => {
+    const mails = await emailSink.messagesWithSubject(VERIFY_SUBJECT_PATTERN);
+    expect(mails.filter((mail) => mail.to.includes(ADMIN_EMAIL))).toHaveLength(0);
   });
 
   await test.step("configure both alert channels: sink webhook and email", async () => {
