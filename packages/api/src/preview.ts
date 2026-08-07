@@ -14,21 +14,181 @@ import type {
   SelectorMatch,
   SelectorTest,
 } from "@drop-watch/core/extract";
+import type { UrlVerdict } from "@drop-watch/core/net/guard";
+import type { RetrieveResult } from "@drop-watch/core/render";
 import type { RenderMode } from "./schemas/products";
 
+/** A one-off preview may choose a transport; saved listings cannot use `auto`. */
+export const PREVIEW_REQUEST_MODES = ["auto", "browser", "http"] as const;
+export type PreviewRequestMode = (typeof PREVIEW_REQUEST_MODES)[number];
+
+export type PreviewPreflightDecision =
+  | { kind: "allowed" | "check_url" }
+  | {
+      code: "BAD_REQUEST" | "PRECONDITION_FAILED";
+      kind: "rejected";
+      message: string;
+    };
+
 /**
- * Decides which transport a preview should use without reaching into runtime
- * configuration. Keeping this pure makes the missing-renderer branch testable
- * without a sidecar.
+ * Orders preview preconditions without performing DNS or transport work.
+ * Explicit browser configuration wins over URL policy so its existing error
+ * remains stable; every configured mode then requires one common URL check.
  */
+export function decidePreviewPreflight(
+  render: PreviewRequestMode,
+  renderUrl: string | undefined,
+  verdict: UrlVerdict | null
+): PreviewPreflightDecision {
+  if (render === "browser" && !renderUrl) {
+    return {
+      code: "PRECONDITION_FAILED",
+      kind: "rejected",
+      message: "Browser rendering is not configured (RENDER_URL is unset).",
+    };
+  }
+  if (verdict === null) {
+    return { kind: "check_url" };
+  }
+  if (!verdict.ok) {
+    return { code: "BAD_REQUEST", kind: "rejected", message: verdict.reason };
+  }
+  return { kind: "allowed" };
+}
+
+/**
+ * Lists the transports a preview should try without reaching into runtime
+ * configuration. An automatic preview prefers the rendered DOM when a
+ * renderer exists, then falls back to the origin response if extraction fails.
+ */
+export function previewTransports(
+  render: PreviewRequestMode,
+  renderUrl: string | undefined
+): readonly RenderMode[] {
+  if (render === "auto") {
+    return renderUrl ? ["browser", "http"] : ["http"];
+  }
+  if (render === "browser") {
+    return renderUrl ? ["browser"] : [];
+  }
+  return ["http"];
+}
+
+/** The first transport, retaining an explicit unconfigured-browser signal for the UI. */
 export function previewTarget(
-  render: RenderMode,
+  render: PreviewRequestMode,
   renderUrl: string | undefined
 ): "http" | "browser" | "unconfigured" {
-  if (render !== "browser") {
-    return "http";
+  return previewTransports(render, renderUrl)[0] ?? "unconfigured";
+}
+
+export interface PreviewAttempt {
+  extraction: ExtractionResult | null;
+  result: RetrieveResult;
+  transport: RenderMode;
+}
+
+type RetrievedPreviewAttempt = PreviewAttempt & {
+  extraction: ExtractionResult;
+  result: Extract<RetrieveResult, { status: "ok" }>;
+};
+
+export type PreviewOrchestration =
+  | {
+      attempt: RetrievedPreviewAttempt;
+      attempts: readonly PreviewAttempt[];
+      kind: "extracted" | "no_extraction";
+    }
+  | { attempts: readonly PreviewAttempt[]; kind: "failed" };
+
+export interface PreviewOrchestrationOptions {
+  extractPage: (html: string, url: string) => ExtractionResult;
+  render: PreviewRequestMode;
+  renderUrl: string | undefined;
+  retrieve: (transport: RenderMode) => Promise<RetrieveResult>;
+}
+
+/**
+ * Retrieves and extracts a page according to the request mode. Only an auto
+ * request may use more than one transport. A body is still useful when the
+ * extractor misses: selector picking should prefer the browser DOM.
+ */
+export async function orchestratePreview({
+  extractPage,
+  render,
+  renderUrl,
+  retrieve,
+}: PreviewOrchestrationOptions): Promise<PreviewOrchestration> {
+  const attempts: PreviewAttempt[] = [];
+
+  for (const transport of previewTransports(render, renderUrl)) {
+    // biome-ignore lint/performance/noAwaitInLoops: automatic fallback requires the browser result before deciding whether HTTP is needed.
+    const result = await retrieve(transport);
+    const extraction = result.status === "ok" ? extractPage(result.body, result.url) : null;
+    const attempt = { extraction, result, transport };
+    attempts.push(attempt);
+
+    if (result.status === "ok" && extraction?.ok) {
+      const extractedAttempt: RetrievedPreviewAttempt = { extraction, result, transport };
+      return { attempt: extractedAttempt, attempts, kind: "extracted" };
+    }
   }
-  return renderUrl ? "browser" : "unconfigured";
+
+  const browserBody = attempts.find(
+    (previewAttempt): previewAttempt is RetrievedPreviewAttempt =>
+      previewAttempt.transport === "browser" &&
+      previewAttempt.result.status === "ok" &&
+      previewAttempt.extraction !== null
+  );
+  const firstBody = attempts.find(
+    (previewAttempt): previewAttempt is RetrievedPreviewAttempt =>
+      previewAttempt.result.status === "ok" && previewAttempt.extraction !== null
+  );
+  const selectedAttempt = browserBody ?? firstBody;
+
+  if (selectedAttempt) {
+    return { attempt: selectedAttempt, attempts, kind: "no_extraction" };
+  }
+  return { attempts, kind: "failed" };
+}
+
+export interface PreviewFailure {
+  code: "BAD_GATEWAY" | "GATEWAY_TIMEOUT" | "SERVICE_UNAVAILABLE";
+  message: string;
+}
+
+/** Summarizes every failed transport so an automatic fallback is diagnosable. */
+export function previewFailure(attempts: readonly PreviewAttempt[]): PreviewFailure {
+  const failures = attempts.filter(
+    (attempt): attempt is PreviewAttempt & { result: Exclude<RetrieveResult, { status: "ok" }> } =>
+      attempt.result.status !== "ok"
+  );
+  const allRendererFaults = failures.every((attempt) => attempt.result.status === "renderer_error");
+  const allTimeouts = failures.every((attempt) => attempt.result.status === "timeout");
+  let code: PreviewFailure["code"] = "BAD_GATEWAY";
+  if (allRendererFaults) {
+    code = "SERVICE_UNAVAILABLE";
+  } else if (allTimeouts) {
+    code = "GATEWAY_TIMEOUT";
+  }
+  const details = failures
+    .map((attempt) => `${attempt.transport}: ${failureDescription(attempt.result)}`)
+    .join("; ");
+
+  return {
+    code,
+    message: `Unable to retrieve the page (${details || "no transport was available"}).`,
+  };
+}
+
+function failureDescription(result: Exclude<RetrieveResult, { status: "ok" }>): string {
+  if (result.status === "not_modified") {
+    return "the page answered 304 with no body";
+  }
+  if (result.status === "timeout") {
+    return `timed out: ${result.error}`;
+  }
+  return result.error;
 }
 
 /** One fetched page, held only long enough to pick a selector against it. */

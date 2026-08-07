@@ -180,6 +180,221 @@ describe("extract — JSON-LD", () => {
 
     expect(extract(html)).toMatchObject({ currency: "EUR", price: "1234.56" });
   });
+
+  it("uses an unambiguous selected SKU to choose a later ProductGroup variant", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          image: "https://images.example.com/cover.jpg",
+          name: "Earlier accessory",
+          offers: { price: "99.00", priceCurrency: "GBP", sku: "accessory-1" },
+        },
+        {
+          "@type": "ProductGroup",
+          hasVariant: [
+            {
+              "@type": "Product",
+              image: "https://images.example.com/114250751.jpg",
+              name: "Laptop, 8 GB",
+              offers: { price: "399.00", priceCurrency: "GBP", sku: "114250751" },
+            },
+            {
+              "@type": "Product",
+              image: "https://images.example.com/114250752.jpg",
+              name: "Laptop, 16 GB",
+              offers: {
+                availability: "https://schema.org/InStock",
+                price: "499.00",
+                priceCurrency: "GBP",
+                sku: 114_250_752,
+              },
+            },
+          ],
+        },
+      ]),
+      '<button data-sku="114250752" data-sku-selected="true">16 GB</button>'
+    );
+
+    expect(extract(html)).toMatchObject({
+      currency: "GBP",
+      imageUrl: "https://images.example.com/114250752.jpg",
+      inStock: true,
+      price: "499.00",
+      strategy: "jsonld",
+      title: "Laptop, 16 GB",
+    });
+  });
+
+  it("uses the owning Product SKU when its Offer has no SKU", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Red",
+          offers: { price: "99.00", priceCurrency: "GBP" },
+          sku: "red",
+        },
+        {
+          "@type": "Product",
+          name: "Blue",
+          offers: { price: "499.00", priceCurrency: "GBP" },
+          sku: "blue",
+        },
+      ]),
+      '<button data-sku="blue" data-sku-selected="true">Blue</button>'
+    );
+
+    expect(extract(html)).toMatchObject({ price: "499.00", title: "Blue" });
+  });
+
+  it("uses an exact variant query URL before an earlier pathname match", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Blue",
+          offers: {
+            price: "499.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?variant=blue",
+          },
+        },
+        {
+          "@type": "Product",
+          name: "Red",
+          offers: {
+            price: "99.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?variant=red#details",
+          },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?variant=red" })).toMatchObject({
+      price: "99.00",
+      title: "Red",
+    });
+  });
+
+  it("uses a matching Offer URL path before earlier Products", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Red widget",
+          offers: {
+            price: "99.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget/red",
+          },
+        },
+        {
+          "@type": "Product",
+          name: "Blue widget",
+          offers: {
+            price: "499.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget/blue?variant=blue#details",
+          },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget/blue?source=ad" })).toMatchObject({
+      price: "499.00",
+      title: "Blue widget",
+    });
+  });
+
+  it("uses a matching Product URL path when its Offer has no URL", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Earlier widget",
+          offers: { price: "99.00", priceCurrency: "GBP" },
+          url: "https://shop.example.com/widget/earlier",
+        },
+        {
+          "@type": "Product",
+          name: "Current widget",
+          offers: { price: "499.00", priceCurrency: "GBP" },
+          url: "https://shop.example.com/widget/current?colour=blue",
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget/current#reviews" })).toMatchObject(
+      {
+        price: "499.00",
+        title: "Current widget",
+      }
+    );
+  });
+
+  it("ignores conflicting selected-SKU hints and keeps legacy document order", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "First variant",
+          offers: { price: "99.00", priceCurrency: "GBP", sku: "red" },
+        },
+        {
+          "@type": "Product",
+          name: "Second variant",
+          offers: { price: "499.00", priceCurrency: "GBP", sku: "blue" },
+        },
+      ]),
+      '<button data-sku="red" data-sku-selected="true"></button><button data-sku="blue" data-sku-selected="true"></button>'
+    );
+
+    expect(extract(html)).toMatchObject({ price: "99.00", title: "First variant" });
+  });
+
+  it("ignores malformed and relative JSON-LD URLs", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "First variant",
+          offers: { price: "99.00", priceCurrency: "GBP", url: "/widget/current" },
+        },
+        {
+          "@type": "Product",
+          name: "Second variant",
+          offers: { price: "499.00", priceCurrency: "GBP", url: "not a valid URL" },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget/current" })).toMatchObject({
+      price: "99.00",
+      title: "First variant",
+    });
+  });
+
+  it("keeps product-first, document-order behaviour when no selection hint exists", () => {
+    const html = page(
+      ldScript([
+        { "@type": "ItemList", offers: { price: "1.00", priceCurrency: "GBP" } },
+        {
+          "@type": "Product",
+          name: "First product",
+          offers: { price: "99.00", priceCurrency: "GBP" },
+        },
+        {
+          "@type": "Product",
+          name: "Later product",
+          offers: { price: "499.00", priceCurrency: "GBP" },
+        },
+      ])
+    );
+
+    expect(extract(html)).toMatchObject({ price: "99.00", title: "First product" });
+  });
 });
 
 describe("extract — microdata", () => {

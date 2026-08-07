@@ -18,7 +18,7 @@ test("check now records a price point and shows it", async ({
 }) => {
   await test.step("track the product", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.track();
   });
 

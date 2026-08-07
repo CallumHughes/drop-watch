@@ -150,9 +150,9 @@ changed in the UI takes effect on the next check without restarting anything.
   fetch layer is deliberately polite — a realistic user agent and conditional
   requests, but no escalation beyond that. If a shop is determined to block
   scripted access, DropWatch will not fight it.
-- **One `web` replica.** The add-product preview caches the fetched page in
-  memory per process, so behind a load balancer the selector picker would test
-  against a page a different replica holds.
+- **One `web` replica.** The add-product preview caches its result in memory
+  per process, so behind a load balancer the selector picker would test against
+  a page a different replica holds.
 - **Check history grows without bound.** `check_runs` records every attempt and
   nothing prunes it yet.
 - **Prices render in `en-GB` formatting.** The currency follows the shop; the

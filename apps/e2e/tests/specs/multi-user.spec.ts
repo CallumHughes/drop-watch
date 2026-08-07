@@ -27,7 +27,7 @@ test("another user's product id is indistinguishable from a missing one", async 
 
   await test.step("the admin tracks a product", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     productId = await addProduct.track();
   });
 
@@ -44,7 +44,7 @@ test("two accounts can track the same URL without conflict", async ({
 }) => {
   await test.step("the admin tracks the URL", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.track();
   });
 
@@ -52,7 +52,7 @@ test("two accounts can track the same URL without conflict", async ({
     // Uniqueness is per-(account, url) now: what CONFLICTs for the same
     // account (product-add.spec.ts) goes through cleanly for another.
     await secondUser.addProduct.goto();
-    await secondUser.addProduct.fetchPreview(fixtureProduct.url);
+    await secondUser.addProduct.loadPreview(fixtureProduct.url);
     await secondUser.addProduct.track();
   });
 });
@@ -73,7 +73,7 @@ test("a plain user's price drop mails only them and skips the webhook", async ({
     // Their own fixture page, not the shared-URL scenario above: the alert
     // must be attributable to exactly one owner for the isolation claim.
     await secondUser.addProduct.goto();
-    await secondUser.addProduct.fetchPreview(secondFixtureProduct.url);
+    await secondUser.addProduct.loadPreview(secondFixtureProduct.url);
     await secondUser.addProduct.track();
     await secondUser.productDetail.checkNow();
     await expect(secondUser.productDetail.currentPrice).toHaveText("£100.00", {

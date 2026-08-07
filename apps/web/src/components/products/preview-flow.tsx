@@ -37,10 +37,7 @@ export function Field({
 
 /** What the chain found, plus the manual override when one is being worked on. */
 function PreviewPanel({
-  browserRenderAvailable,
   isTesting,
-  isRendering,
-  onRetryWithBrowser,
   onSelectorChange,
   onTogglePicker,
   preview,
@@ -48,10 +45,7 @@ function PreviewPanel({
   test,
   usingSelector,
 }: {
-  browserRenderAvailable: boolean;
   isTesting: boolean;
-  isRendering: boolean;
-  onRetryWithBrowser: () => void;
   onSelectorChange: (selector: string) => void;
   onTogglePicker: () => void;
   preview: PagePreview;
@@ -59,11 +53,6 @@ function PreviewPanel({
   test: SelectorPreview | undefined;
   usingSelector: boolean;
 }) {
-  // An unavailable browser button in this failure state would be noise: the
-  // manual selector remains available below and the person who can configure
-  // RENDER_URL is not necessarily the person trying to add this product.
-  const showBrowserRetry = browserRenderAvailable && preview.render === "http";
-
   return (
     <Card>
       <CardHeader>
@@ -86,25 +75,10 @@ function PreviewPanel({
             </div>
           </>
         ) : (
-          <>
-            <p className="text-sm">
-              Nothing matched automatically: {preview.extractionError}. Pick the price element
-              yourself below.
-            </p>
-            {showBrowserRetry ? (
-              <div>
-                <Button
-                  disabled={isRendering}
-                  onClick={onRetryWithBrowser}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {isRendering ? "Rendering…" : "Try loading it in a browser"}
-                </Button>
-              </div>
-            ) : null}
-          </>
+          <p className="text-sm">
+            Nothing matched automatically: {preview.extractionError}. Pick the price element
+            yourself below.
+          </p>
         )}
 
         {usingSelector ? (
@@ -124,24 +98,19 @@ function PreviewPanel({
 
 /**
  * The URL-to-preview half of add-product and add-listing: paste a URL, fetch
- * it once, then show what the extraction chain (or a hand-picked selector)
- * made of it. The caller renders its own save step below this, reading
+ * it, then show what the extraction chain (or a hand-picked selector) made of
+ * it. The caller renders its own save step below this, reading
  * `flow.chosen`/`flow.preview` once a price is on the screen.
  */
 export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
   const urlId = useId();
-  const isRendering =
-    flow.fetchPreview.isPending && flow.fetchPreview.variables?.render === "browser";
-  let fetchButtonLabel = "Fetch preview";
-  if (flow.fetchPreview.isPending) {
-    fetchButtonLabel = isRendering ? "Rendering…" : "Fetching…";
-  }
+  const fetchButtonLabel = flow.fetchPreview.isPending ? "Loading…" : "Load preview";
 
   return (
     <>
       <form className="flex flex-col gap-2" onSubmit={flow.onFetch}>
         <Field
-          hint="The page is fetched once. Everything after that runs against that copy."
+          hint="We’ll look for the most reliable price we can find on this page."
           htmlFor={urlId}
           label="Product URL"
         >
@@ -165,10 +134,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
 
       {flow.preview ? (
         <PreviewPanel
-          browserRenderAvailable={flow.browserRenderAvailable}
-          isRendering={isRendering}
           isTesting={flow.isTesting}
-          onRetryWithBrowser={flow.onRetryWithBrowser}
           onSelectorChange={flow.onSelectorChange}
           onTogglePicker={flow.togglePicker}
           preview={flow.preview}

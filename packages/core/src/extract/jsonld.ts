@@ -128,41 +128,42 @@ function currencyFrom(offer: JsonRecord): string | undefined {
   }
 }
 
-function candidateFromNode(node: JsonRecord, locale: string | undefined): PriceCandidate | null {
-  for (const offer of offerCandidates(node)) {
-    const rawPrice = priceFrom(offer);
-    if (rawPrice === undefined) {
-      continue;
-    }
-    const parsed = parsePrice(rawPrice, { currency: currencyFrom(offer), locale });
-    if (!parsed) {
-      continue;
-    }
-
-    const availability = parseAvailability(
-      firstString(offer.availability) ?? firstString(offer.itemAvailability)
-    );
-    const candidate: PriceCandidate = { price: parsed.amount };
-    if (parsed.currency) {
-      candidate.currency = parsed.currency;
-    }
-    if (availability) {
-      candidate.availability = availability.availability;
-      if (availability.inStock !== undefined) {
-        candidate.inStock = availability.inStock;
-      }
-    }
-    const title = firstString(node.name);
-    if (title) {
-      candidate.title = title;
-    }
-    const imageUrl = firstString(node.image);
-    if (imageUrl) {
-      candidate.imageUrl = imageUrl;
-    }
-    return candidate;
+function candidateFromOffer(
+  product: JsonRecord,
+  offer: JsonRecord,
+  locale: string | undefined
+): PriceCandidate | null {
+  const rawPrice = priceFrom(offer);
+  if (rawPrice === undefined) {
+    return null;
   }
-  return null;
+  const parsed = parsePrice(rawPrice, { currency: currencyFrom(offer), locale });
+  if (!parsed) {
+    return null;
+  }
+
+  const availability = parseAvailability(
+    firstString(offer.availability) ?? firstString(offer.itemAvailability)
+  );
+  const candidate: PriceCandidate = { price: parsed.amount };
+  if (parsed.currency) {
+    candidate.currency = parsed.currency;
+  }
+  if (availability) {
+    candidate.availability = availability.availability;
+    if (availability.inStock !== undefined) {
+      candidate.inStock = availability.inStock;
+    }
+  }
+  const title = firstString(product.name);
+  if (title) {
+    candidate.title = title;
+  }
+  const imageUrl = firstString(product.image);
+  if (imageUrl) {
+    candidate.imageUrl = imageUrl;
+  }
+  return candidate;
 }
 
 /** Products first; anything else carrying an `offers` block is the fallback. */
@@ -182,7 +183,115 @@ function rankNodes(nodes: JsonRecord[]): JsonRecord[] {
   return [...products, ...others];
 }
 
-export function extractJsonLd({ $, locale }: StrategyContext): PriceCandidate | null {
+function skuFrom(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const sku = value.trim();
+    return sku.length > 0 ? sku : undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+}
+
+/** A SKU hint is trustworthy only when every selected control points to one SKU. */
+function selectedSku($: StrategyContext["$"]): string | undefined {
+  const skus = new Set<string>();
+  for (const element of $('[data-sku-selected="true"][data-sku]').toArray()) {
+    const sku = skuFrom($(element).attr("data-sku"));
+    if (sku) {
+      skus.add(sku);
+    }
+  }
+  return skus.size === 1 ? skus.values().next().value : undefined;
+}
+
+interface UrlIdentity {
+  full: string;
+  originPathname: string;
+}
+
+/** Hashes do not identify variants; sorted query parameters still do. */
+function urlIdentity(value: unknown): UrlIdentity | undefined {
+  if (typeof value !== "string") {
+    return;
+  }
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.searchParams.sort();
+    const originPathname = `${url.origin}${url.pathname}`;
+    return { full: `${originPathname}${url.search}`, originPathname };
+  } catch {
+    // Only absolute, well-formed URLs have an origin to compare.
+  }
+}
+
+type UrlMatch = "exact" | "origin-pathname" | null;
+
+function pageUrlMatch(
+  product: JsonRecord,
+  offer: JsonRecord,
+  pageUrl: UrlIdentity | undefined
+): UrlMatch {
+  if (!pageUrl) {
+    return null;
+  }
+
+  let originPathnameMatches = false;
+  for (const value of [product.url, offer.url]) {
+    const candidateUrl = urlIdentity(value);
+    if (candidateUrl?.full === pageUrl.full) {
+      return "exact";
+    }
+    if (candidateUrl?.originPathname === pageUrl.originPathname) {
+      originPathnameMatches = true;
+    }
+  }
+  return originPathnameMatches ? "origin-pathname" : null;
+}
+
+interface OfferWithProduct {
+  offer: JsonRecord;
+  product: JsonRecord;
+}
+
+/**
+ * Ranking is global because a selected variant can live after an earlier Product
+ * node. Each bucket preserves the existing product-first/document order.
+ */
+function rankOffers(
+  nodes: JsonRecord[],
+  selected: string | undefined,
+  pageUrl: UrlIdentity | undefined
+): OfferWithProduct[] {
+  const selectedSkuMatches: OfferWithProduct[] = [];
+  const exactUrlMatches: OfferWithProduct[] = [];
+  const originPathnameMatches: OfferWithProduct[] = [];
+  const remaining: OfferWithProduct[] = [];
+
+  for (const product of rankNodes(nodes)) {
+    for (const offer of offerCandidates(product)) {
+      const candidate = { offer, product };
+      const offerSku = skuFrom(offer.sku);
+      const selectedSkuMatchesOffer =
+        selected !== undefined &&
+        (offerSku === selected || (offerSku === undefined && skuFrom(product.sku) === selected));
+      const urlMatch = pageUrlMatch(product, offer, pageUrl);
+      if (selectedSkuMatchesOffer) {
+        selectedSkuMatches.push(candidate);
+      } else if (urlMatch === "exact") {
+        exactUrlMatches.push(candidate);
+      } else if (urlMatch === "origin-pathname") {
+        originPathnameMatches.push(candidate);
+      } else {
+        remaining.push(candidate);
+      }
+    }
+  }
+  return [...selectedSkuMatches, ...exactUrlMatches, ...originPathnameMatches, ...remaining];
+}
+
+export function extractJsonLd({ $, locale, url }: StrategyContext): PriceCandidate | null {
   const nodes: JsonRecord[] = [];
   for (const element of $('script[type="application/ld+json"]').toArray()) {
     const parsed = parseScript($(element).text());
@@ -191,8 +300,9 @@ export function extractJsonLd({ $, locale }: StrategyContext): PriceCandidate | 
     }
   }
 
-  for (const node of rankNodes(nodes)) {
-    const candidate = candidateFromNode(node, locale);
+  const currentPageUrl = urlIdentity(url);
+  for (const { product, offer } of rankOffers(nodes, selectedSku($), currentPageUrl)) {
+    const candidate = candidateFromOffer(product, offer, locale);
     if (candidate) {
       return candidate;
     }

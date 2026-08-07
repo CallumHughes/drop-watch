@@ -87,7 +87,7 @@ export class ProductDetailPage {
     await this.addStoreTrigger.click();
     const dialog = this.page.getByRole("dialog");
     await dialog.getByLabel("Product URL").fill(url);
-    await dialog.getByRole("button", { name: "Fetch preview" }).click();
+    await dialog.getByRole("button", { name: "Load preview" }).click();
     await dialog.getByRole("button", { exact: true, name: "Add store" }).click();
   }
 

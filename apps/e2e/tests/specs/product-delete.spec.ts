@@ -7,7 +7,7 @@ test("deleting a product removes it from the dashboard", async ({
   productDetail,
 }) => {
   await addProduct.goto();
-  await addProduct.fetchPreview(fixtureProduct.url);
+  await addProduct.loadPreview(fixtureProduct.url);
   const productId = await addProduct.track();
 
   await productDetail.deleteProduct();
@@ -28,7 +28,7 @@ test("cancelling the confirm leaves the product alone", async ({
   productDetail,
 }) => {
   await addProduct.goto();
-  await addProduct.fetchPreview(fixtureProduct.url);
+  await addProduct.loadPreview(fixtureProduct.url);
   const productId = await addProduct.track();
 
   await productDetail.deleteProductButton.click();

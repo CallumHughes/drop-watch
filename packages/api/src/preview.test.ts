@@ -1,6 +1,16 @@
+import type { RetrieveResult } from "@drop-watch/core/render";
 import { describe, expect, it } from "vitest";
 
-import { PreviewCache, type PreviewEntry, previewTarget, toPreviewExtraction } from "./preview";
+import {
+  decidePreviewPreflight,
+  orchestratePreview,
+  PreviewCache,
+  type PreviewEntry,
+  previewFailure,
+  previewTarget,
+  previewTransports,
+  toPreviewExtraction,
+} from "./preview";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
@@ -12,10 +22,60 @@ function entry(url: string, storedAt = NOW): PreviewEntry {
   return { html: `<html lang="en">${url}</html>`, storedAt, url };
 }
 
-describe("previewTarget", () => {
-  it("uses http for the default mode regardless of renderer configuration", () => {
-    expect(previewTarget("http", undefined)).toBe("http");
-    expect(previewTarget("http", "http://renderer:3002")).toBe("http");
+function fetched(body: string): RetrieveResult {
+  return {
+    body,
+    durationMs: 10,
+    httpStatus: 200,
+    status: "ok",
+    url: "https://example.com/product",
+  };
+}
+
+describe("decidePreviewPreflight", () => {
+  it("rejects a denied automatic URL as a bad request before transport selection", () => {
+    expect(
+      decidePreviewPreflight("auto", "http://renderer:3002", {
+        ok: false,
+        reason: "example.test resolves to 127.0.0.1, which is not public",
+      })
+    ).toEqual({
+      code: "BAD_REQUEST",
+      kind: "rejected",
+      message: "example.test resolves to 127.0.0.1, which is not public",
+    });
+  });
+
+  it("preserves explicit unconfigured-browser priority over URL policy denial", () => {
+    expect(
+      decidePreviewPreflight("browser", undefined, {
+        ok: false,
+        reason: "not public",
+      })
+    ).toEqual({
+      code: "PRECONDITION_FAILED",
+      kind: "rejected",
+      message: "Browser rendering is not configured (RENDER_URL is unset).",
+    });
+  });
+
+  it("requires the common URL check for every configured request mode", () => {
+    expect(decidePreviewPreflight("auto", undefined, null)).toEqual({ kind: "check_url" });
+    expect(decidePreviewPreflight("http", undefined, null)).toEqual({ kind: "check_url" });
+    expect(decidePreviewPreflight("browser", "http://renderer:3002", null)).toEqual({
+      kind: "check_url",
+    });
+  });
+});
+
+describe("preview transports", () => {
+  it("uses HTTP once for automatic previews without a renderer", () => {
+    expect(previewTransports("auto", undefined)).toEqual(["http"]);
+    expect(previewTarget("auto", undefined)).toBe("http");
+  });
+
+  it("tries browser then HTTP for automatic previews with a renderer", () => {
+    expect(previewTransports("auto", "http://renderer:3002")).toEqual(["browser", "http"]);
   });
 
   it("uses the browser when browser mode has a renderer", () => {
@@ -24,6 +84,170 @@ describe("previewTarget", () => {
 
   it("marks browser mode unconfigured without a renderer", () => {
     expect(previewTarget("browser", undefined)).toBe("unconfigured");
+  });
+});
+
+describe("orchestratePreview", () => {
+  it("keeps a successful browser extraction without fetching HTTP", async () => {
+    const transports: string[] = [];
+    const outcome = await orchestratePreview({
+      extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: (transport) => {
+        transports.push(transport);
+        return Promise.resolve(fetched("<browser />"));
+      },
+    });
+
+    expect(outcome.kind).toBe("extracted");
+    expect(transports).toEqual(["browser"]);
+    if (outcome.kind !== "failed") {
+      expect(outcome.attempt.transport).toBe("browser");
+    }
+  });
+
+  it("falls back from a failed browser retrieval to an HTTP extraction", async () => {
+    const transports: string[] = [];
+    const outcome = await orchestratePreview({
+      extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: (transport) => {
+        transports.push(transport);
+        if (transport === "browser") {
+          return Promise.resolve({
+            durationMs: 5,
+            error: "renderer unavailable",
+            status: "renderer_error" as const,
+          });
+        }
+        return Promise.resolve(fetched("<http />"));
+      },
+    });
+
+    expect(outcome.kind).toBe("extracted");
+    expect(transports).toEqual(["browser", "http"]);
+    if (outcome.kind !== "failed") {
+      expect(outcome.attempt.transport).toBe("http");
+    }
+  });
+
+  it("falls back when the browser body has no automatic extraction", async () => {
+    const outcome = await orchestratePreview({
+      extractPage: (html) =>
+        html === "<http />"
+          ? { ok: true, price: "12.99", strategy: "jsonld" }
+          : { error: "no price found", ok: false },
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: (transport) =>
+        Promise.resolve(fetched(transport === "browser" ? "<browser />" : "<http />")),
+    });
+
+    expect(outcome.kind).toBe("extracted");
+    if (outcome.kind !== "failed") {
+      expect(outcome.attempt.transport).toBe("http");
+    }
+  });
+
+  it("keeps the browser DOM when neither body has an automatic extraction", async () => {
+    const transports: string[] = [];
+    const outcome = await orchestratePreview({
+      extractPage: () => ({ error: "no price found", ok: false }),
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: (transport) => {
+        transports.push(transport);
+        return Promise.resolve(fetched(transport === "browser" ? "<rendered />" : "<origin />"));
+      },
+    });
+
+    expect(outcome.kind).toBe("no_extraction");
+    expect(transports).toEqual(["browser", "http"]);
+    if (outcome.kind !== "failed") {
+      expect(outcome.attempt.result.body).toBe("<rendered />");
+      expect(outcome.attempt.transport).toBe("browser");
+    }
+  });
+
+  it("does not require a renderer for automatic HTTP previews", async () => {
+    const transports: string[] = [];
+    await orchestratePreview({
+      extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+      render: "auto",
+      renderUrl: undefined,
+      retrieve: (transport) => {
+        transports.push(transport);
+        return Promise.resolve(fetched("<origin />"));
+      },
+    });
+
+    expect(transports).toEqual(["http"]);
+  });
+
+  it("does not attempt an unconfigured explicit browser preview", async () => {
+    const transports: string[] = [];
+    const outcome = await orchestratePreview({
+      extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+      render: "browser",
+      renderUrl: undefined,
+      retrieve: (transport) => {
+        transports.push(transport);
+        return Promise.resolve(fetched("<page />"));
+      },
+    });
+
+    expect(outcome.kind).toBe("failed");
+    expect(transports).toEqual([]);
+  });
+
+  it.each(["browser", "http"] as const)(
+    "uses exactly the explicitly requested %s transport",
+    async (render) => {
+      const transports: string[] = [];
+      await orchestratePreview({
+        extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+        render,
+        renderUrl: "http://renderer:3002",
+        retrieve: (transport) => {
+          transports.push(transport);
+          return Promise.resolve(fetched("<page />"));
+        },
+      });
+      expect(transports).toEqual([render]);
+    }
+  );
+
+  it("returns a combined, useful failure when no transport retrieves a body", async () => {
+    const outcome = await orchestratePreview({
+      extractPage: () => ({ ok: true, price: "12.99", strategy: "jsonld" }),
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: (transport) => {
+        if (transport === "browser") {
+          return Promise.resolve({
+            durationMs: 5,
+            error: "renderer unavailable",
+            status: "renderer_error" as const,
+          });
+        }
+        return Promise.resolve({
+          durationMs: 10,
+          error: "origin unreachable",
+          status: "network_error" as const,
+        });
+      },
+    });
+
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed") {
+      expect(previewFailure(outcome.attempts)).toEqual({
+        code: "BAD_GATEWAY",
+        message:
+          "Unable to retrieve the page (browser: renderer unavailable; http: origin unreachable).",
+      });
+    }
   });
 });
 

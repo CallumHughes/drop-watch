@@ -121,6 +121,9 @@ function buildContext(html: string, options: ExtractOptions): StrategyContext {
   if (options.selector !== undefined) {
     context.selector = options.selector;
   }
+  if (options.url !== undefined) {
+    context.url = options.url;
+  }
   return context;
 }
 

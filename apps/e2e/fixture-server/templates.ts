@@ -1,11 +1,12 @@
 /**
  * HTML for the fake retailer pages the fixture server serves.
  *
- * Three variants, matching the halves of the app's extraction chain:
+ * Four variants, matching the halves of the app's extraction chain:
  * `jsonld` exercises the automatic path (schema.org/Product structured data),
  * `selector` has no structured data at all so only a hand-picked CSS selector
  * (`.price`) can find the price, and `js` injects JSON-LD after the initial
- * document has loaded for the browser-render retry flow.
+ * document has loaded for the browser-first automatic preview. `browser-no-match`
+ * does the inverse: HTTP sees JSON-LD that the rendered DOM removes.
  */
 
 export interface FixtureProductState {
@@ -14,7 +15,7 @@ export interface FixtureProductState {
   currency: string;
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
-  template: "js" | "jsonld" | "selector";
+  template: "browser-no-match" | "js" | "jsonld" | "selector";
   title: string;
 }
 
@@ -52,14 +53,18 @@ function productJsonLd(state: FixtureProductState, url: string) {
   };
 }
 
-function jsonLdPage(state: FixtureProductState, url: string): string {
+function jsonLdPage(state: FixtureProductState, url: string, removeWhenRendered = false): string {
   const data = productJsonLd(state, url);
+  const removalScript = removeWhenRendered
+    ? `<script>document.querySelector('script[type="application/ld+json"]')?.remove();</script>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(state.title)}</title>
   <script type="application/ld+json">${JSON.stringify(data)}</script>
+  ${removalScript}
 </head>
 <body>
   <main>
@@ -124,6 +129,9 @@ function selectorPage(state: FixtureProductState): string {
 export function renderProductPage(state: FixtureProductState, url: string): string {
   if (state.template === "jsonld") {
     return jsonLdPage(state, url);
+  }
+  if (state.template === "browser-no-match") {
+    return jsonLdPage(state, url, true);
   }
   return state.template === "js" ? javascriptPage(state, url) : selectorPage(state);
 }

@@ -12,25 +12,25 @@ test("the browser-render toggle survives a save and a reload", async ({
   productDetail,
 }) => {
   await addProduct.goto();
-  await addProduct.fetchPreview(fixtureProduct.url);
+  await addProduct.loadPreview(fixtureProduct.url);
   await addProduct.track();
 
   const listing = productDetail.listingRow(fixtureProduct.url);
 
-  await test.step("tick the box and save", async () => {
+  await test.step("untick the browser-first result and save", async () => {
     await listing.edit();
     const settings = listing.settings();
     await expect(settings.browserRenderCheckbox).toBeEnabled();
-    await expect(settings.browserRenderCheckbox).not.toBeChecked();
+    await expect(settings.browserRenderCheckbox).toBeChecked();
 
-    await settings.browserRenderCheckbox.check();
+    await settings.browserRenderCheckbox.uncheck();
     await settings.saveButton.click();
     await expect(productDetail.page.getByText("Listing settings saved.")).toBeVisible();
   });
 
-  await test.step("it is still ticked after a reload", async () => {
+  await test.step("it stays unticked after a reload", async () => {
     await productDetail.page.reload();
     await listing.edit();
-    await expect(listing.settings().browserRenderCheckbox).toBeChecked();
+    await expect(listing.settings().browserRenderCheckbox).not.toBeChecked();
   });
 });

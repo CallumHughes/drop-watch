@@ -44,6 +44,8 @@ export interface StrategyContext {
   locale?: string;
   /** CSS selector for the `selector` strategy; that strategy is skipped without one. */
   selector?: string;
+  /** Final fetched page URL, used to identify the currently selected JSON-LD variant. */
+  url?: string;
 }
 
 export type Strategy = (context: StrategyContext) => PriceCandidate | null;

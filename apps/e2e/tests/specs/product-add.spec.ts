@@ -9,7 +9,7 @@ test("tracks a product found by the automatic JSON-LD extraction", async ({
 }) => {
   await test.step("the preview extracts title and price from the page", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await expect(addProduct.strategyNote).toContainText("schema.org JSON-LD");
   });
 
@@ -31,7 +31,7 @@ test("tracks a structured-data-free page with a hand-picked selector", async ({
 
   await test.step("the automatic chain finds nothing and offers the picker", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await expect(addProduct.noAutoMatchNote).toBeVisible();
   });
 
@@ -48,13 +48,13 @@ test("tracks a structured-data-free page with a hand-picked selector", async ({
 test("the same URL cannot be tracked twice", async ({ addProduct, fixtureProduct }) => {
   await test.step("track it once", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.track();
   });
 
   await test.step("a second attempt is rejected", async () => {
     await addProduct.goto();
-    await addProduct.fetchPreview(fixtureProduct.url);
+    await addProduct.loadPreview(fixtureProduct.url);
     await addProduct.trackButton.click();
     await expect(addProduct.page.getByText(ALREADY_TRACKED_PATTERN)).toBeVisible();
   });
