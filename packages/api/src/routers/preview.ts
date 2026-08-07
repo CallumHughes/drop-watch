@@ -168,16 +168,23 @@ export const previewRouter = {
         retrieve: async (transport) => await retrievePreview(input.url, transport, env.RENDER_URL),
       });
       const attemptLog = outcome.attempts.map((attempt) => ({
+        confidence: attempt.extraction?.ok ? attempt.extraction.confidence : null,
         durationMs: attempt.result.durationMs,
+        evidence: attempt.extraction?.ok ? attempt.extraction.evidence : null,
         extraction: attempt.extraction?.ok ?? null,
         status: attempt.result.status,
         transport: attempt.transport,
       }));
-      const fallback = outcome.attempts.length > 1;
+      const fallback = outcome.fallbackReason !== null;
 
       if (outcome.kind === "failed") {
         const failure = previewFailure(outcome.attempts);
-        log.set({ attempts: attemptLog, fallback, winner: null });
+        log.set({
+          attempts: attemptLog,
+          fallback,
+          fallbackReason: outcome.fallbackReason,
+          winner: null,
+        });
         log.warn("preview fetch failed");
         log.emit();
         throw new ORPCError(failure.code, { message: failure.message });
@@ -194,8 +201,11 @@ export const previewRouter = {
 
       log.set({
         attempts: attemptLog,
+        confidence: result.ok ? result.confidence : null,
         durationMs: fetched.durationMs,
+        evidence: result.ok ? result.evidence : null,
         fallback,
+        fallbackReason: outcome.fallbackReason,
         fetchStatus: fetched.status,
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,

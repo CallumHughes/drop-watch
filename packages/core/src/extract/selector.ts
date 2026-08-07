@@ -40,8 +40,17 @@ export function extractBySelector({ $, locale, selector }: StrategyContext): Pri
       continue;
     }
     return parsed.currency
-      ? { currency: parsed.currency, price: parsed.amount }
-      : { price: parsed.amount };
+      ? {
+          confidence: "high",
+          currency: parsed.currency,
+          evidence: { matchCount: matched.length, type: "selector:configured" },
+          price: parsed.amount,
+        }
+      : {
+          confidence: "high",
+          evidence: { matchCount: matched.length, type: "selector:configured" },
+          price: parsed.amount,
+        };
   }
   return null;
 }

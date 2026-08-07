@@ -29,7 +29,9 @@ describe("extract — JSON-LD", () => {
 
     expect(extract(html)).toEqual({
       availability: "InStock",
+      confidence: "low",
       currency: "GBP",
+      evidence: { candidateCount: 1, type: "jsonld:document-order" },
       imageUrl: "https://cdn.example.com/widget.jpg",
       inStock: true,
       ok: true,
@@ -121,7 +123,12 @@ describe("extract — JSON-LD", () => {
       })
     );
 
-    expect(extract(html)).toMatchObject({ currency: "USD", price: "60.00" });
+    expect(extract(html)).toMatchObject({
+      confidence: "low",
+      currency: "USD",
+      evidence: { candidateCount: 1, type: "jsonld:aggregate-offer" },
+      price: "60.00",
+    });
   });
 
   it("reads a price out of priceSpecification", () => {
@@ -217,12 +224,42 @@ describe("extract — JSON-LD", () => {
     );
 
     expect(extract(html)).toMatchObject({
+      confidence: "high",
       currency: "GBP",
+      evidence: { candidateCount: 3, type: "jsonld:selected-sku" },
       imageUrl: "https://images.example.com/114250752.jpg",
       inStock: true,
       price: "499.00",
       strategy: "jsonld",
       title: "Laptop, 16 GB",
+    });
+  });
+
+  it("deduplicates a selected concrete Offer nested in an AggregateOffer", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Nested variant",
+        offers: {
+          "@type": "AggregateOffer",
+          lowPrice: "499.00",
+          offers: {
+            "@type": "Offer",
+            price: "499.00",
+            priceCurrency: "GBP",
+            sku: "selected-blue",
+          },
+          priceCurrency: "GBP",
+        },
+      }),
+      '<button data-sku="selected-blue" data-sku-selected="true">Blue</button>'
+    );
+
+    expect(extract(html)).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:selected-sku" },
+      price: "499.00",
+      title: "Nested variant",
     });
   });
 
@@ -245,7 +282,12 @@ describe("extract — JSON-LD", () => {
       '<button data-sku="blue" data-sku-selected="true">Blue</button>'
     );
 
-    expect(extract(html)).toMatchObject({ price: "499.00", title: "Blue" });
+    expect(extract(html)).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:selected-sku" },
+      price: "499.00",
+      title: "Blue",
+    });
   });
 
   it("uses an exact variant query URL before an earlier pathname match", () => {
@@ -273,6 +315,8 @@ describe("extract — JSON-LD", () => {
     );
 
     expect(extract(html, { url: "https://shop.example.com/widget?variant=red" })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:exact-url" },
       price: "99.00",
       title: "Red",
     });
@@ -303,6 +347,8 @@ describe("extract — JSON-LD", () => {
     );
 
     expect(extract(html, { url: "https://shop.example.com/widget/blue?source=ad" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:pathname" },
       price: "499.00",
       title: "Blue widget",
     });
@@ -328,6 +374,8 @@ describe("extract — JSON-LD", () => {
 
     expect(extract(html, { url: "https://shop.example.com/widget/current#reviews" })).toMatchObject(
       {
+        confidence: "low",
+        evidence: { candidateCount: 2, type: "jsonld:pathname" },
         price: "499.00",
         title: "Current widget",
       }
@@ -351,7 +399,12 @@ describe("extract — JSON-LD", () => {
       '<button data-sku="red" data-sku-selected="true"></button><button data-sku="blue" data-sku-selected="true"></button>'
     );
 
-    expect(extract(html)).toMatchObject({ price: "99.00", title: "First variant" });
+    expect(extract(html)).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:conflict" },
+      price: "99.00",
+      title: "First variant",
+    });
   });
 
   it("ignores malformed and relative JSON-LD URLs", () => {
@@ -371,6 +424,8 @@ describe("extract — JSON-LD", () => {
     );
 
     expect(extract(html, { url: "https://shop.example.com/widget/current" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
       price: "99.00",
       title: "First variant",
     });
@@ -393,7 +448,114 @@ describe("extract — JSON-LD", () => {
       ])
     );
 
-    expect(extract(html)).toMatchObject({ price: "99.00", title: "First product" });
+    expect(extract(html)).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 3, type: "jsonld:multiple-candidates" },
+      price: "99.00",
+      title: "First product",
+    });
+  });
+
+  it("marks one concrete Product Offer on an unqueried final URL high confidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Only product",
+        offers: { price: "25.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/only-product" })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 1, type: "jsonld:singleton" },
+      price: "25.00",
+    });
+  });
+
+  it("marks a singleton with an unresolved final URL query low confidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Queried product",
+        offers: { price: "25.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/product?variant=unknown" })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:queried-url" },
+      price: "25.00",
+    });
+  });
+
+  it("marks selected SKU and exact URL disagreement low confidence", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Blue",
+          offers: {
+            price: "499.00",
+            priceCurrency: "GBP",
+            sku: "blue",
+            url: "https://shop.example.com/widget?variant=blue",
+          },
+        },
+        {
+          "@type": "Product",
+          name: "Red",
+          offers: {
+            price: "99.00",
+            priceCurrency: "GBP",
+            sku: "red",
+            url: "https://shop.example.com/widget?variant=red",
+          },
+        },
+      ]),
+      '<button data-sku="blue" data-sku-selected="true">Blue</button>'
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?variant=red" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:conflict" },
+      price: "499.00",
+      title: "Blue",
+    });
+  });
+
+  it("marks an Offer owned by a non-Product node low confidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "ItemList",
+        name: "Related listing",
+        offers: { price: "1.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/list" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:non-product" },
+      price: "1.00",
+    });
+  });
+
+  it("keeps a standalone AggregateOffer nested-offer fallback", () => {
+    const html = page(
+      ldScript({
+        "@type": "AggregateOffer",
+        name: "Standalone range",
+        offers: { "@type": "Offer", price: "12.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/list" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:non-product" },
+      price: "12.00",
+      title: "Standalone range",
+    });
   });
 });
 
@@ -414,7 +576,9 @@ describe("extract — microdata", () => {
 
     expect(extract(html, { url: "https://shop.example.com/p/1" })).toMatchObject({
       availability: "InStock",
+      confidence: "high",
       currency: "USD",
+      evidence: { candidateCount: 1, type: "microdata:single-product-price" },
       imageUrl: "https://shop.example.com/img/micro.png",
       inStock: true,
       ok: true,
@@ -456,7 +620,63 @@ describe("extract — microdata", () => {
 
   it("widens to the whole document when nothing is inside a Product scope", () => {
     const html = page("", '<span itemprop="price" content="3.20">£3.20</span>');
-    expect(extract(html)).toMatchObject({ price: "3.20", strategy: "microdata" });
+    expect(extract(html)).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "microdata:document-price" },
+      price: "3.20",
+      strategy: "microdata",
+    });
+  });
+
+  it("marks multiple priced top-level Products ambiguous", () => {
+    const html = page(
+      "",
+      `<div itemscope itemtype="https://schema.org/Product">
+         <meta itemprop="price" content="10.00" />
+       </div>
+       <div itemscope itemtype="https://schema.org/Product">
+         <meta itemprop="price" content="20.00" />
+       </div>`
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/products" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "microdata:ambiguous" },
+      price: "10.00",
+    });
+  });
+
+  it("marks multiple prices inside one top-level Product ambiguous", () => {
+    const html = page(
+      "",
+      `<div itemscope itemtype="https://schema.org/Product">
+         <meta itemprop="price" content="10.00" />
+         <meta itemprop="price" content="20.00" />
+       </div>`
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/product" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "microdata:ambiguous" },
+      price: "10.00",
+    });
+  });
+
+  it("marks a singleton microdata Product on a queried URL low confidence", () => {
+    const html = page(
+      "",
+      `<div itemscope itemtype="https://schema.org/Product">
+         <meta itemprop="price" content="10.00" />
+       </div>`
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/product?variant=unknown" })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "microdata:queried-url" },
+      price: "10.00",
+    });
   });
 });
 
@@ -472,7 +692,9 @@ describe("extract — OpenGraph", () => {
 
     expect(extract(html)).toEqual({
       availability: "instock",
+      confidence: "low",
       currency: "SEK",
+      evidence: { type: "opengraph:page-metadata" },
       imageUrl: "https://cdn.example.com/og.jpg",
       inStock: true,
       ok: true,
@@ -507,7 +729,9 @@ describe("extract — configured selector", () => {
 
   it("extracts from the matched element and backfills the title", () => {
     expect(extract(html, { selector: ".price" })).toMatchObject({
+      confidence: "high",
       currency: "GBP",
+      evidence: { matchCount: 1, type: "selector:configured" },
       ok: true,
       price: "1299.00",
       strategy: "selector",

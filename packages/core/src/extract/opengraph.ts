@@ -45,7 +45,11 @@ export function extractOpenGraph({ $, locale }: StrategyContext): PriceCandidate
     return null;
   }
 
-  const candidate: PriceCandidate = { price: parsed.amount };
+  const candidate: PriceCandidate = {
+    confidence: "low",
+    evidence: { type: "opengraph:page-metadata" },
+    price: parsed.amount,
+  };
   if (parsed.currency) {
     candidate.currency = parsed.currency;
   }

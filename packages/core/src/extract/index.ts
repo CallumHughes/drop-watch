@@ -34,6 +34,8 @@ import type {
 export type {
   Availability,
   Extracted,
+  ExtractionConfidence,
+  ExtractionEvidence,
   ExtractionResult,
   ExtractorStrategy,
   PriceCandidate,

@@ -20,10 +20,41 @@ export interface Availability {
 /** Which link in the fallback chain produced the price. */
 export type ExtractorStrategy = "jsonld" | "microdata" | "opengraph" | "selector";
 
+/** Whether the extractor found enough evidence to auto-accept the result. */
+export type ExtractionConfidence = "high" | "low";
+
+export type ExtractionEvidence =
+  | {
+      candidateCount: number;
+      type:
+        | "jsonld:selected-sku"
+        | "jsonld:exact-url"
+        | "jsonld:singleton"
+        | "jsonld:aggregate-offer"
+        | "jsonld:pathname"
+        | "jsonld:queried-url"
+        | "jsonld:conflict"
+        | "jsonld:multiple-candidates"
+        | "jsonld:non-product"
+        | "jsonld:document-order";
+    }
+  | {
+      candidateCount: number;
+      type:
+        | "microdata:single-product-price"
+        | "microdata:ambiguous"
+        | "microdata:document-price"
+        | "microdata:queried-url";
+    }
+  | { type: "opengraph:page-metadata" }
+  | { matchCount: number; type: "selector:configured" };
+
 export interface Extracted {
   /** Bare schema.org availability token, e.g. "InStock". */
   availability?: string;
+  confidence: ExtractionConfidence;
   currency?: string;
+  evidence: ExtractionEvidence;
   imageUrl?: string;
   inStock?: boolean;
   /** Decimal string, e.g. "1234.56". Never a float. */

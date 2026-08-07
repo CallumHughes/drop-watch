@@ -1,11 +1,27 @@
 import { expect, test } from "../fixtures";
 
-/**
- * A JavaScript-built price succeeds through the renderer sidecar first. This
- * stays separate from product-add coverage because it is the only spec that
- * depends on the renderer web server.
- */
-test("browser-first preview finds a JavaScript-built price and saves that mode", async ({
+test("confident HTTP preview skips browser rendering and saves HTTP mode", async ({
+  addProduct,
+  fixtureProduct,
+  productDetail,
+}) => {
+  await test.step("the automatic preview uses the exact HTTP result", async () => {
+    await addProduct.goto();
+    await addProduct.loadPreview(fixtureProduct.url);
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).toBeVisible();
+    await expect(addProduct.browserRenderProvenance).not.toBeVisible();
+  });
+
+  await test.step("tracking saves HTTP mode", async () => {
+    await addProduct.track();
+
+    const listing = productDetail.listingRow(fixtureProduct.url);
+    await listing.edit();
+    await expect(listing.settings().browserRenderCheckbox).not.toBeChecked();
+  });
+});
+
+test("missing HTTP price renders JavaScript and saves browser mode", async ({
   addProduct,
   fixtureProduct,
   productDetail,
@@ -15,6 +31,7 @@ test("browser-first preview finds a JavaScript-built price and saves that mode",
   await test.step("the automatic preview finds the price in a browser", async () => {
     await addProduct.goto();
     await addProduct.loadPreview(fixtureProduct.url);
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).toBeVisible();
     await expect(addProduct.strategyNote).toContainText("schema.org JSON-LD");
     await expect(addProduct.browserRenderProvenance).toBeVisible();
   });
@@ -28,7 +45,30 @@ test("browser-first preview finds a JavaScript-built price and saves that mode",
   });
 });
 
-test("browser no-match falls back to HTTP and saves HTTP mode", async ({
+test("rendered selected SKU resolves ambiguous HTTP and saves browser mode", async ({
+  addProduct,
+  fixtureProduct,
+  productDetail,
+}) => {
+  await fixtureProduct.publish({ template: "rendered-selected-sku" });
+
+  await test.step("the rendered selection chooses the blue variant", async () => {
+    await addProduct.goto();
+    await addProduct.loadPreview(fixtureProduct.url);
+    await expect(addProduct.page.getByText("£75.00", { exact: true })).toBeVisible();
+    await expect(addProduct.browserRenderProvenance).toBeVisible();
+  });
+
+  await test.step("tracking saves browser mode", async () => {
+    await addProduct.track();
+
+    const listing = productDetail.listingRow(fixtureProduct.url);
+    await listing.edit();
+    await expect(listing.settings().browserRenderCheckbox).toBeChecked();
+  });
+});
+
+test("browser no-match salvages ambiguous HTTP and saves HTTP mode", async ({
   addProduct,
   fixtureProduct,
   productDetail,
@@ -38,6 +78,7 @@ test("browser no-match falls back to HTTP and saves HTTP mode", async ({
   await test.step("the automatic preview falls back to the HTTP document", async () => {
     await addProduct.goto();
     await addProduct.loadPreview(fixtureProduct.url);
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).toBeVisible();
     await expect(addProduct.strategyNote).toContainText("schema.org JSON-LD");
     await expect(addProduct.browserRenderProvenance).not.toBeVisible();
   });
@@ -59,7 +100,7 @@ test("changing the URL discards its preview before loading the next URL", async 
   await fixtureProduct.publish({ template: "js" });
   await secondFixtureProduct.publish({ template: "js" });
 
-  await test.step("the first URL is previewed in a browser", async () => {
+  await test.step("the first URL is previewed", async () => {
     await addProduct.goto();
     await addProduct.loadPreview(fixtureProduct.url);
     await expect(addProduct.browserRenderProvenance).toBeVisible();
@@ -70,7 +111,7 @@ test("changing the URL discards its preview before loading the next URL", async 
     await expect(addProduct.browserRenderProvenance).not.toBeVisible();
   });
 
-  await test.step("loading the new URL also prefers the browser", async () => {
+  await test.step("loading the new URL creates a fresh browser preview", async () => {
     await addProduct.loadPreviewButton.click();
     await expect(addProduct.strategyNote).toContainText("schema.org JSON-LD");
     await expect(addProduct.browserRenderProvenance).toBeVisible();

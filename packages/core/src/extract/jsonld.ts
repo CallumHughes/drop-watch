@@ -20,6 +20,7 @@ const CDATA_WRAPPER = /^\s*(?:\/\*\s*)?<!\[CDATA\[|\]\]>(?:\s*\*\/)?\s*$/g;
 const HTML_COMMENT = /^\s*<!--|-->\s*$/g;
 
 type JsonRecord = Record<string, unknown>;
+type CandidateFields = Omit<PriceCandidate, "confidence" | "evidence">;
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -132,7 +133,7 @@ function candidateFromOffer(
   product: JsonRecord,
   offer: JsonRecord,
   locale: string | undefined
-): PriceCandidate | null {
+): CandidateFields | null {
   const rawPrice = priceFrom(offer);
   if (rawPrice === undefined) {
     return null;
@@ -145,7 +146,7 @@ function candidateFromOffer(
   const availability = parseAvailability(
     firstString(offer.availability) ?? firstString(offer.itemAvailability)
   );
-  const candidate: PriceCandidate = { price: parsed.amount };
+  const candidate: CandidateFields = { price: parsed.amount };
   if (parsed.currency) {
     candidate.currency = parsed.currency;
   }
@@ -193,8 +194,13 @@ function skuFrom(value: unknown): string | undefined {
   }
 }
 
+interface SelectedSkuHint {
+  conflict: boolean;
+  sku?: string;
+}
+
 /** A SKU hint is trustworthy only when every selected control points to one SKU. */
-function selectedSku($: StrategyContext["$"]): string | undefined {
+function selectedSkuHint($: StrategyContext["$"]): SelectedSkuHint {
   const skus = new Set<string>();
   for (const element of $('[data-sku-selected="true"][data-sku]').toArray()) {
     const sku = skuFrom($(element).attr("data-sku"));
@@ -202,11 +208,15 @@ function selectedSku($: StrategyContext["$"]): string | undefined {
       skus.add(sku);
     }
   }
-  return skus.size === 1 ? skus.values().next().value : undefined;
+  if (skus.size === 1) {
+    return { conflict: false, sku: skus.values().next().value };
+  }
+  return { conflict: skus.size > 1 };
 }
 
 interface UrlIdentity {
   full: string;
+  hasQuery: boolean;
   originPathname: string;
 }
 
@@ -220,7 +230,11 @@ function urlIdentity(value: unknown): UrlIdentity | undefined {
     url.hash = "";
     url.searchParams.sort();
     const originPathname = `${url.origin}${url.pathname}`;
-    return { full: `${originPathname}${url.search}`, originPathname };
+    return {
+      full: `${originPathname}${url.search}`,
+      hasQuery: url.search.length > 0,
+      originPathname,
+    };
   } catch {
     // Only absolute, well-formed URLs have an origin to compare.
   }
@@ -251,8 +265,11 @@ function pageUrlMatch(
 }
 
 interface OfferWithProduct {
+  isProduct: boolean;
   offer: JsonRecord;
   product: JsonRecord;
+  selectedSkuMatch: boolean;
+  urlMatch: UrlMatch;
 }
 
 /**
@@ -268,15 +285,26 @@ function rankOffers(
   const exactUrlMatches: OfferWithProduct[] = [];
   const originPathnameMatches: OfferWithProduct[] = [];
   const remaining: OfferWithProduct[] = [];
+  const seenOffers = new Set<JsonRecord>();
 
   for (const product of rankNodes(nodes)) {
     for (const offer of offerCandidates(product)) {
-      const candidate = { offer, product };
+      if (seenOffers.has(offer)) {
+        continue;
+      }
+      seenOffers.add(offer);
       const offerSku = skuFrom(offer.sku);
       const selectedSkuMatchesOffer =
         selected !== undefined &&
         (offerSku === selected || (offerSku === undefined && skuFrom(product.sku) === selected));
       const urlMatch = pageUrlMatch(product, offer, pageUrl);
+      const candidate: OfferWithProduct = {
+        isProduct: typeNames(product).includes("product"),
+        offer,
+        product,
+        selectedSkuMatch: selectedSkuMatchesOffer,
+        urlMatch,
+      };
       if (selectedSkuMatchesOffer) {
         selectedSkuMatches.push(candidate);
       } else if (urlMatch === "exact") {
@@ -291,6 +319,69 @@ function rankOffers(
   return [...selectedSkuMatches, ...exactUrlMatches, ...originPathnameMatches, ...remaining];
 }
 
+interface PricedOffer extends OfferWithProduct {
+  candidate: CandidateFields;
+}
+
+function isAggregateOrRange(offer: JsonRecord): boolean {
+  return (
+    typeNames(offer).includes("aggregateoffer") ||
+    offer.lowPrice !== undefined ||
+    offer.highPrice !== undefined
+  );
+}
+
+function confidenceForJsonLd(
+  winning: PricedOffer,
+  candidates: PricedOffer[],
+  hint: SelectedSkuHint,
+  pageUrl: UrlIdentity | undefined
+): Pick<PriceCandidate, "confidence" | "evidence"> {
+  const candidateCount = candidates.length;
+  const selectedMatches = candidates.filter((candidate) => candidate.selectedSkuMatch);
+  const exactUrlMatches = candidates.filter((candidate) => candidate.urlMatch === "exact");
+  const selectedUrlConflict =
+    hint.sku !== undefined &&
+    (selectedMatches.length === 0 ||
+      (exactUrlMatches.length > 0 &&
+        !exactUrlMatches.some((candidate) => candidate.selectedSkuMatch)));
+
+  if (hint.conflict || selectedUrlConflict) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:conflict" } };
+  }
+  if (!winning.isProduct) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:non-product" } };
+  }
+  if (isAggregateOrRange(winning.offer)) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:aggregate-offer" } };
+  }
+  if (winning.selectedSkuMatch) {
+    if (selectedMatches.length === 1) {
+      return { confidence: "high", evidence: { candidateCount, type: "jsonld:selected-sku" } };
+    }
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:multiple-candidates" } };
+  }
+  if (winning.urlMatch === "exact") {
+    if (exactUrlMatches.length === 1) {
+      return { confidence: "high", evidence: { candidateCount, type: "jsonld:exact-url" } };
+    }
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:multiple-candidates" } };
+  }
+  if (winning.urlMatch === "origin-pathname") {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:pathname" } };
+  }
+  if (candidateCount > 1) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:multiple-candidates" } };
+  }
+  if (pageUrl?.hasQuery) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:queried-url" } };
+  }
+  if (pageUrl) {
+    return { confidence: "high", evidence: { candidateCount, type: "jsonld:singleton" } };
+  }
+  return { confidence: "low", evidence: { candidateCount, type: "jsonld:document-order" } };
+}
+
 export function extractJsonLd({ $, locale, url }: StrategyContext): PriceCandidate | null {
   const nodes: JsonRecord[] = [];
   for (const element of $('script[type="application/ld+json"]').toArray()) {
@@ -301,11 +392,20 @@ export function extractJsonLd({ $, locale, url }: StrategyContext): PriceCandida
   }
 
   const currentPageUrl = urlIdentity(url);
-  for (const { product, offer } of rankOffers(nodes, selectedSku($), currentPageUrl)) {
-    const candidate = candidateFromOffer(product, offer, locale);
+  const hint = selectedSkuHint($);
+  const candidates: PricedOffer[] = [];
+  for (const rankedOffer of rankOffers(nodes, hint.sku, currentPageUrl)) {
+    const candidate = candidateFromOffer(rankedOffer.product, rankedOffer.offer, locale);
     if (candidate) {
-      return candidate;
+      candidates.push({ ...rankedOffer, candidate });
     }
   }
-  return null;
+  const [winning] = candidates;
+  if (!winning) {
+    return null;
+  }
+  return {
+    ...winning.candidate,
+    ...confidenceForJsonLd(winning, candidates, hint, currentPageUrl),
+  };
 }
