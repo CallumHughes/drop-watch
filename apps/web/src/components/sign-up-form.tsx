@@ -62,20 +62,19 @@ export default function SignUpForm({
         },
         onSuccess: async () => {
           // With a mailer configured the server never auto-signs-in on signup
-          // (requireEmailVerification), even though invited accounts are born
-          // verified. Rather than sniffing the response for a session token,
-          // invite mode always signs in explicitly — on mailer-off installs
-          // it is a harmless re-authentication with known-good credentials.
-          if (invite) {
-            const signedIn = await authClient.signIn.email({
-              email: value.email,
-              password: value.password,
-            });
-            if (signedIn.error) {
-              toast.error(signedIn.error.message || "Account created — please sign in.");
-              router.push("/login");
-              return;
-            }
+          // (requireEmailVerification), even though both accounts a signup can
+          // produce — bootstrap admin and invited user — are born verified.
+          // Rather than sniffing the response for a session token, always sign
+          // in explicitly; on mailer-off installs it is a harmless
+          // re-authentication with known-good credentials.
+          const signedIn = await authClient.signIn.email({
+            email: value.email,
+            password: value.password,
+          });
+          if (signedIn.error) {
+            toast.error(signedIn.error.message || "Account created — please sign in.");
+            router.push("/login");
+            return;
           }
           router.push("/");
           toast.success("Sign up successful");
