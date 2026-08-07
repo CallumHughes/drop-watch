@@ -3,15 +3,15 @@ import type { RetrieveResult } from "@drop-watch/core/render";
 import { describe, expect, it } from "vitest";
 
 import {
-  decidePreviewPreflight,
   orchestratePreview,
   PreviewCache,
   type PreviewEntry,
   type PreviewOrchestration,
   type PreviewRequestMode,
+  previewConfigurationRejection,
   previewFailure,
-  previewTarget,
   previewTransports,
+  previewUrlRejection,
   toPreviewExtraction,
 } from "./preview";
 
@@ -86,46 +86,37 @@ async function runScenario({
   return { outcome, transports };
 }
 
-describe("decidePreviewPreflight", () => {
-  it("rejects a denied automatic URL as a bad request before transport selection", () => {
+describe("preview preflight", () => {
+  it("rejects an explicit browser request with no renderer configured", () => {
+    expect(previewConfigurationRejection("browser", undefined)).toEqual({
+      code: "PRECONDITION_FAILED",
+      message: "Browser rendering is not configured (RENDER_URL is unset).",
+    });
+  });
+
+  it("allows every other mode through to the URL check", () => {
+    expect(previewConfigurationRejection("auto", undefined)).toBeNull();
+    expect(previewConfigurationRejection("http", undefined)).toBeNull();
+    expect(previewConfigurationRejection("browser", "http://renderer:3002")).toBeNull();
+  });
+
+  it("rejects a denied URL as a bad request, quoting the guard's reason", () => {
     expect(
-      decidePreviewPreflight("auto", "http://renderer:3002", {
+      previewUrlRejection({
         ok: false,
         reason: "example.test resolves to 127.0.0.1, which is not public",
       })
     ).toEqual({
       code: "BAD_REQUEST",
-      kind: "rejected",
       message: "example.test resolves to 127.0.0.1, which is not public",
     });
-  });
-
-  it("preserves explicit unconfigured-browser priority over URL policy denial", () => {
-    expect(
-      decidePreviewPreflight("browser", undefined, {
-        ok: false,
-        reason: "not public",
-      })
-    ).toEqual({
-      code: "PRECONDITION_FAILED",
-      kind: "rejected",
-      message: "Browser rendering is not configured (RENDER_URL is unset).",
-    });
-  });
-
-  it("requires the common URL check for every configured request mode", () => {
-    expect(decidePreviewPreflight("auto", undefined, null)).toEqual({ kind: "check_url" });
-    expect(decidePreviewPreflight("http", undefined, null)).toEqual({ kind: "check_url" });
-    expect(decidePreviewPreflight("browser", "http://renderer:3002", null)).toEqual({
-      kind: "check_url",
-    });
+    expect(previewUrlRejection({ ok: true })).toBeNull();
   });
 });
 
 describe("preview transports", () => {
   it("uses HTTP once for automatic previews without a renderer", () => {
     expect(previewTransports("auto", undefined)).toEqual(["http"]);
-    expect(previewTarget("auto", undefined)).toBe("http");
   });
 
   it("tries HTTP then browser for automatic previews with a renderer", () => {
@@ -133,11 +124,11 @@ describe("preview transports", () => {
   });
 
   it("uses the browser when browser mode has a renderer", () => {
-    expect(previewTarget("browser", "http://renderer:3002")).toBe("browser");
+    expect(previewTransports("browser", "http://renderer:3002")).toEqual(["browser"]);
   });
 
-  it("marks browser mode unconfigured without a renderer", () => {
-    expect(previewTarget("browser", undefined)).toBe("unconfigured");
+  it("has no transport for browser mode without a renderer", () => {
+    expect(previewTransports("browser", undefined)).toEqual([]);
   });
 });
 
@@ -477,6 +468,13 @@ describe("orchestratePreview", () => {
           "Unable to retrieve the page (http: origin unreachable; browser: renderer unavailable).",
       });
     }
+  });
+
+  it("blames no transport when none ran", () => {
+    expect(previewFailure([])).toEqual({
+      code: "BAD_GATEWAY",
+      message: "Unable to retrieve the page (no transport ran).",
+    });
   });
 });
 

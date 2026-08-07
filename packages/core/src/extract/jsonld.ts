@@ -8,6 +8,7 @@
  */
 
 import { parseAvailability } from "./availability";
+import { type UrlIdentity, urlIdentity } from "./page-url";
 import { parsePrice } from "./price";
 import type { PriceCandidate, StrategyContext } from "./types";
 
@@ -199,7 +200,15 @@ interface SelectedSkuHint {
   sku?: string;
 }
 
-/** A SKU hint is trustworthy only when every selected control points to one SKU. */
+/**
+ * The one selection convention we trust: `data-sku` naming the variant and
+ * `data-sku-selected="true"` marking the chosen one, as the John Lewis size and
+ * colour pickers emit. Deliberately narrow — a looser reading (`aria-checked`,
+ * a `selected` class) matches carousels and filter chips too, and a wrong SKU
+ * hint is worse than none because it wins the ranking outright.
+ *
+ * The hint is trustworthy only when every selected control points to one SKU.
+ */
 function selectedSkuHint($: StrategyContext["$"]): SelectedSkuHint {
   const skus = new Set<string>();
   for (const element of $('[data-sku-selected="true"][data-sku]').toArray()) {
@@ -212,32 +221,6 @@ function selectedSkuHint($: StrategyContext["$"]): SelectedSkuHint {
     return { conflict: false, sku: skus.values().next().value };
   }
   return { conflict: skus.size > 1 };
-}
-
-interface UrlIdentity {
-  full: string;
-  hasQuery: boolean;
-  originPathname: string;
-}
-
-/** Hashes do not identify variants; sorted query parameters still do. */
-function urlIdentity(value: unknown): UrlIdentity | undefined {
-  if (typeof value !== "string") {
-    return;
-  }
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    url.searchParams.sort();
-    const originPathname = `${url.origin}${url.pathname}`;
-    return {
-      full: `${originPathname}${url.search}`,
-      hasQuery: url.search.length > 0,
-      originPathname,
-    };
-  } catch {
-    // Only absolute, well-formed URLs have an origin to compare.
-  }
 }
 
 type UrlMatch = "exact" | "origin-pathname" | null;

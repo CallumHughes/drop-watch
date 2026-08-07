@@ -490,6 +490,87 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("keeps a singleton confident when the query is only campaign tracking", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Shared product",
+        offers: { price: "25.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(
+      extract(html, {
+        url: "https://shop.example.com/product?utm_source=email&utm_medium=cpc&gclid=abc123",
+      })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 1, type: "jsonld:singleton" },
+      price: "25.00",
+    });
+  });
+
+  it("matches a variant URL exactly despite pasted tracking parameters", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Blue",
+          offers: {
+            price: "499.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?variant=blue",
+          },
+        },
+        {
+          "@type": "Product",
+          name: "Red",
+          offers: {
+            price: "99.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?variant=red",
+          },
+        },
+      ])
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?variant=red&utm_campaign=spring" })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:exact-url" },
+      price: "99.00",
+      title: "Red",
+    });
+  });
+
+  it("ignores selection markup that does not use the data-sku pair", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "First variant",
+          offers: { price: "99.00", priceCurrency: "GBP", sku: "red" },
+        },
+        {
+          "@type": "Product",
+          name: "Second variant",
+          offers: { price: "499.00", priceCurrency: "GBP", sku: "blue" },
+        },
+      ]),
+      `<button aria-checked="true" data-sku="blue">Blue</button>
+       <button data-sku-selected="true">Blue</button>
+       <button class="selected" data-sku="blue">Blue</button>`
+    );
+
+    expect(extract(html)).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
+      price: "99.00",
+      title: "First variant",
+    });
+  });
+
   it("marks selected SKU and exact URL disagreement low confidence", () => {
     const html = page(
       ldScript([
@@ -675,6 +756,23 @@ describe("extract — microdata", () => {
     ).toMatchObject({
       confidence: "low",
       evidence: { candidateCount: 1, type: "microdata:queried-url" },
+      price: "10.00",
+    });
+  });
+
+  it("keeps a single microdata Product confident under campaign tracking", () => {
+    const html = page(
+      "",
+      `<div itemscope itemtype="https://schema.org/Product">
+         <meta itemprop="price" content="10.00" />
+       </div>`
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/product?utm_source=newsletter" })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 1, type: "microdata:single-product-price" },
       price: "10.00",
     });
   });

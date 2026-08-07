@@ -22,38 +22,35 @@ import type { RenderMode } from "./schemas/products";
 export const PREVIEW_REQUEST_MODES = ["auto", "browser", "http"] as const;
 export type PreviewRequestMode = (typeof PREVIEW_REQUEST_MODES)[number];
 
-export type PreviewPreflightDecision =
-  | { kind: "allowed" | "check_url" }
-  | {
-      code: "BAD_REQUEST" | "PRECONDITION_FAILED";
-      kind: "rejected";
-      message: string;
-    };
+export interface PreviewRejection {
+  code: "BAD_REQUEST" | "PRECONDITION_FAILED";
+  message: string;
+}
 
 /**
- * Orders preview preconditions without performing DNS or transport work.
- * Explicit browser configuration wins over URL policy so its existing error
- * remains stable; every configured mode then requires one common URL check.
+ * Checked first, and before any DNS work, so that asking for a transport the
+ * deployment does not have fails the same way whatever the URL is.
  */
-export function decidePreviewPreflight(
+export function previewConfigurationRejection(
   render: PreviewRequestMode,
-  renderUrl: string | undefined,
-  verdict: UrlVerdict | null
-): PreviewPreflightDecision {
+  renderUrl: string | undefined
+): PreviewRejection | null {
   if (render === "browser" && !renderUrl) {
     return {
       code: "PRECONDITION_FAILED",
-      kind: "rejected",
       message: "Browser rendering is not configured (RENDER_URL is unset).",
     };
   }
-  if (verdict === null) {
-    return { kind: "check_url" };
-  }
-  if (!verdict.ok) {
-    return { code: "BAD_REQUEST", kind: "rejected", message: verdict.reason };
-  }
-  return { kind: "allowed" };
+  return null;
+}
+
+/**
+ * One common URL check for every mode. Defence in depth and a better immediate
+ * message — `fetchPage` and the renderer own the authoritative guards, because
+ * each resolves and connects from its own process.
+ */
+export function previewUrlRejection(verdict: UrlVerdict): PreviewRejection | null {
+  return verdict.ok ? null : { code: "BAD_REQUEST", message: verdict.reason };
 }
 
 /**
@@ -72,14 +69,6 @@ export function previewTransports(
     return renderUrl ? ["browser"] : [];
   }
   return ["http"];
-}
-
-/** The first transport, retaining an explicit unconfigured-browser signal for the UI. */
-export function previewTarget(
-  render: PreviewRequestMode,
-  renderUrl: string | undefined
-): "http" | "browser" | "unconfigured" {
-  return previewTransports(render, renderUrl)[0] ?? "unconfigured";
 }
 
 export interface PreviewAttempt {
@@ -240,8 +229,11 @@ function browserShouldWin(
 
 /**
  * Currency describes the price rather than page state, so an otherwise-winning
- * browser observation may inherit it from HTTP. The attempt list keeps the
- * original browser extraction for faithful confidence/evidence logging.
+ * browser observation may inherit it from HTTP. Availability and stock are not
+ * inherited on purpose: the rendered document is the newer observation of page
+ * state, and silently carrying "in stock" forward would outlive its evidence.
+ * The attempt list keeps the original browser extraction for faithful
+ * confidence/evidence logging.
  */
 function withHttpFallbackCurrency(
   httpAttempt: ExtractedPreviewAttempt,
@@ -296,6 +288,11 @@ export function previewFailure(attempts: readonly PreviewAttempt[]): PreviewFail
     (attempt): attempt is PreviewAttempt & { result: Exclude<RetrieveResult, { status: "ok" }> } =>
       attempt.result.status !== "ok"
   );
+  if (failures.length === 0) {
+    // No transport ran at all, so no transport is at fault; `every` over an
+    // empty list would otherwise blame the renderer.
+    return { code: "BAD_GATEWAY", message: "Unable to retrieve the page (no transport ran)." };
+  }
   const allRendererFaults = failures.every((attempt) => attempt.result.status === "renderer_error");
   const allTimeouts = failures.every((attempt) => attempt.result.status === "timeout");
   let code: PreviewFailure["code"] = "BAD_GATEWAY";
@@ -308,10 +305,7 @@ export function previewFailure(attempts: readonly PreviewAttempt[]): PreviewFail
     .map((attempt) => `${attempt.transport}: ${failureDescription(attempt.result)}`)
     .join("; ");
 
-  return {
-    code,
-    message: `Unable to retrieve the page (${details || "no transport was available"}).`,
-  };
+  return { code, message: `Unable to retrieve the page (${details}).` };
 }
 
 function failureDescription(result: Exclude<RetrieveResult, { status: "ok" }>): string {

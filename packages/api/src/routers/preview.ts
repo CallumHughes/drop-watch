@@ -25,13 +25,15 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import {
-  decidePreviewPreflight,
   orchestratePreview,
   type PagePreview,
   PREVIEW_REQUEST_MODES,
   PreviewCache,
   type PreviewEntry,
+  previewConfigurationRejection,
   previewFailure,
+  previewTransports,
+  previewUrlRejection,
   type SelectorPreview,
   toPreviewExtraction,
   toSelectorPreview,
@@ -58,6 +60,12 @@ const PREVIEW_TIMEOUT_MS = 15_000;
 const PREVIEW_RENDER_TIMEOUT_MS = 20_000;
 /** One retry. A page that is down stays down for the seconds a user will wait. */
 const PREVIEW_MAX_RETRIES = 1;
+/**
+ * None when a browser leg follows: that escalation is already the retry, and
+ * one "Load preview" click must not stack two HTTP attempts in front of a
+ * 20-second render before anything reaches the screen.
+ */
+const PREVIEW_ESCALATING_RETRIES = 0;
 
 /**
  * Enough markup to find a price by eye without shipping a 5MB body into the
@@ -92,11 +100,12 @@ function previewCache(): PreviewCache {
 async function retrievePreview(
   url: string,
   render: RenderMode,
-  renderUrl: string | undefined
+  renderUrl: string | undefined,
+  httpRetries: number
 ): Promise<RetrieveResult> {
   if (render === "http") {
     return await fetchPage(url, {
-      maxRetries: PREVIEW_MAX_RETRIES,
+      maxRetries: httpRetries,
       timeoutMs: PREVIEW_TIMEOUT_MS,
     });
   }
@@ -148,24 +157,28 @@ export const previewRouter = {
     .input(z.object({ render: z.enum(PREVIEW_REQUEST_MODES).default("auto"), url: urlInput }))
     .handler(async ({ input }): Promise<PagePreview> => {
       const log = createLogger({ action: "preview_page", url: input.url });
-      const configurationDecision = decidePreviewPreflight(input.render, env.RENDER_URL, null);
-      if (configurationDecision.kind === "rejected") {
-        throw new ORPCError(configurationDecision.code, {
-          message: configurationDecision.message,
+      const configurationRejection = previewConfigurationRejection(input.render, env.RENDER_URL);
+      if (configurationRejection) {
+        throw new ORPCError(configurationRejection.code, {
+          message: configurationRejection.message,
         });
       }
 
-      const verdict = await checkUrl(input.url);
-      const preflightDecision = decidePreviewPreflight(input.render, env.RENDER_URL, verdict);
-      if (preflightDecision.kind === "rejected") {
-        throw new ORPCError(preflightDecision.code, { message: preflightDecision.message });
+      const urlRejection = previewUrlRejection(await checkUrl(input.url));
+      if (urlRejection) {
+        throw new ORPCError(urlRejection.code, { message: urlRejection.message });
       }
 
+      const httpRetries =
+        previewTransports(input.render, env.RENDER_URL).length > 1
+          ? PREVIEW_ESCALATING_RETRIES
+          : PREVIEW_MAX_RETRIES;
       const outcome = await orchestratePreview({
         extractPage: (html, url) => extract(html, { url }),
         render: input.render,
         renderUrl: env.RENDER_URL,
-        retrieve: async (transport) => await retrievePreview(input.url, transport, env.RENDER_URL),
+        retrieve: async (transport) =>
+          await retrievePreview(input.url, transport, env.RENDER_URL, httpRetries),
       });
       const attemptLog = outcome.attempts.map((attempt) => ({
         confidence: attempt.extraction?.ok ? attempt.extraction.confidence : null,

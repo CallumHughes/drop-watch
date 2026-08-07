@@ -8,6 +8,7 @@
  */
 
 import { parseAvailability } from "./availability";
+import { urlIdentity } from "./page-url";
 import { parsePrice } from "./price";
 import type { CheerioElement, CheerioSelection, PriceCandidate, StrategyContext } from "./types";
 
@@ -139,12 +140,9 @@ export function extractMicrodata(context: StrategyContext): PriceCandidate | nul
     for (const scopedCandidate of scopedCandidates) {
       candidateCount += scopedCandidate.priceCount;
     }
-    let pageHasQuery: boolean | undefined;
-    try {
-      pageHasQuery = url === undefined ? undefined : new URL(url).search.length > 0;
-    } catch {
-      // A malformed final URL cannot establish that there is no unresolved query.
-    }
+    // A missing or malformed final URL cannot establish that there is no
+    // unresolved variant query, so it stays `undefined` rather than `false`.
+    const pageHasQuery = urlIdentity(url)?.hasQuery;
     if (candidateCount === 1 && winning.isProduct && pageHasQuery === false) {
       return {
         ...winning.candidate,
