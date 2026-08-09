@@ -86,8 +86,12 @@ primitives:
   - id: extractor
     group: domain
     summary: >
-      Price and availability extraction: JSON-LD, microdata, OpenGraph, and
-      user-supplied CSS selectors, in precedence order.
+      Price and availability extraction. The automatic chain runs JSON-LD,
+      microdata and OpenGraph in precedence order; a listing may instead be
+      pinned to one expression strategy — CSS selector, regular expression over
+      the raw body, or a JSONPath over the page's embedded JSON. This package
+      owns the list of strategy names, which is why `listings.extractor` is a
+      text column rather than a pg enum.
     code:
       - packages/core/src/extract/**
     depends_on: [money]
