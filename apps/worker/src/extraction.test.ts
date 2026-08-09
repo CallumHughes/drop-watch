@@ -2,7 +2,7 @@ import { STRATEGY_ORDER } from "@drop-watch/core/extract";
 import type { Listing } from "@drop-watch/db/schema/products";
 import { describe, expect, it } from "vitest";
 
-import { extractionOptions } from "./check-listing";
+import { extractionOptions } from "./extraction";
 
 function listing(overrides: Partial<Listing> = {}): Listing {
   return {

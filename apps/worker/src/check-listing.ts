@@ -12,9 +12,8 @@
  * deliberately unable to fail the check — see `./alerting`.
  */
 
-import type { ExtractionResult, ExtractOptions } from "@drop-watch/core/extract";
-import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
-import { toExpressionMode } from "@drop-watch/core/extract/strategies";
+import type { ExtractionResult } from "@drop-watch/core/extract";
+import { extract } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import type { RetrieveResult } from "@drop-watch/core/render";
@@ -26,6 +25,7 @@ import { env } from "@drop-watch/env/worker";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
+import { extractionOptions } from "./extraction";
 import { type CheckOutcome, toCheckOutcome } from "./outcome";
 import { renderTarget, unconfiguredRenderResult } from "./retrieve";
 import { nextCheckAt } from "./schedule";
@@ -42,30 +42,6 @@ export type CheckSource = "scheduled" | "manual";
  * otherwise double-fetch the same page. Cheap belt to pg-boss's braces.
  */
 const inFlight = new Set<string>();
-
-/**
- * Which strategies a listing runs, and the expression they read.
- *
- * One function rather than two so the pinned mode and the expression cannot
- * disagree — feeding a regex to the CSS engine because the mode said one thing
- * and the column held another is exactly the bug a single column invites.
- *
- * `extractor` is a text column rather than a pg enum (strategy names are owned
- * by `@drop-watch/core`, so adding one is not a migration). The membership
- * check is what that costs: an unrecognised value falls back to the chain
- * instead of throwing on a `STRATEGIES` lookup miss.
- */
-export function extractionOptions(
-  listing: Listing
-): Pick<ExtractOptions, "expression" | "strategies"> {
-  const pinned = toExpressionMode(listing.extractor);
-  if (!(pinned && listing.expression)) {
-    return { strategies: STRATEGY_ORDER };
-  }
-  // A pinned listing should fail loudly when its expression rots, not quietly
-  // start reporting whatever JSON-LD the page happens to carry.
-  return { expression: listing.expression, strategies: [pinned] };
-}
 
 /** `undefined` rather than `null`, because that is what the fetch layer takes. */
 function conditionalRequest(listing: Listing): { etag?: string; lastModified?: string } {
