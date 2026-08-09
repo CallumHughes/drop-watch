@@ -18,7 +18,7 @@ import { extractJsonLd } from "./jsonld";
 import { extractByJsonPath, jsonPathMatches } from "./jsonpath";
 import { extractMicrodata } from "./microdata";
 import { extractOpenGraph, extractPageMetadata } from "./opengraph";
-import { extractByRegex, regexMatches, regexValue } from "./regex";
+import { extractByRegex, regexValue, scanRegexMatches } from "./regex";
 import { extractBySelector } from "./selector";
 import type {
   CheerioSelection,
@@ -307,13 +307,13 @@ function regexTest(
   expression: string,
   url: string | undefined
 ): ExpressionTest {
-  const matches = regexMatches(context.html, expression);
-  const samples = matches.slice(0, MAX_SAMPLES).map((match) => ({
+  const scan = scanRegexMatches(context.html, expression, MAX_SAMPLES);
+  const samples = scan.samples.map((match) => ({
     context: truncate(match[0].replace(COLLAPSE_WHITESPACE, " ").trim(), MAX_SAMPLE_CHARS),
     value: truncate(regexValue(match), MAX_SAMPLE_CHARS),
   }));
 
-  return toTest(context, "regex", matches.length, samples, "matched nothing on this page", url);
+  return toTest(context, "regex", scan.matchCount, samples, "matched nothing on this page", url);
 }
 
 function jsonPathTest(

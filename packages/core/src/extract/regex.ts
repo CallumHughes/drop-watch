@@ -37,6 +37,16 @@ const MAX_INPUT_CHARS = 500_000;
  */
 const FLAGS = "gi";
 
+type RegexCandidate = Omit<PriceCandidate, "evidence">;
+
+function compilePattern(expression: string): RegExp | null {
+  try {
+    return new RegExp(expression.trim(), FLAGS);
+  } catch {
+    return null;
+  }
+}
+
 export function extractByRegex({
   expression,
   html,
@@ -49,32 +59,28 @@ export function extractByRegex({
     return null;
   }
 
-  let pattern: RegExp;
-  try {
-    pattern = new RegExp(expression.trim(), FLAGS);
-  } catch {
+  const pattern = compilePattern(expression);
+  if (!pattern) {
     return null;
   }
 
-  const matches = [...html.slice(0, MAX_INPUT_CHARS).matchAll(pattern)];
-  if (matches.length === 0) {
-    return null;
-  }
-
-  for (const match of matches) {
-    const candidate = candidateFrom(match, matches.length, locale);
-    if (candidate) {
-      return candidate;
+  let candidate: RegexCandidate | null = null;
+  let matchCount = 0;
+  for (const match of html.slice(0, MAX_INPUT_CHARS).matchAll(pattern)) {
+    matchCount += 1;
+    if (!candidate) {
+      candidate = candidateFrom(match, locale);
     }
   }
-  return null;
+  return candidate
+    ? {
+        ...candidate,
+        evidence: { matchCount, type: "regex:configured" },
+      }
+    : null;
 }
 
-function candidateFrom(
-  match: RegExpExecArray,
-  matchCount: number,
-  locale: string | undefined
-): PriceCandidate | null {
+function candidateFrom(match: RegExpExecArray, locale: string | undefined): RegexCandidate | null {
   const groups = match.groups ?? {};
   const raw = groups.price ?? match[1] ?? match[0];
   if (!raw?.trim()) {
@@ -89,9 +95,8 @@ function candidateFrom(
     return null;
   }
 
-  const candidate: PriceCandidate = {
+  const candidate: RegexCandidate = {
     confidence: "high",
-    evidence: { matchCount, type: "regex:configured" },
     price: parsed.amount,
   };
   if (parsed.currency) {
@@ -107,15 +112,31 @@ function candidateFrom(
   return candidate;
 }
 
-/** The matches the picker shows, so the value column is the captured value. */
-export function regexMatches(html: string, expression: string): RegExpExecArray[] {
-  let pattern: RegExp;
-  try {
-    pattern = new RegExp(expression.trim(), FLAGS);
-  } catch {
-    return [];
+export interface RegexMatchScan {
+  matchCount: number;
+  samples: RegExpExecArray[];
+}
+
+/** Counts every match while retaining only the few the picker can display. */
+export function scanRegexMatches(
+  html: string,
+  expression: string,
+  sampleLimit: number
+): RegexMatchScan {
+  const pattern = compilePattern(expression);
+  if (!pattern) {
+    return { matchCount: 0, samples: [] };
   }
-  return [...html.slice(0, MAX_INPUT_CHARS).matchAll(pattern)];
+
+  let matchCount = 0;
+  const samples: RegExpExecArray[] = [];
+  for (const match of html.slice(0, MAX_INPUT_CHARS).matchAll(pattern)) {
+    matchCount += 1;
+    if (samples.length < sampleLimit) {
+      samples.push(match);
+    }
+  }
+  return { matchCount, samples };
 }
 
 /** The value a match contributes: named `price` group, group 1, or the match. */

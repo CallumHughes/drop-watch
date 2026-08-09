@@ -25,7 +25,7 @@ const MAX_PATTERN_LENGTH = 500;
 
 /** `(a+)+`, `(a*)*` — a repeated group that is itself unbounded. */
 const UNBOUNDED_QUANTIFIER = /[*+]|\{\d+,\}/;
-const QUANTIFIER_AFTER_GROUP = /[*+]|\{\d+,?\d*\}/;
+const QUANTIFIER_AFTER_GROUP = /^(?:[*+]|\{\d+(?:,\d*)?\})/;
 
 /**
  * A repeated group whose body can match the same text more than one way is the
@@ -82,7 +82,7 @@ function hasNestedQuantifier(pattern: string): boolean {
     }
     const body = pattern.slice(index + 1, closing);
     const after = pattern.slice(closing + 1);
-    if (QUANTIFIER_AFTER_GROUP.test(after.charAt(0)) && isAmbiguousBody(body)) {
+    if (QUANTIFIER_AFTER_GROUP.test(after) && isAmbiguousBody(body)) {
       return true;
     }
   }

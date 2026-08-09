@@ -26,6 +26,17 @@ const MAX_DOCUMENT_CHARS = 2_000_000;
  */
 const INLINE_ASSIGNMENT =
   /(?:(?:window|globalThis|self)\s*\.\s*|(?:var|let|const)\s+)([A-Za-z_$][\w$]*)\s*=\s*(?=[{[])/g;
+const NON_CODE_TOKEN =
+  /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g;
+const NON_NEWLINE = /[^\r\n]/g;
+const EXECUTABLE_SCRIPT_TYPES = new Set([
+  "",
+  "application/ecmascript",
+  "application/javascript",
+  "module",
+  "text/ecmascript",
+  "text/javascript",
+]);
 
 export interface JsonDocument {
   /** Where it came from, shown as the context line in the picker. */
@@ -48,7 +59,7 @@ export function collectJsonDocuments({
   // `__NEXT_DATA__` ships with exactly this type, so it lands here.
   collectScripts($, 'script[type="application/json"]', documents);
   collectScripts($, 'script[type="application/ld+json"]', documents);
-  collectInlineAssignments(html, documents);
+  collectInlineAssignments($, documents);
 
   return documents.slice(0, MAX_DOCUMENTS);
 }
@@ -71,23 +82,54 @@ function collectScripts(
   }
 }
 
-function collectInlineAssignments(html: string, documents: JsonDocument[]): void {
+function collectInlineAssignments($: StrategyContext["$"], documents: JsonDocument[]): void {
+  for (const element of $("script:not([src])").toArray()) {
+    if (documents.length >= MAX_DOCUMENTS) {
+      return;
+    }
+    const node = $(element);
+    if (!isExecutableScript(node.attr("type"))) {
+      continue;
+    }
+    scanInlineAssignments(node.text(), documents);
+  }
+}
+
+function isExecutableScript(type: string | undefined): boolean {
+  const normalized = type?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return EXECUTABLE_SCRIPT_TYPES.has(normalized);
+}
+
+/** Blanks strings and comments without moving assignment positions. */
+function executableCode(source: string): string {
+  return source.replace(NON_CODE_TOKEN, (token) => token.replace(NON_NEWLINE, " "));
+}
+
+function scanInlineAssignments(source: string, documents: JsonDocument[]): void {
+  const code = executableCode(source);
   INLINE_ASSIGNMENT.lastIndex = 0;
-  let match = INLINE_ASSIGNMENT.exec(html);
+  let match = INLINE_ASSIGNMENT.exec(code);
   while (match !== null) {
     if (documents.length >= MAX_DOCUMENTS) {
       return;
     }
-    const literal = readJsonLiteral(html, match.index + match[0].length);
-    if (literal !== null) {
+    const literal = readJsonLiteral(source, match.index + match[0].length);
+    if (literal) {
       try {
-        documents.push({ source: `${match[1]} =`, value: JSON.parse(literal) as unknown });
+        documents.push({ source: `${match[1]} =`, value: JSON.parse(literal.value) as unknown });
       } catch {
         // JavaScript, not JSON. Skipping is the point.
       }
+      // Do not rediscover assignment-shaped strings inside the literal itself.
+      INLINE_ASSIGNMENT.lastIndex = literal.end;
     }
-    match = INLINE_ASSIGNMENT.exec(html);
+    match = INLINE_ASSIGNMENT.exec(code);
   }
+}
+
+interface JsonLiteralRead {
+  end: number;
+  value: string;
 }
 
 /**
@@ -97,7 +139,7 @@ function collectInlineAssignments(html: string, documents: JsonDocument[]): void
  * Slicing on the next `}` would truncate at the first brace inside a string,
  * and a price is very often quoted next to markup that contains one.
  */
-function readJsonLiteral(source: string, start: number): string | null {
+function readJsonLiteral(source: string, start: number): JsonLiteralRead | null {
   const open = source.charAt(start);
   const close = open === "{" ? "}" : "]";
   const limit = Math.min(source.length, start + MAX_DOCUMENT_CHARS);
@@ -123,7 +165,7 @@ function readJsonLiteral(source: string, start: number): string | null {
     } else if (char === close) {
       depth -= 1;
       if (depth === 0) {
-        return source.slice(start, index + 1);
+        return { end: index + 1, value: source.slice(start, index + 1) };
       }
     }
   }

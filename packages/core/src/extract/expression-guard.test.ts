@@ -30,7 +30,7 @@ describe("checkRegexExpression", () => {
     expect(check.ok === false && check.error).toContain("longer than 500 characters");
   });
 
-  it.each(["(a+)+", "(a*)*$", "(a|aa)+", "(\\d+)+x", "([\\s\\S]*)*"])(
+  it.each(["(a+)+", "(a*)*$", "(a|aa)+", "(\\d+)+x", "([\\s\\S]*)*", "(a+){2,}$", "(a|aa){1,3}$"])(
     "rejects the catastrophic shape %s",
     (expression) => {
       // A user's regex runs in the shared worker process, so one backtracker
@@ -44,6 +44,7 @@ describe("checkRegexExpression", () => {
   it("does not mistake a quantified group with a bounded body for a backtracker", () => {
     expect(checkRegexExpression("(ab)+")).toEqual({ ok: true });
     expect(checkRegexExpression("(a{1,3})+")).toEqual({ ok: true });
+    expect(checkRegexExpression("(ab){2,4}")).toEqual({ ok: true });
   });
 
   it("does not read an escaped paren as a group", () => {

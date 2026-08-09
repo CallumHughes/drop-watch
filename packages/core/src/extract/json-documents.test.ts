@@ -45,6 +45,24 @@ describe("collectJsonDocuments", () => {
     });
   });
 
+  it("ignores assignment-shaped text outside a script", () => {
+    const documents = collect(`<pre>window.fake = {"price":1}</pre>
+      <script>window.real = {"price":9};</script>`);
+
+    expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
+  });
+
+  it("ignores assignments inside script comments and strings", () => {
+    const documents = collect(`<script>
+      // window.lineComment = {"price":1};
+      const example = 'window.stringValue = {"price":2}';
+      /* window.blockComment = {"price":3}; */
+      window.real = {"price":9};
+    </script>`);
+
+    expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
+  });
+
   it("does not truncate at a brace inside a string", () => {
     // Slicing to the next `}` is the obvious implementation and the wrong one:
     // a price sits next to markup containing braces more often than not.

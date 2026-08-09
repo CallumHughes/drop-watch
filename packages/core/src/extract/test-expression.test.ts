@@ -166,6 +166,18 @@ describe("testExpression — regex", () => {
     expect(test.invalidReason).toContain("more than one way");
   });
 
+  it("counts high-cardinality matches without losing a later price", () => {
+    const repeated = `${"x".repeat(10_000)}data-price="42.50"`;
+    const test = testExpression(repeated, {
+      expression: 'x|data-price="([\\d.]+)"',
+      mode: "regex",
+    });
+
+    expect(test.matchCount).toBe(10_001);
+    expect(test.samples).toHaveLength(5);
+    expect(test.result).toMatchObject({ ok: true, price: "42.50" });
+  });
+
   it("separates matching nothing from matching without a price", () => {
     expect(testExpression(PAGE, { expression: "nothing-here", mode: "regex" }).result).toEqual({
       error: "matched nothing on this page",
