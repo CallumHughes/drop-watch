@@ -40,12 +40,12 @@ type ListingSettingKey = Exclude<keyof ListingCreateInput, "productId" | "url">;
 
 const LISTING_INSERT_KEYS = Object.keys({
   currency: true,
+  expression: true,
   extractor: true,
   intervalMinutes: true,
   jitterPercent: true,
   locale: true,
   render: true,
-  selector: true,
 } satisfies Record<ListingSettingKey, true>) as ListingSettingKey[];
 
 /**
@@ -83,12 +83,12 @@ type ListingPatchKey = Exclude<keyof ListingUpdateInput, "id">;
 const LISTING_PATCH_KEYS = Object.keys({
   active: true,
   currency: true,
+  expression: true,
   extractor: true,
   intervalMinutes: true,
   jitterPercent: true,
   locale: true,
   render: true,
-  selector: true,
 } satisfies Record<ListingPatchKey, true>) as ListingPatchKey[];
 
 /** Only the keys actually supplied, routed onto the listing row. */

@@ -12,8 +12,9 @@
  * deliberately unable to fail the check — see `./alerting`.
  */
 
-import type { ExtractionResult, ExtractorStrategy } from "@drop-watch/core/extract";
+import type { ExtractionResult, ExtractOptions } from "@drop-watch/core/extract";
 import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
+import { toExpressionMode } from "@drop-watch/core/extract/strategies";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import type { RetrieveResult } from "@drop-watch/core/render";
@@ -42,10 +43,28 @@ export type CheckSource = "scheduled" | "manual";
  */
 const inFlight = new Set<string>();
 
-function strategiesFor(listing: Listing): readonly ExtractorStrategy[] {
-  // A listing pinned to `selector` should fail loudly when its selector rots,
-  // not quietly start reporting whatever JSON-LD the page happens to carry.
-  return listing.extractor === "selector" ? ["selector"] : STRATEGY_ORDER;
+/**
+ * Which strategies a listing runs, and the expression they read.
+ *
+ * One function rather than two so the pinned mode and the expression cannot
+ * disagree — feeding a regex to the CSS engine because the mode said one thing
+ * and the column held another is exactly the bug a single column invites.
+ *
+ * `extractor` is a text column rather than a pg enum (strategy names are owned
+ * by `@drop-watch/core`, so adding one is not a migration). The membership
+ * check is what that costs: an unrecognised value falls back to the chain
+ * instead of throwing on a `STRATEGIES` lookup miss.
+ */
+export function extractionOptions(
+  listing: Listing
+): Pick<ExtractOptions, "expression" | "strategies"> {
+  const pinned = toExpressionMode(listing.extractor);
+  if (!(pinned && listing.expression)) {
+    return { strategies: STRATEGY_ORDER };
+  }
+  // A pinned listing should fail loudly when its expression rots, not quietly
+  // start reporting whatever JSON-LD the page happens to carry.
+  return { expression: listing.expression, strategies: [pinned] };
 }
 
 /** `undefined` rather than `null`, because that is what the fetch layer takes. */
@@ -177,10 +196,9 @@ function extractFrom(listing: Listing, fetched: RetrieveResult): ExtractionResul
     return null;
   }
   return extract(fetched.body, {
-    strategies: strategiesFor(listing),
+    ...extractionOptions(listing),
     url: fetched.url,
     ...(listing.locale ? { locale: listing.locale } : {}),
-    ...(listing.selector ? { selector: listing.selector } : {}),
   });
 }
 

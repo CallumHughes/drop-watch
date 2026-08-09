@@ -8,31 +8,12 @@
  */
 
 import { parseAvailability } from "./availability";
+import { asArray, isRecord, type JsonRecord, MAX_NODES, MAX_WALK_DEPTH, parseScript } from "./json";
 import { type UrlIdentity, urlIdentity } from "./page-url";
 import { parsePrice } from "./price";
 import type { PriceCandidate, StrategyContext } from "./types";
 
-/** Depth cap on the JSON walk — real documents nest a handful of levels. */
-const MAX_WALK_DEPTH = 12;
-/** Node cap, so a pathological document cannot pin the event loop. */
-const MAX_NODES = 2000;
-
-const CDATA_WRAPPER = /^\s*(?:\/\*\s*)?<!\[CDATA\[|\]\]>(?:\s*\*\/)?\s*$/g;
-const HTML_COMMENT = /^\s*<!--|-->\s*$/g;
-
-type JsonRecord = Record<string, unknown>;
 type CandidateFields = Omit<PriceCandidate, "confidence" | "evidence">;
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asArray(value: unknown): unknown[] {
-  if (value === undefined || value === null) {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
-}
 
 function typeNames(node: JsonRecord): string[] {
   return asArray(node["@type"])
@@ -57,18 +38,6 @@ function collectNodes(value: unknown, out: JsonRecord[], depth: number): void {
   out.push(value);
   for (const entry of Object.values(value)) {
     collectNodes(entry, out, depth + 1);
-  }
-}
-
-function parseScript(raw: string): unknown {
-  const cleaned = raw.replace(CDATA_WRAPPER, "").replace(HTML_COMMENT, "").trim();
-  if (cleaned.length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    return null;
   }
 }
 

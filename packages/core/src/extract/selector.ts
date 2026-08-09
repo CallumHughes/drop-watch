@@ -13,14 +13,18 @@ import type { CheerioSelection, PriceCandidate, StrategyContext } from "./types"
 /** Collapses the whitespace cheerio's text() preserves from the source HTML. */
 const WHITESPACE = /\s+/g;
 
-export function extractBySelector({ $, locale, selector }: StrategyContext): PriceCandidate | null {
-  if (!selector || selector.trim().length === 0) {
+export function extractBySelector({
+  $,
+  expression,
+  locale,
+}: StrategyContext): PriceCandidate | null {
+  if (!expression || expression.trim().length === 0) {
     return null;
   }
 
   let matched: CheerioSelection;
   try {
-    matched = $(selector);
+    matched = $(expression);
   } catch {
     return null;
   }

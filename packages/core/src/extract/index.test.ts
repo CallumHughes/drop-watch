@@ -826,7 +826,7 @@ describe("extract — configured selector", () => {
   );
 
   it("extracts from the matched element and backfills the title", () => {
-    expect(extract(html, { selector: ".price" })).toMatchObject({
+    expect(extract(html, { expression: ".price" })).toMatchObject({
       confidence: "high",
       currency: "GBP",
       evidence: { matchCount: 1, type: "selector:configured" },
@@ -837,28 +837,28 @@ describe("extract — configured selector", () => {
     });
   });
 
-  it("is skipped when no selector is configured", () => {
+  it("is skipped when no expression is configured", () => {
     const result = extract(html);
     expect(result.ok).toBe(false);
   });
 
   it("returns a failure when the selector matches nothing", () => {
-    expect(extract(html, { selector: ".nope" })).toEqual({
+    expect(extract(html, { expression: ".nope" })).toEqual({
       error: "no price found (tried: jsonld, microdata, opengraph, selector)",
       ok: false,
     });
   });
 
   it("does not throw on an invalid selector", () => {
-    expect(extract(html, { selector: "!!!" }).ok).toBe(false);
+    expect(extract(html, { expression: "!!!" }).ok).toBe(false);
   });
 
   it("applies the locale hint to the matched text", () => {
     const german = page("", '<span class="price">1.234 €</span>');
-    expect(extract(german, { locale: "en-GB", selector: ".price" })).toMatchObject({
+    expect(extract(german, { expression: ".price", locale: "en-GB" })).toMatchObject({
       price: "1.234",
     });
-    expect(extract(german, { locale: "de-DE", selector: ".price" })).toMatchObject({
+    expect(extract(german, { expression: ".price", locale: "de-DE" })).toMatchObject({
       price: "1234",
     });
   });
@@ -880,7 +880,7 @@ describe("extract — chain order and options", () => {
   );
 
   it("prefers JSON-LD over every later strategy", () => {
-    expect(extract(html, { selector: ".price" })).toMatchObject({
+    expect(extract(html, { expression: ".price" })).toMatchObject({
       price: "10.00",
       strategy: "jsonld",
     });
@@ -888,12 +888,12 @@ describe("extract — chain order and options", () => {
 
   it("falls through in order when earlier strategies are excluded", () => {
     expect(
-      extract(html, { selector: ".price", strategies: ["microdata", "opengraph"] })
+      extract(html, { expression: ".price", strategies: ["microdata", "opengraph"] })
     ).toMatchObject({ price: "30.00", strategy: "microdata" });
     expect(
-      extract(html, { selector: ".price", strategies: ["opengraph", "selector"] })
+      extract(html, { expression: ".price", strategies: ["opengraph", "selector"] })
     ).toMatchObject({ price: "20.00", strategy: "opengraph" });
-    expect(extract(html, { selector: ".price", strategies: ["selector"] })).toMatchObject({
+    expect(extract(html, { expression: ".price", strategies: ["selector"] })).toMatchObject({
       price: "40.00",
       strategy: "selector",
     });

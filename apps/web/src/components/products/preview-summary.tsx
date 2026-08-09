@@ -8,8 +8,10 @@ const THUMBNAIL_SIZE = 64;
 /** Plain-English names for the chain, so the badge means something to a human. */
 const STRATEGY_LABELS: Record<PreviewExtraction["strategy"], string> = {
   jsonld: "schema.org JSON-LD",
+  jsonpath: "JSONPath",
   microdata: "microdata",
   opengraph: "OpenGraph tags",
+  regex: "regular expression",
   selector: "CSS selector",
 };
 

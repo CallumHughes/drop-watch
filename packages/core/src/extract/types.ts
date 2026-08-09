@@ -1,6 +1,8 @@
 import type { Cheerio, CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
 
+import type { ExtractorStrategy } from "./strategies";
+
 /**
  * A cheerio selection, and the raw node it wraps. `domhandler` is part of
  * cheerio's public type surface, so it is a direct dependency rather than
@@ -17,8 +19,12 @@ export interface Availability {
   inStock?: boolean;
 }
 
-/** Which link in the fallback chain produced the price. */
-export type ExtractorStrategy = "jsonld" | "microdata" | "opengraph" | "selector";
+/**
+ * Which link in the fallback chain produced the price. Re-exported from
+ * `./strategies` so importers of this module keep working — that leaf is the
+ * single list, because the database and the zod schemas read it too.
+ */
+export type { ExpressionMode, ExtractorStrategy } from "./strategies";
 
 /** Whether the extractor found enough evidence to auto-accept the result. */
 export type ExtractionConfidence = "high" | "low";
@@ -47,7 +53,10 @@ export type ExtractionEvidence =
         | "microdata:queried-url";
     }
   | { type: "opengraph:page-metadata" }
-  | { matchCount: number; type: "selector:configured" };
+  | {
+      matchCount: number;
+      type: "selector:configured" | "regex:configured" | "jsonpath:configured";
+    };
 
 export interface Extracted {
   /** Bare schema.org availability token, e.g. "InStock". */
@@ -71,10 +80,16 @@ export type ExtractionResult = ({ ok: true } & Extracted) | { ok: false; error: 
 export interface StrategyContext {
   /** The parsed document, loaded once and shared by every strategy. */
   $: CheerioAPI;
+  /**
+   * The configured extraction expression — a CSS selector, a regular expression
+   * or a JSONPath, depending on which strategy is reading it. Every expression
+   * strategy is skipped without one.
+   */
+  expression?: string;
+  /** The raw body. `regex` matches against this, not the DOM, so attributes count. */
+  html: string;
   /** BCP 47 hint for ambiguous price separators. */
   locale?: string;
-  /** CSS selector for the `selector` strategy; that strategy is skipped without one. */
-  selector?: string;
   /** Final fetched page URL, used to identify the currently selected JSON-LD variant. */
   url?: string;
 }

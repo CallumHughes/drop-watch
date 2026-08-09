@@ -12,12 +12,17 @@
  */
 
 import { load } from "cheerio";
+import { checkExpression } from "./expression-guard";
+import { describeJsonValue } from "./json-documents";
 import { extractJsonLd } from "./jsonld";
+import { extractByJsonPath, jsonPathMatches } from "./jsonpath";
 import { extractMicrodata } from "./microdata";
 import { extractOpenGraph, extractPageMetadata } from "./opengraph";
+import { extractByRegex, regexMatches, regexValue } from "./regex";
 import { extractBySelector } from "./selector";
 import type {
   CheerioSelection,
+  ExpressionMode,
   ExtractionResult,
   ExtractorStrategy,
   PriceCandidate,
@@ -33,6 +38,7 @@ import type {
  */
 export type {
   Availability,
+  ExpressionMode,
   Extracted,
   ExtractionConfidence,
   ExtractionEvidence,
@@ -48,7 +54,13 @@ const MAX_SAMPLES = 5;
 /** One matched element's markup, truncated. A `<div>` can be the whole page. */
 const MAX_SAMPLE_CHARS = 300;
 
-/** Fallback order. Fixed by the plan; callers may narrow it, not reorder it. */
+/**
+ * Fallback order. Fixed by the plan; callers may narrow it, not reorder it.
+ *
+ * `regex` and `jsonpath` are deliberately absent. Both need an expression the
+ * user wrote, so in a chain that runs without one they could only ever no-op —
+ * they are reachable by pinning a listing to them, not by falling back.
+ */
 export const STRATEGY_ORDER: readonly ExtractorStrategy[] = [
   "jsonld",
   "microdata",
@@ -58,17 +70,23 @@ export const STRATEGY_ORDER: readonly ExtractorStrategy[] = [
 
 const STRATEGIES: Record<ExtractorStrategy, Strategy> = {
   jsonld: extractJsonLd,
+  jsonpath: extractByJsonPath,
   microdata: extractMicrodata,
   opengraph: extractOpenGraph,
+  regex: extractByRegex,
   selector: extractBySelector,
 };
 
 export interface ExtractOptions {
+  /**
+   * The configured extraction expression — CSS, a regular expression or a
+   * JSONPath, read by whichever strategy the caller pinned. Every expression
+   * strategy no-ops without it.
+   */
+  expression?: string;
   /** BCP 47 hint for ambiguous price separators, e.g. "de-DE". */
   locale?: string;
-  /** CSS selector for the `selector` strategy. Without it that strategy no-ops. */
-  selector?: string;
-  /** Narrows the chain — e.g. `["selector"]` for a product configured that way. */
+  /** Narrows the chain — e.g. `["regex"]` for a listing configured that way. */
   strategies?: readonly ExtractorStrategy[];
   /** Page URL, used to resolve a relative image URL to an absolute one. */
   url?: string;
@@ -116,12 +134,12 @@ function backfill(
  * UI can show it and `checkRuns.extractorUsed` can record it.
  */
 function buildContext(html: string, options: ExtractOptions): StrategyContext {
-  const context: StrategyContext = { $: load(html) };
+  const context: StrategyContext = { $: load(html), html };
   if (options.locale !== undefined) {
     context.locale = options.locale;
   }
-  if (options.selector !== undefined) {
-    context.selector = options.selector;
+  if (options.expression !== undefined) {
+    context.expression = options.expression;
   }
   if (options.url !== undefined) {
     context.url = options.url;
@@ -147,34 +165,42 @@ export function extract(html: string, options: ExtractOptions = {}): ExtractionR
   return { error: `no price found (tried: ${order.join(", ")})`, ok: false };
 }
 
-/** One element a candidate selector matched, as the picker displays it. */
-export interface SelectorMatch {
-  /** The element's own markup, truncated to {@link MAX_SAMPLE_CHARS}. */
-  html: string;
-  /** Its text with whitespace collapsed — usually the price itself. */
-  text: string;
+/** One thing a candidate expression matched, as the picker displays it. */
+export interface ExpressionMatch {
+  /**
+   * What produced the value — the element's markup, the whole regex match, or
+   * the JSON document the path resolved in. Truncated to
+   * {@link MAX_SAMPLE_CHARS}.
+   */
+  context: string;
+  /** The value itself: collapsed element text, the capture, or the JSON value. */
+  value: string;
 }
 
 /**
- * What a candidate selector does to a page: how much it matches, what those
+ * What a candidate expression does to a page: how much it matches, what those
  * matches look like, and whether a price falls out of them.
  */
-export interface SelectorTest {
+export interface ExpressionTest {
   /**
-   * The string is not valid CSS. Distinct from "matched nothing" because it is
-   * what a half-typed selector looks like, not a wrong one.
+   * The string is not valid in its mode — bad CSS, a regex that will not
+   * compile, an unparseable path. Distinct from "matched nothing" because it is
+   * what every half-typed expression looks like, not a wrong one.
    */
-  invalidSelector: boolean;
+  invalidExpression: boolean;
+  /** Why it is invalid; empty when it is not. */
+  invalidReason: string;
   matchCount: number;
-  /** The `selector` strategy's verdict, identical to what a check would record. */
+  /** The pinned strategy's verdict, identical to what a check would record. */
   result: ExtractionResult;
   /** The first few matches in document order. */
-  samples: SelectorMatch[];
+  samples: ExpressionMatch[];
 }
 
-export interface TestSelectorOptions {
+export interface TestExpressionOptions {
+  expression: string;
   locale?: string;
-  selector: string;
+  mode: ExpressionMode;
   url?: string;
 }
 
@@ -184,56 +210,129 @@ function truncate(value: string, limit: number): string {
   return value.length > limit ? `${value.slice(0, limit)}…` : value;
 }
 
-function failed(error: string, invalidSelector = false): SelectorTest {
-  return { invalidSelector, matchCount: 0, result: { error, ok: false }, samples: [] };
+function failed(error: string, invalidReason = ""): ExpressionTest {
+  return {
+    invalidExpression: invalidReason !== "",
+    invalidReason,
+    matchCount: 0,
+    result: { error, ok: false },
+    samples: [],
+  };
 }
 
 /**
- * Runs the `selector` strategy alone and reports what it saw.
+ * Runs one pinned strategy alone and reports what it saw.
  *
- * This is what the add-product selector picker calls on every edit, against
- * HTML fetched once and held in memory — the document is parsed
- * here but never re-downloaded. It returns the same {@link ExtractionResult}
- * a scheduled check would record, so what the picker shows is what will be
- * tracked.
+ * This is what the add-product picker calls on every edit, against HTML fetched
+ * once and held in memory — the document is parsed here but never
+ * re-downloaded. It returns the same {@link ExtractionResult} a scheduled check
+ * would record, so what the picker shows is what will be tracked.
  */
-export function testSelector(html: string, options: TestSelectorOptions): SelectorTest {
+export function testExpression(html: string, options: TestExpressionOptions): ExpressionTest {
   if (html.trim().length === 0) {
     return failed("empty document");
   }
-  if (options.selector.trim().length === 0) {
-    return failed("no selector");
+  const expression = options.expression.trim();
+  if (expression.length === 0) {
+    return failed("no expression");
   }
 
-  const context = buildContext(html, options);
+  // Syntax and safety first, so the picker rejects exactly what a save would.
+  const check = checkExpression(options.mode, expression);
+  if (!check.ok) {
+    return failed(check.error, check.error);
+  }
+
+  const context = buildContext(html, { ...options, expression });
+  if (options.mode === "regex") {
+    return regexTest(context, expression, options.url);
+  }
+  if (options.mode === "jsonpath") {
+    return jsonPathTest(context, expression, options.url);
+  }
+  return selectorTest(context, expression, options.url);
+}
+
+function toTest(
+  context: StrategyContext,
+  strategy: ExpressionMode,
+  matchCount: number,
+  samples: ExpressionMatch[],
+  emptyError: string,
+  url: string | undefined
+): ExpressionTest {
+  const candidate = STRATEGIES[strategy](context);
+  const result: ExtractionResult = candidate
+    ? { ok: true, strategy, ...backfill(candidate, context, url) }
+    : { error: matchCount === 0 ? emptyError : unreadableError(strategy), ok: false };
+  return { invalidExpression: false, invalidReason: "", matchCount, result, samples };
+}
+
+function unreadableError(strategy: ExpressionMode): string {
+  if (strategy === "jsonpath") {
+    return "resolved, but no price could be read from the value";
+  }
+  return "matched, but no price could be read from the matched text";
+}
+
+function selectorTest(
+  context: StrategyContext,
+  selector: string,
+  url: string | undefined
+): ExpressionTest {
   let matched: CheerioSelection;
   try {
-    matched = context.$(options.selector);
+    matched = context.$(selector);
   } catch {
-    return failed(`not a valid CSS selector: ${options.selector}`, true);
+    const reason = `not a valid CSS selector: ${selector}`;
+    return failed(reason, reason);
   }
 
   const samples = matched
     .toArray()
     .slice(0, MAX_SAMPLES)
     .map((element) => ({
-      html: truncate(context.$.html(context.$(element)), MAX_SAMPLE_CHARS),
-      text: truncate(
+      context: truncate(context.$.html(context.$(element)), MAX_SAMPLE_CHARS),
+      value: truncate(
         context.$(element).text().replace(COLLAPSE_WHITESPACE, " ").trim(),
         MAX_SAMPLE_CHARS
       ),
     }));
 
-  const candidate = extractBySelector(context);
-  const result: ExtractionResult = candidate
-    ? { ok: true, strategy: "selector", ...backfill(candidate, context, options.url) }
-    : {
-        error:
-          matched.length === 0
-            ? "matched nothing on this page"
-            : "matched, but no price could be read from the matched text",
-        ok: false,
-      };
+  return toTest(context, "selector", matched.length, samples, "matched nothing on this page", url);
+}
 
-  return { invalidSelector: false, matchCount: matched.length, result, samples };
+function regexTest(
+  context: StrategyContext,
+  expression: string,
+  url: string | undefined
+): ExpressionTest {
+  const matches = regexMatches(context.html, expression);
+  const samples = matches.slice(0, MAX_SAMPLES).map((match) => ({
+    context: truncate(match[0].replace(COLLAPSE_WHITESPACE, " ").trim(), MAX_SAMPLE_CHARS),
+    value: truncate(regexValue(match), MAX_SAMPLE_CHARS),
+  }));
+
+  return toTest(context, "regex", matches.length, samples, "matched nothing on this page", url);
+}
+
+function jsonPathTest(
+  context: StrategyContext,
+  expression: string,
+  url: string | undefined
+): ExpressionTest {
+  const matches = jsonPathMatches(context, expression);
+  const samples = matches.slice(0, MAX_SAMPLES).map((match) => ({
+    context: truncate(match.source, MAX_SAMPLE_CHARS),
+    value: truncate(describeJsonValue(match.value), MAX_SAMPLE_CHARS),
+  }));
+
+  return toTest(
+    context,
+    "jsonpath",
+    matches.length,
+    samples,
+    "resolved nothing in any JSON on this page",
+    url
+  );
 }

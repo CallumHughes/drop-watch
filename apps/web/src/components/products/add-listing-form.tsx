@@ -41,25 +41,27 @@ export function AddListingForm({
     })
   );
 
-  const { chosen, preview, savingWithSelector, trimmedSelector } = flow;
+  const { chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
     if (!(preview && chosen)) {
       return;
     }
     addListing.mutate({
       currency: chosen.currency,
-      extractor: savingWithSelector ? "selector" : "auto",
+      expression: savedMode ? trimmedExpression : null,
+      extractor: savedMode ?? "auto",
       productId,
       render: preview.render,
-      selector: savingWithSelector ? trimmedSelector : null,
       url: preview.url,
     });
-  }, [addListing, chosen, preview, productId, savingWithSelector, trimmedSelector]);
+  }, [addListing, chosen, preview, productId, savedMode, trimmedExpression]);
 
   const note = extractorNote({
+    expression: savedMode ? trimmedExpression : null,
     hasPrice: chosen !== null,
+    mode: savedMode,
     render: preview?.render ?? "http",
-    selector: savingWithSelector ? trimmedSelector : null,
   });
 
   return (

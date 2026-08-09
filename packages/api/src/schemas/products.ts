@@ -1,13 +1,5 @@
-/**
- * The products router's input schemas, in a module with no server imports.
- *
- * The router (`../routers/products`) validates with these; the web app's forms
- * import the same bounds for their native `min`/`max`/`pattern` attributes, so
- * the browser and the server reject exactly the same values. That sharing is
- * why this file exists: the router itself pulls in the database, which a
- * client bundle must never do.
- */
-
+import { checkExpression } from "@drop-watch/core/extract/expression-guard";
+import { LISTING_EXTRACTORS } from "@drop-watch/core/extract/strategies";
 import { ALERT_RULES } from "@drop-watch/core/rules";
 import { z } from "zod";
 
@@ -40,7 +32,37 @@ export const PRICE_PATTERN = new RegExp(`^${PRICE_PATTERN_SOURCE}$`);
 /** Bounds on the free-text columns the add-product flow writes. */
 export const MAX_URL_LENGTH = 2048;
 export const MAX_TITLE_LENGTH = 500;
-export const MAX_SELECTOR_LENGTH = 500;
+export const MAX_EXPRESSION_LENGTH = 500;
+
+/**
+ * The refines every extraction-carrying schema shares.
+ *
+ * `expression` holds a CSS selector, a regular expression or a JSONPath, and
+ * `extractor` says which — so "is this valid?" is one question with three
+ * answers, asked here rather than restated on each schema. `checkExpression`
+ * is the same function the add-product picker calls, so a pattern the picker
+ * accepted can never fail on save.
+ */
+export interface ExtractionInput {
+  expression?: string | null | undefined;
+  extractor?: string | undefined;
+}
+
+export function hasExpressionWhenPinned(input: ExtractionInput): boolean {
+  return input.extractor === undefined || input.extractor === "auto"
+    ? true
+    : Boolean(input.expression?.trim());
+}
+
+export function expressionIsValid(input: ExtractionInput): boolean {
+  if (!(input.extractor && input.expression?.trim())) {
+    return true;
+  }
+  return checkExpression(input.extractor, input.expression).ok;
+}
+
+export const PINNED_NEEDS_EXPRESSION = "A pinned extractor needs an expression";
+export const EXPRESSION_IS_INVALID = "The expression is not valid for the chosen extractor";
 
 /**
  * What `products.update` accepts: identity and alert configuration, all
@@ -73,8 +95,10 @@ export const productCreateInput = z
   .object({
     currency: z.string().length(3).nullable().optional(),
     dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
-    /** Pinning to `selector` makes a rotted selector fail loudly. */
-    extractor: z.enum(["auto", "selector"]).default("auto"),
+    /** CSS, a regular expression or a JSONPath — `extractor` says which. */
+    expression: z.string().max(MAX_EXPRESSION_LENGTH).nullable().optional(),
+    /** Pinning to a strategy makes a rotted expression fail loudly. */
+    extractor: z.enum(LISTING_EXTRACTORS).default("auto"),
     imageUrl: z.url().max(MAX_URL_LENGTH).nullable().optional(),
     intervalMinutes: z
       .number()
@@ -94,14 +118,11 @@ export const productCreateInput = z
      */
     render: z.enum(RENDER_MODES).default("http"),
     rules: z.array(z.enum(ALERT_RULES)).optional(),
-    selector: z.string().max(MAX_SELECTOR_LENGTH).nullable().optional(),
     targetPrice: z.string().regex(PRICE_PATTERN).nullable().optional(),
     title: z.string().max(MAX_TITLE_LENGTH).nullable().optional(),
     url: z.url().max(MAX_URL_LENGTH),
   })
-  .refine(
-    (input) => input.extractor !== "selector" || Boolean(input.selector?.trim()),
-    "A selector-mode product needs a selector"
-  );
+  .refine(hasExpressionWhenPinned, PINNED_NEEDS_EXPRESSION)
+  .refine(expressionIsValid, EXPRESSION_IS_INVALID);
 
 export type ProductCreateInput = z.infer<typeof productCreateInput>;

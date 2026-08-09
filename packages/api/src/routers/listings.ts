@@ -25,6 +25,11 @@ import { protectedProcedure } from "../index";
 import { buildListingInsert, buildListingPatch } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { listingCreateInput, listingUpdateInput } from "../schemas/listings";
+import {
+  EXPRESSION_IS_INVALID,
+  expressionIsValid,
+  PINNED_NEEDS_EXPRESSION,
+} from "../schemas/products";
 import { type ProductSummary, pulledInNextCheckAt } from "../summary";
 import { type CheckNowResult, loadProduct, summariseOne } from "./products";
 
@@ -113,11 +118,11 @@ export const listingsRouter = {
     }),
 
   /**
-   * Tunes one listing's schedule and extraction. `extractor`/`selector`
+   * Tunes one listing's schedule and extraction. `extractor`/`expression`
    * validity is checked here against the *merged* state (this patch over the
-   * existing row) rather than in the schema, because a caller switching to
-   * `selector` mode without also sending a `selector` is valid when the
-   * listing already has one — see `listingUpdateInput`'s doc.
+   * existing row) rather than in the schema, because a caller pinning a mode
+   * without also sending an `expression` is valid when the listing already has
+   * one — see `listingUpdateInput`'s doc.
    */
   update: protectedProcedure
     .input(listingUpdateInput)
@@ -125,9 +130,12 @@ export const listingsRouter = {
       const listing = await loadListing(input.id, context.session.user.id);
 
       const nextExtractor = input.extractor ?? listing.extractor;
-      const nextSelector = input.selector === undefined ? listing.selector : input.selector;
-      if (nextExtractor === "selector" && !nextSelector?.trim()) {
-        throw new ORPCError("BAD_REQUEST", { message: "A selector-mode listing needs a selector" });
+      const nextExpression = input.expression === undefined ? listing.expression : input.expression;
+      if (nextExtractor !== "auto" && !nextExpression?.trim()) {
+        throw new ORPCError("BAD_REQUEST", { message: PINNED_NEEDS_EXPRESSION });
+      }
+      if (!expressionIsValid({ expression: nextExpression, extractor: nextExtractor })) {
+        throw new ORPCError("BAD_REQUEST", { message: EXPRESSION_IS_INVALID });
       }
 
       const patch = buildListingPatch(input);

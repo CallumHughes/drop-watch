@@ -1,6 +1,10 @@
 "use client";
 
-import type { PagePreview, SelectorPreview } from "@drop-watch/api/routers/preview";
+import type {
+  ExpressionMode,
+  ExpressionPreview,
+  PagePreview,
+} from "@drop-watch/api/routers/preview";
 import { Button } from "@drop-watch/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import { Input } from "@drop-watch/ui/components/input";
@@ -8,8 +12,8 @@ import { useId } from "react";
 
 import { productHost } from "@/lib/format";
 
+import { ExpressionPicker } from "./expression-picker";
 import { PreviewSummary } from "./preview-summary";
-import { SelectorPicker } from "./selector-picker";
 import type { PreviewFlow as PreviewFlowState } from "./use-preview-flow";
 
 /** A labelled control, shared by every step of the add-product/add-listing flows. */
@@ -37,21 +41,23 @@ export function Field({
 
 /** What the chain found, plus the manual override when one is being worked on. */
 function PreviewPanel({
+  expression,
   isTesting,
-  onSelectorChange,
+  mode,
+  onExpressionChange,
+  onModeChange,
   onTogglePicker,
   preview,
-  selector,
   test,
-  usingSelector,
 }: {
+  expression: string;
   isTesting: boolean;
-  onSelectorChange: (selector: string) => void;
+  mode: ExpressionMode | null;
+  onExpressionChange: (expression: string) => void;
+  onModeChange: (mode: ExpressionMode) => void;
   onTogglePicker: () => void;
   preview: PagePreview;
-  selector: string;
-  test: SelectorPreview | undefined;
-  usingSelector: boolean;
+  test: ExpressionPreview | undefined;
 }) {
   return (
     <Card>
@@ -70,27 +76,28 @@ function PreviewPanel({
             <PreviewSummary extraction={preview.extraction} url={preview.url} />
             <div>
               <Button onClick={onTogglePicker} size="sm" type="button" variant="outline">
-                {usingSelector ? "Use the automatic result" : "Pick the price myself"}
+                {mode === null ? "Pick the price myself" : "Use the automatic result"}
               </Button>
             </div>
           </>
         ) : (
           <p className="text-sm">
-            Nothing matched automatically: {preview.extractionError}. Pick the price element
-            yourself below.
+            Nothing matched automatically: {preview.extractionError}. Pick the price yourself below.
           </p>
         )}
 
-        {usingSelector ? (
-          <SelectorPicker
+        {mode === null ? null : (
+          <ExpressionPicker
+            expression={expression}
             isPending={isTesting}
-            onSelectorChange={onSelectorChange}
+            mode={mode}
+            onExpressionChange={onExpressionChange}
+            onModeChange={onModeChange}
             previewId={preview.previewId}
-            selector={selector}
             test={test}
             url={preview.url}
           />
-        ) : null}
+        )}
       </CardContent>
     </Card>
   );
@@ -134,13 +141,14 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
 
       {flow.preview ? (
         <PreviewPanel
+          expression={flow.expression}
           isTesting={flow.isTesting}
-          onSelectorChange={flow.onSelectorChange}
+          mode={flow.mode}
+          onExpressionChange={flow.onExpressionChange}
+          onModeChange={flow.onModeChange}
           onTogglePicker={flow.togglePicker}
           preview={flow.preview}
-          selector={flow.selector}
-          test={flow.selectorTest.data}
-          usingSelector={flow.usingSelector}
+          test={flow.expressionTest.data}
         />
       ) : null}
     </>
