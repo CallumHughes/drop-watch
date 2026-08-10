@@ -58,8 +58,8 @@ catalogs:
       specifier: ^2.24.0
       version: 2.24.0
     hono:
-      specifier: ^4.12.32
-      version: 4.12.33
+      specifier: ^4.12.34
+      version: 4.13.1
     lucide-react:
       specifier: ^1.28.0
       version: 1.28.0
@@ -164,13 +164,13 @@ importers:
         version: link:../../packages/core
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.0.12(hono@4.12.33)
+        version: 2.0.12(hono@4.13.1)
       evlog:
         specifier: 'catalog:'
-        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
+        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
       hono:
         specifier: 'catalog:'
-        version: 4.12.33
+        version: 4.13.1
       p-queue:
         specifier: ^9.3.3
         version: 9.3.3
@@ -252,7 +252,7 @@ importers:
         version: 17.4.2
       evlog:
         specifier: 'catalog:'
-        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
+        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
       lucide-react:
         specifier: 'catalog:'
         version: 1.28.0(react@19.2.8)
@@ -325,7 +325,7 @@ importers:
         version: 0.45.2(@types/pg@8.20.3)(kysely@0.29.4)(pg@8.22.0)
       evlog:
         specifier: 'catalog:'
-        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
+        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
       pg-boss:
         specifier: 'catalog:'
         version: 12.26.4
@@ -386,7 +386,7 @@ importers:
         version: 0.45.2(@types/pg@8.20.3)(kysely@0.29.4)(pg@8.22.0)
       evlog:
         specifier: 'catalog:'
-        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
+        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
       next:
         specifier: 'catalog:'
         version: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -423,7 +423,7 @@ importers:
         version: 17.4.2
       evlog:
         specifier: 'catalog:'
-        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
+        version: 2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0))
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -3596,6 +3596,10 @@ packages:
     resolution: {integrity: sha512-+SwvkaiJtxsiPjhy9LivY/1m7UsNqCJetM1BrZl9A5DkQhlbHQDU730mMiDPWjnoCYOM8Chf3WrCJw27kNTPFQ==}
     engines: {node: '>=16.9.0'}
 
+  hono@4.13.1:
+    resolution: {integrity: sha512-kdJoFVv2xmayw6cY09H7AbMJMt8Jn5jdlEdXsP7AGBdF2DIptVlKlOLKXP41yPip4/a3yQPv9gVcJYI8YY04dw==}
+    engines: {node: '>=16.9.0'}
+
   html-to-text@9.0.5:
     resolution: {integrity: sha512-qY60FjREgVZL03vJU6IfMV4GDjGBIoOyvuFdpBDIX9yTlDw0TjxVBQp+P8NvpdIXNJvfWBTNul7fsAQJq2FNpg==}
     engines: {node: '>=14'}
@@ -4684,11 +4688,6 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  tsx@4.23.1:
-    resolution: {integrity: sha512-GQHnkIfxyx1wYCOS/wonik5MVRZU9hi1TEZmzGZSCJB1y9YgoZ8H6itNE/u4suE+yLmOzuE4E5S4TZ/ZX2wcWQ==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
-
   tsx@4.23.5:
     resolution: {integrity: sha512-rw55FUaqOoI7RvlQwLbhO4nSDApnQ4/CykPuiQ/EPvtrX3WA9Ig55jIt9VvbBJbzJuj12ueRu4PMZ2SxPVbihg==}
     engines: {node: '>=18.0.0'}
@@ -5576,6 +5575,10 @@ snapshots:
   '@hono/node-server@2.0.12(hono@4.12.33)':
     dependencies:
       hono: 4.12.33
+
+  '@hono/node-server@2.0.12(hono@4.13.1)':
+    dependencies:
+      hono: 4.13.1
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -6916,7 +6919,7 @@ snapshots:
       '@drizzle-team/brocli': 0.10.2
       '@esbuild-kit/esm-loader': 2.6.5
       esbuild: 0.25.12
-      tsx: 4.23.1
+      tsx: 4.23.5
 
   drizzle-orm@0.45.2(@types/pg@8.20.3)(kysely@0.29.4)(pg@8.22.0):
     optionalDependencies:
@@ -7150,11 +7153,11 @@ snapshots:
     dependencies:
       eventsource-parser: 3.1.0
 
-  evlog@2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.12.33)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0)):
+  evlog@2.24.0(@orpc/server@1.14.13)(express@5.2.1)(hono@4.13.1)(next@16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0)):
     optionalDependencies:
       '@orpc/server': 1.14.13
       express: 5.2.1
-      hono: 4.12.33
+      hono: 4.13.1
       next: 16.2.12(@babel/core@7.29.7)(@playwright/test@1.62.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       vite: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.5)(yaml@2.9.0)
@@ -7384,6 +7387,8 @@ snapshots:
       function-bind: 1.1.2
 
   hono@4.12.33: {}
+
+  hono@4.13.1: {}
 
   html-to-text@9.0.5:
     dependencies:
@@ -8433,12 +8438,6 @@ snapshots:
       strip-bom: 3.0.0
 
   tslib@2.8.1: {}
-
-  tsx@4.23.1:
-    dependencies:
-      esbuild: 0.28.1
-    optionalDependencies:
-      fsevents: 2.3.3
 
   tsx@4.23.5:
     dependencies:
