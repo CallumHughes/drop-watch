@@ -22,7 +22,7 @@
     "cheerio": "^1.2.0",
     "domhandler": "^6.0.1",
     "p-queue": "^9.3.3",
-    "undici": "^8.9.0",
+    "undici": "^8.10.0",
     "zod": "catalog:"
   },
   "devDependencies": {
