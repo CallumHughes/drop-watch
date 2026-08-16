@@ -23,15 +23,19 @@ const DEFAULT_MODE: ExpressionMode = "selector";
  * A failed capability read is deliberately indistinguishable from loading here:
  * the browser request is still the authority on whether rendering can work.
  */
-export function browserReloadControl({
+export function transportReloadControl({
   browserRender,
+  currentRender,
   preconditionFailed,
 }: {
   browserRender: boolean | undefined;
+  currentRender: PagePreview["render"];
   preconditionFailed: boolean;
 }) {
-  const unavailable = browserRender === false;
-  return { disabled: unavailable || preconditionFailed, unavailable };
+  const target = currentRender === "http" ? "browser" : "http";
+  const unavailable = target === "browser" && browserRender === false;
+  const disabled = target === "browser" && (unavailable || preconditionFailed);
+  return { disabled, target, unavailable };
 }
 
 function isPreconditionFailure(error: unknown): boolean {
@@ -39,7 +43,7 @@ function isPreconditionFailure(error: unknown): boolean {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unable to reload the page in a browser.";
+  return error instanceof Error ? error.message : "Unable to reload the page preview.";
 }
 
 /**
@@ -61,7 +65,7 @@ export function usePreviewFlow() {
   const [mode, setMode] = useState<ExpressionMode | null>(null);
   const [expression, setExpression] = useState("");
   const [settledExpression, setSettledExpression] = useState("");
-  const [browserReloadError, setBrowserReloadError] = useState<string | null>(null);
+  const [transportReloadError, setTransportReloadError] = useState<string | null>(null);
   const [browserReloadPreconditionFailed, setBrowserReloadPreconditionFailed] = useState(false);
 
   useEffect(() => {
@@ -87,23 +91,24 @@ export function usePreviewFlow() {
     })
   );
 
-  const reloadBrowserPreview = useMutation(
+  const reloadPreview = useMutation(
     orpc.preview.page.mutationOptions({
-      onError: (error) => {
-        setBrowserReloadError(errorMessage(error));
-        if (isPreconditionFailure(error)) {
+      onError: (error, variables) => {
+        setTransportReloadError(errorMessage(error));
+        if (variables.render === "browser" && isPreconditionFailure(error)) {
           setBrowserReloadPreconditionFailed(true);
         }
       },
       onMutate: () => {
-        setBrowserReloadError(null);
+        setTransportReloadError(null);
       },
       onSuccess: (data) => {
         setPreview(data);
         setExpression("");
         setSettledExpression("");
         setMode(data.extraction === null ? DEFAULT_MODE : null);
-        setBrowserReloadError(null);
+        setTransportReloadError(null);
+        setBrowserReloadPreconditionFailed(false);
       },
     })
   );
@@ -121,21 +126,24 @@ export function usePreviewFlow() {
   );
   const capabilities = useQuery(
     orpc.capabilities.queryOptions({
-      enabled: mode !== null && preview?.render === "http",
+      enabled: preview?.render === "http",
       staleTime: Number.POSITIVE_INFINITY,
     })
   );
-  const reloadControl = browserReloadControl({
-    browserRender: capabilities.data?.browserRender,
-    preconditionFailed: browserReloadPreconditionFailed,
-  });
+  const reloadControl = preview
+    ? transportReloadControl({
+        browserRender: capabilities.data?.browserRender,
+        currentRender: preview.render,
+        preconditionFailed: browserReloadPreconditionFailed,
+      })
+    : null;
 
   const onUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setUrl(event.target.value);
     // A preview belongs to the exact URL that produced it. Dropping it here
     // prevents save actions from combining stale markup with a newly typed URL.
     setPreview(null);
-    setBrowserReloadError(null);
+    setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
   }, []);
   const togglePicker = useCallback(() => {
@@ -150,16 +158,17 @@ export function usePreviewFlow() {
   }, []);
   const loadPreview = useCallback(() => {
     setPreview(null);
-    setBrowserReloadError(null);
+    setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
     fetchPreview.mutate({ render: "auto", url: url.trim() });
   }, [fetchPreview, url]);
-  const reloadInBrowser = useCallback(() => {
-    if (!(preview?.render === "http")) {
+  const reloadWithOtherTransport = useCallback(() => {
+    if (!preview) {
       return;
     }
-    reloadBrowserPreview.mutate({ render: "browser", url: preview.url });
-  }, [preview, reloadBrowserPreview]);
+    const render = preview.render === "http" ? "browser" : "http";
+    reloadPreview.mutate({ render, url: preview.url });
+  }, [preview, reloadPreview]);
   const onFetch = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -176,12 +185,6 @@ export function usePreviewFlow() {
   const savingWithExpression = expressionExtraction !== null;
 
   return {
-    browserReload: {
-      error: browserReloadError,
-      isPending: reloadBrowserPreview.isPending,
-      onReload: reloadInBrowser,
-      ...reloadControl,
-    },
     chosen,
     expression,
     expressionTest,
@@ -195,6 +198,14 @@ export function usePreviewFlow() {
     preview,
     savingWithExpression,
     togglePicker,
+    transportReload: reloadControl
+      ? {
+          error: transportReloadError,
+          isPending: reloadPreview.isPending,
+          onReload: reloadWithOtherTransport,
+          ...reloadControl,
+        }
+      : null,
     trimmedExpression,
     url,
   };

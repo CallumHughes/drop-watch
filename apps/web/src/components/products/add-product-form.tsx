@@ -102,10 +102,11 @@ export function AddProductForm() {
     setTargetPrice(event.target.value);
   }, []);
 
-  const { browserReload, chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const { chosen, mode, preview, savingWithExpression, transportReload, trimmedExpression } = flow;
+  const isTransportReloadPending = transportReload?.isPending ?? false;
   const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
-    if (!(preview && chosen) || browserReload.isPending) {
+    if (!(preview && chosen) || isTransportReloadPending) {
       return;
     }
     create.mutate({
@@ -118,7 +119,15 @@ export function AddProductForm() {
       title: chosen.title,
       url: preview.url,
     });
-  }, [browserReload.isPending, chosen, create, preview, savedMode, targetPrice, trimmedExpression]);
+  }, [
+    chosen,
+    create,
+    isTransportReloadPending,
+    preview,
+    savedMode,
+    targetPrice,
+    trimmedExpression,
+  ]);
 
   const note = extractorNote({
     expression: savedMode ? trimmedExpression : null,
@@ -133,7 +142,7 @@ export function AddProductForm() {
       {preview ? (
         <SavePanel
           chosen={chosen}
-          isSaveDisabled={create.isPending || browserReload.isPending}
+          isSaveDisabled={create.isPending || isTransportReloadPending}
           isSaving={create.isPending}
           note={note}
           onSave={onSave}

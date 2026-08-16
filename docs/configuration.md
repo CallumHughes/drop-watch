@@ -77,14 +77,16 @@ listing, so scheduled checks stay pinned to that winning mode. Existing
 listings are unchanged; switch one manually in its settings if you want to
 change its scheduled check mode.
 
-When manually choosing an expression against an HTTP preview, use **Reload in
-browser** to explicitly replace that preview with the post-JavaScript document.
-The HTTP preview remains on screen while the browser loads; on success the new
-document (and its fresh selector/source cache) replaces it. The action is
-disabled when the web app knows `RENDER_URL` is unset. A configured renderer
-can still be unavailable: failures leave the HTTP preview intact and can be
-retried, while an explicit configuration rejection disables the action for the
-rest of that add form.
+On any HTTP preview, use **Reload in browser** to explicitly replace it with the
+post-JavaScript document. A browser preview offers **Reload with HTTP** as the
+return path, so you can compare the results and keep whichever is more useful.
+Each action fetches a fresh page and replaces the preview and selector/source
+cache only after it succeeds; the current preview remains on screen while the
+replacement loads. Browser reload is disabled when the web app knows
+`RENDER_URL` is unset. A configured renderer can still be unavailable: failures
+leave the HTTP preview intact and can be retried, while an explicit
+configuration rejection disables browser reload for the rest of that add form.
+Returning to HTTP never depends on `RENDER_URL`.
 
 It is **not** for bot protection. Sites with active bot protection (Amazon in
 particular) are treated as unsupported — DropWatch does not escalate against

@@ -41,10 +41,11 @@ export function AddListingForm({
     })
   );
 
-  const { browserReload, chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const { chosen, mode, preview, savingWithExpression, transportReload, trimmedExpression } = flow;
+  const isTransportReloadPending = transportReload?.isPending ?? false;
   const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
-    if (!(preview && chosen) || browserReload.isPending) {
+    if (!(preview && chosen) || isTransportReloadPending) {
       return;
     }
     addListing.mutate({
@@ -57,8 +58,8 @@ export function AddListingForm({
     });
   }, [
     addListing,
-    browserReload.isPending,
     chosen,
+    isTransportReloadPending,
     preview,
     productId,
     savedMode,
@@ -84,7 +85,7 @@ export function AddListingForm({
             <p className="text-muted-foreground text-xs">{note}</p>
             <div>
               <Button
-                disabled={!chosen || addListing.isPending || browserReload.isPending}
+                disabled={!chosen || addListing.isPending || isTransportReloadPending}
                 onClick={onSave}
                 type="button"
               >

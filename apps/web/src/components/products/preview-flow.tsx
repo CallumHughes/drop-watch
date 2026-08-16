@@ -39,9 +39,55 @@ export function Field({
   );
 }
 
+function TransportReload({ reload }: { reload: NonNullable<PreviewFlowState["transportReload"]> }) {
+  const targetsBrowser = reload.target === "browser";
+  const actionLabel = targetsBrowser ? "Reload in browser" : "Reload with HTTP";
+  const pendingLabel = targetsBrowser ? "Reloading in browser…" : "Reloading with HTTP…";
+  const buttonLabel = reload.isPending ? pendingLabel : actionLabel;
+  const errorPrefix = targetsBrowser
+    ? "Could not reload in a browser:"
+    : "Could not reload with HTTP:";
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div>
+        <Button
+          disabled={reload.disabled || reload.isPending}
+          onClick={reload.onReload}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {buttonLabel}
+        </Button>
+      </div>
+      {reload.unavailable ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          Browser rendering is not configured on this instance. Set <code>RENDER_URL</code> and
+          restart to enable it.
+        </p>
+      ) : null}
+      {reload.isPending ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          {targetsBrowser
+            ? "Loading the page in a browser. Your HTTP preview remains available while this runs."
+            : "Loading the page with plain HTTP. Your browser preview remains available while this runs."}
+        </p>
+      ) : null}
+      {reload.error ? (
+        <p className="text-destructive text-xs" role="alert">
+          {errorPrefix} {reload.error}{" "}
+          {reload.disabled
+            ? "This action is unavailable for the rest of this form."
+            : "You can try again."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** What the chain found, plus the manual override when one is being worked on. */
 function PreviewPanel({
-  browserReload,
   expression,
   isTesting,
   mode,
@@ -50,8 +96,8 @@ function PreviewPanel({
   onTogglePicker,
   preview,
   test,
+  transportReload,
 }: {
-  browserReload: PreviewFlowState["browserReload"];
   expression: string;
   isTesting: boolean;
   mode: ExpressionMode | null;
@@ -60,6 +106,7 @@ function PreviewPanel({
   onTogglePicker: () => void;
   preview: PagePreview;
   test: ExpressionPreview | undefined;
+  transportReload: PreviewFlowState["transportReload"];
 }) {
   return (
     <Card>
@@ -78,7 +125,7 @@ function PreviewPanel({
             <PreviewSummary extraction={preview.extraction} url={preview.url} />
             <div>
               <Button
-                disabled={browserReload.isPending}
+                disabled={transportReload?.isPending}
                 onClick={onTogglePicker}
                 size="sm"
                 type="button"
@@ -94,6 +141,8 @@ function PreviewPanel({
           </p>
         )}
 
+        {transportReload ? <TransportReload reload={transportReload} /> : null}
+
         {mode === null ? null : (
           <ExpressionPicker
             expression={expression}
@@ -102,7 +151,6 @@ function PreviewPanel({
             onExpressionChange={onExpressionChange}
             onModeChange={onModeChange}
             previewId={preview.previewId}
-            reloadInBrowser={preview.render === "http" ? browserReload : undefined}
             test={test}
             url={preview.url}
           />
@@ -120,7 +168,7 @@ function PreviewPanel({
  */
 export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
   const urlId = useId();
-  const isLoadingPreview = flow.fetchPreview.isPending || flow.browserReload.isPending;
+  const isLoadingPreview = flow.fetchPreview.isPending || Boolean(flow.transportReload?.isPending);
   const fetchButtonLabel = flow.fetchPreview.isPending ? "Loading…" : "Load preview";
 
   return (
@@ -151,7 +199,6 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
 
       {flow.preview ? (
         <PreviewPanel
-          browserReload={flow.browserReload}
           expression={flow.expression}
           isTesting={flow.isTesting}
           mode={flow.mode}
@@ -160,6 +207,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
           onTogglePicker={flow.togglePicker}
           preview={flow.preview}
           test={flow.expressionTest.data}
+          transportReload={flow.transportReload}
         />
       ) : null}
     </>

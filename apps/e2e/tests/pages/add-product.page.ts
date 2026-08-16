@@ -4,6 +4,7 @@ const PRODUCT_URL_PATTERN = /\/products\/(?<id>[0-9a-f-]{36})$/;
 const STRATEGY_NOTE_PATTERN = /found by/;
 const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
 const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/;
+const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/;
 
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {
@@ -12,8 +13,10 @@ export class AddProductPage {
   /** "found by schema.org JSON-LD" etc — proof of which strategy won. */
   readonly strategyNote: Locator;
   readonly pickMyselfButton: Locator;
-  /** Available from the expression picker when a user wants a rendered DOM. */
+  /** Available on HTTP previews when a user wants a rendered DOM. */
   readonly reloadInBrowserButton: Locator;
+  /** Available on browser previews to replace them with a fresh HTTP response. */
+  readonly reloadWithHttpButton: Locator;
   /** Shown when the automatic chain found nothing and the picker is the next step. */
   readonly noAutoMatchNote: Locator;
   /** Provenance displayed when the successful preview came from the renderer sidecar. */
@@ -31,6 +34,9 @@ export class AddProductPage {
     this.pickMyselfButton = page.getByRole("button", { name: "Pick the price myself" });
     this.reloadInBrowserButton = page.getByRole("button", {
       name: BROWSER_RELOAD_BUTTON_PATTERN,
+    });
+    this.reloadWithHttpButton = page.getByRole("button", {
+      name: HTTP_RELOAD_BUTTON_PATTERN,
     });
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
     this.browserRenderProvenance = page.getByText("rendered in a browser");
