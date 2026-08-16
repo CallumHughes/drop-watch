@@ -4,7 +4,6 @@ import type { RenderMode } from "@drop-watch/api/schemas/products";
 /** How each pinned mode reads in prose. */
 const MODE_LABELS: Record<ExpressionMode, string> = {
   jsonpath: "the JSONPath",
-  regex: "the regular expression",
   selector: "the selector",
 };
 

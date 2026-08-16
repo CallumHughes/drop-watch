@@ -14,8 +14,8 @@ import type { Listing } from "@drop-watch/db/schema/products";
 
 /**
  * One function rather than two so the pinned mode and the expression cannot
- * disagree — feeding a regex to the CSS engine because the mode said one thing
- * and the column held another is exactly the bug a single column invites.
+ * disagree — feeding a JSONPath to the CSS engine because the mode said one
+ * thing and the column held another is exactly the bug a single column invites.
  *
  * `extractor` is a text column rather than a pg enum (strategy names are owned
  * by `@drop-watch/core`, so adding one is not a migration). The membership

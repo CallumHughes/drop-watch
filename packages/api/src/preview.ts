@@ -465,8 +465,8 @@ export interface ExpressionPreview {
   extraction: PreviewExtraction | null;
   extractionError: string | null;
   /**
-   * The expression is not valid in its mode — bad CSS, a regex that will not
-   * compile, an unparseable path. Worth its own flag because it is what every
+   * The expression is not valid in its mode — bad CSS or an unparseable path.
+   * Worth its own flag because it is what every
    * half-typed expression looks like, and should not read as "wrong expression".
    */
   invalidExpression: boolean;

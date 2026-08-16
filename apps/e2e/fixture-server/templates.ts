@@ -8,10 +8,10 @@
  * ambiguity but removes it when rendered, while `selector` exercises the
  * hand-picked fallback.
  *
- * `regex-only` and `json-blob` cover the two places a CSS selector cannot
- * reach: a price that is only ever an attribute value, and one that only
- * exists inside an embedded JSON payload. Neither carries structured data, so
- * the automatic chain must come up empty on both.
+ * `attribute-only` and `json-blob` cover the two manual paths: a price that is
+ * only ever an attribute value, and one that only exists inside an embedded
+ * JSON payload. Neither carries structured data, so the automatic chain must
+ * come up empty on both.
  */
 
 export interface FixtureProductState {
@@ -25,7 +25,7 @@ export interface FixtureProductState {
     | "js"
     | "json-blob"
     | "jsonld"
-    | "regex-only"
+    | "attribute-only"
     | "rendered-selected-sku"
     | "selector";
   title: string;
@@ -196,10 +196,10 @@ function selectorPage(state: FixtureProductState): string {
 }
 
 /**
- * The price exists only as an attribute value — never as text, so no CSS
- * selector can reach it and no structured data describes it.
+ * The price exists only as an attribute value — never as text. The explicit
+ * selector attribute syntax can read it, while the automatic chain cannot.
  */
-function regexOnlyPage(state: FixtureProductState): string {
+function attributeOnlyPage(state: FixtureProductState): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -207,7 +207,7 @@ function regexOnlyPage(state: FixtureProductState): string {
   <title>${escapeHtml(state.title)}</title>
 </head>
 <body>
-  <main data-price="${state.price}" data-currency="${state.currency}">
+  <main data-price="${state.currency} ${state.price}">
     <h1>${escapeHtml(state.title)}</h1>
     <div class="stock">${state.availability === "InStock" ? "In stock" : "Out of stock"}</div>
     <p class="price">See basket for price</p>
@@ -260,8 +260,8 @@ export function renderProductPage(state: FixtureProductState, url: string): stri
   if (state.template === "rendered-selected-sku") {
     return ambiguousVariantPage(state, "select");
   }
-  if (state.template === "regex-only") {
-    return regexOnlyPage(state);
+  if (state.template === "attribute-only") {
+    return attributeOnlyPage(state);
   }
   if (state.template === "json-blob") {
     return jsonBlobPage(state);

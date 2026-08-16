@@ -7,7 +7,7 @@ import type { Locator } from "@playwright/test";
  */
 export class ListingSettingsForm {
   readonly browserRenderCheckbox: Locator;
-  /** `auto` | `selector` | `regex` | `jsonpath` — how the price is found. */
+  /** `auto` | `selector` | `jsonpath` — how the price is found. */
   readonly extractorSelect: Locator;
   readonly saveButton: Locator;
   private readonly row: Locator;
@@ -22,7 +22,7 @@ export class ListingSettingsForm {
   }
 
   /** The expression input, whose label follows the selected mode. */
-  expressionInput(mode: "CSS selector" | "Regular expression" | "JSONPath"): Locator {
+  expressionInput(mode: "CSS selector" | "JSONPath"): Locator {
     return this.row.getByLabel(`${mode} for the price`);
   }
 }

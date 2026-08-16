@@ -9,11 +9,11 @@ import { PreviewSource } from "./preview-source";
 import { PreviewSummary } from "./preview-summary";
 
 /**
- * The three ways to point at a price by hand, in the order worth trying.
+ * The two ways to point at a price by hand, in the order worth trying.
  *
- * A CSS selector reaches anything that is text on the page; the other two exist
- * for the prices that are not — a value that only lives in an attribute or an
- * inline script, and one that only lives in an embedded JSON payload.
+ * A CSS selector reaches visible price text and, with an explicit terminal
+ * attribute suffix, values stored on an element. JSONPath remains for values
+ * that only live in embedded JSON payloads.
  */
 const MODES: readonly {
   hint: string;
@@ -23,18 +23,16 @@ const MODES: readonly {
   suggestions: readonly string[];
 }[] = [
   {
-    hint: "Tested against the page fetched above — typing here never re-downloads it.",
+    hint: "For an attribute value, append ::attr(attribute-name), for example [data-price]::attr(data-price). If the page provides no currency elsewhere, the attribute should include its symbol or code. Tested against the page fetched above — typing here never re-downloads it.",
     label: "CSS selector",
     mode: "selector",
-    placeholder: ".price, [itemprop='price'] …",
-    suggestions: [".price", ".product-price", "[itemprop='price']", "p.price_color"],
-  },
-  {
-    hint: "The named group (?<price>…) wins, then the first capture group, then the whole match. Use [\\s\\S] to span lines.",
-    label: "Regular expression",
-    mode: "regex",
-    placeholder: 'data-price="([\\d.]+)"',
-    suggestions: ['data-price="([\\d.]+)"', '"price"\\s*:\\s*"?([\\d.]+)'],
+    placeholder: ".price, [data-price]::attr(data-price) …",
+    suggestions: [
+      ".price",
+      ".product-price",
+      "[itemprop='price']",
+      "[data-price]::attr(data-price)",
+    ],
   },
   {
     hint: "Searched across every JSON payload on the page, including __NEXT_DATA__ and inline state.",

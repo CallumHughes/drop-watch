@@ -32,7 +32,7 @@ const MAX_LOCALE_LENGTH = 35;
 export const listingCreateInput = z
   .object({
     currency: z.string().length(3).nullable().optional(),
-    /** CSS, a regular expression or a JSONPath — `extractor` says which. */
+    /** CSS (optionally `::attr(name)`) or JSONPath — `extractor` says which. */
     expression: z.string().max(MAX_EXPRESSION_LENGTH).nullable().optional(),
     /** Pinning to a strategy makes a rotted expression fail loudly. */
     extractor: z.enum(LISTING_EXTRACTORS).default("auto"),

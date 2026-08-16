@@ -14,133 +14,86 @@ import { parseJsonPath } from "./json-path";
 
 export type ExpressionCheck = { ok: true } | { error: string; ok: false };
 
-/**
- * A user's regex runs in the shared worker process, so a catastrophic
- * backtracker stalls every listing's checks rather than only its own. Node
- * cannot interrupt a running regex, so this is mitigation and not a guarantee:
- * a length cap, a nested-quantifier rejection, and (in `./regex`) a cap on how
- * much of the body is searched. `re2` is the escalation if this proves thin.
- */
-const MAX_PATTERN_LENGTH = 500;
+const MAX_EXPRESSION_LENGTH = 500;
 
-/** `(a+)+`, `(a*)*` — a repeated group that is itself unbounded. */
-const UNBOUNDED_QUANTIFIER = /[*+]|\{\d+,\}/;
-const QUANTIFIER_AFTER_GROUP = /^(?:[*+]|\{\d+(?:,\d*)?\})/;
+const ATTRIBUTE_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]*$/;
+const ATTRIBUTE_SUFFIX = /::attr\(([^()]*)\)$/;
 
-/**
- * A repeated group whose body can match the same text more than one way is the
- * shape that backtracks exponentially. Two ways to get there: an inner
- * unbounded quantifier (`(a+)+`) or an alternation whose branches can overlap
- * (`(a|aa)+`).
- *
- * Telling an overlapping alternation from a disjoint one needs real analysis,
- * so every repeated alternation is refused. `(a|b)+` is a false positive and
- * `[ab]+` says the same thing — a price pattern almost never wants the former.
- */
-function isAmbiguousBody(body: string): boolean {
-  return UNBOUNDED_QUANTIFIER.test(body) || hasAlternation(body);
-}
+/** Finds an attribute-reader marker outside quoted CSS attribute values. */
+function selectorAttributeMarkers(expression: string): number[] {
+  const markers: number[] = [];
+  let quote: '"' | "'" | undefined;
+  let escaped = false;
 
-/** A `|` that is a real alternation, not one inside a class or escaped. */
-function hasAlternation(body: string): boolean {
-  let inClass = false;
-  let index = 0;
-  while (index < body.length) {
-    const char = body.charAt(index);
-    if (char === "\\") {
-      index += 1;
-    } else if (inClass) {
-      inClass = char !== "]";
-    } else if (char === "[") {
-      inClass = true;
-    } else if (char === "|") {
-      return true;
-    }
-    index += 1;
-  }
-  return false;
-}
-
-/**
- * Walks the pattern, and for every group that is immediately quantified checks
- * whether its body is ambiguous. A heuristic, not a decision procedure — it
- * catches the shapes people actually paste.
- */
-function hasNestedQuantifier(pattern: string): boolean {
-  for (let index = 0; index < pattern.length; index += 1) {
-    if (pattern[index] === "\\") {
-      index += 1;
+  for (let index = 0; index < expression.length; index += 1) {
+    const character = expression[index];
+    if (escaped) {
+      escaped = false;
       continue;
     }
-    if (pattern[index] !== "(") {
+    if (character === "\\") {
+      escaped = true;
       continue;
     }
-
-    const closing = matchingParen(pattern, index);
-    if (closing === -1) {
-      continue;
-    }
-    const body = pattern.slice(index + 1, closing);
-    const after = pattern.slice(closing + 1);
-    if (QUANTIFIER_AFTER_GROUP.test(after) && isAmbiguousBody(body)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/** Index of the `)` closing the group opened at `open`, or -1 when unbalanced. */
-function matchingParen(pattern: string, open: number): number {
-  let depth = 0;
-  let inClass = false;
-  for (let index = open; index < pattern.length; index += 1) {
-    const char = pattern[index];
-    if (char === "\\") {
-      index += 1;
-      continue;
-    }
-    if (inClass) {
-      if (char === "]") {
-        inClass = false;
+    if (quote) {
+      if (character === quote) {
+        quote = undefined;
       }
       continue;
     }
-    if (char === "[") {
-      inClass = true;
-    } else if (char === "(") {
-      depth += 1;
-    } else if (char === ")") {
-      depth -= 1;
-      if (depth === 0) {
-        return index;
-      }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (expression.startsWith("::attr", index)) {
+      markers.push(index);
     }
   }
-  return -1;
+  return markers;
 }
 
-export function checkRegexExpression(expression: string): ExpressionCheck {
-  const pattern = expression.trim();
-  if (pattern.length === 0) {
-    return { error: "no expression", ok: false };
+export interface ParsedSelectorExpression {
+  attribute?: string;
+  selector: string;
+}
+
+/**
+ * Splits the optional terminal attribute reader from a CSS selector. The
+ * suffix is intentionally distinct from CSS syntax so a normal selector keeps
+ * its existing meaning: `[data-price]::attr(data-price)` reads that attribute.
+ */
+export function parseSelectorExpression(
+  expression: string
+): ParsedSelectorExpression | { error: string } {
+  const source = expression.trim();
+  const markers = selectorAttributeMarkers(source);
+  if (markers.length === 0) {
+    return { selector: source };
   }
-  if (pattern.length > MAX_PATTERN_LENGTH) {
-    return { error: `expression is longer than ${MAX_PATTERN_LENGTH} characters`, ok: false };
+  if (markers.length > 1) {
+    return { error: "a selector may contain only one terminal ::attr(name) suffix" };
   }
-  try {
-    // biome-ignore lint/correctness/noUnusedInstantiation: compiled purely to find out whether it compiles.
-    new RegExp(pattern);
-  } catch (error) {
-    return { error: `not a valid regular expression: ${(error as Error).message}`, ok: false };
+
+  const suffix = source.match(ATTRIBUTE_SUFFIX);
+  if (!suffix || suffix.index === undefined) {
+    return { error: "attribute extraction must use a terminal ::attr(name) suffix" };
   }
-  if (hasNestedQuantifier(pattern)) {
-    return {
-      error:
-        "this pattern repeats a group that can match the same text more than one way, which can hang on some pages — drop the outer repetition, e.g. `[\\s\\S]*?` instead of `(.*)+`, or `[ab]+` instead of `(a|b)+`",
-      ok: false,
-    };
+
+  const selector = source.slice(0, suffix.index).trim();
+  if (selector.length === 0) {
+    return { error: "an attribute extraction expression needs a CSS selector before ::attr(name)" };
   }
-  return { ok: true };
+
+  const [, attribute] = suffix;
+  if (!(attribute && ATTRIBUTE_NAME.test(attribute))) {
+    return { error: "::attr(name) needs a valid HTML attribute name" };
+  }
+  return { attribute, selector };
+}
+
+export function checkSelectorExpression(expression: string): ExpressionCheck {
+  const parsed = parseSelectorExpression(expression);
+  return "error" in parsed ? { error: parsed.error, ok: false } : { ok: true };
 }
 
 export function checkJsonPathExpression(expression: string): ExpressionCheck {
@@ -148,8 +101,8 @@ export function checkJsonPathExpression(expression: string): ExpressionCheck {
   if (path.length === 0) {
     return { error: "no expression", ok: false };
   }
-  if (path.length > MAX_PATTERN_LENGTH) {
-    return { error: `expression is longer than ${MAX_PATTERN_LENGTH} characters`, ok: false };
+  if (path.length > MAX_EXPRESSION_LENGTH) {
+    return { error: `expression is longer than ${MAX_EXPRESSION_LENGTH} characters`, ok: false };
   }
   const parsed = parseJsonPath(path);
   return "error" in parsed ? { error: parsed.error, ok: false } : { ok: true };
@@ -157,13 +110,13 @@ export function checkJsonPathExpression(expression: string): ExpressionCheck {
 
 /** Dispatches to the check for whichever mode is reading the expression. */
 export function checkExpression(mode: string, expression: string): ExpressionCheck {
-  if (mode === "regex") {
-    return checkRegexExpression(expression);
-  }
   if (mode === "jsonpath") {
     return checkJsonPathExpression(expression);
   }
-  // A CSS selector is only checkable by handing it to cheerio, which this
-  // module deliberately cannot do. `testExpression` reports that verdict.
+  if (mode === "selector") {
+    return checkSelectorExpression(expression);
+  }
+  // An unknown mode is rejected by its caller; CSS syntax itself remains
+  // cheerio's responsibility so this browser-safe module stays dependency-free.
   return { ok: true };
 }

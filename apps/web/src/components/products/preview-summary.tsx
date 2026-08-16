@@ -11,7 +11,6 @@ const STRATEGY_LABELS: Record<PreviewExtraction["strategy"], string> = {
   jsonpath: "JSONPath",
   microdata: "microdata",
   opengraph: "OpenGraph tags",
-  regex: "regular expression",
   selector: "CSS selector",
 };
 

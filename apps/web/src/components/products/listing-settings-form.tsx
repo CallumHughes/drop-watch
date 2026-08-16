@@ -26,20 +26,17 @@ import { browserToggleState } from "./render-mode";
 const EXTRACTOR_LABELS: Record<ListingExtractor, string> = {
   auto: "Automatically (recommended)",
   jsonpath: "JSONPath into the page's JSON",
-  regex: "Regular expression over the page source",
   selector: "CSS selector",
 };
 
 const EXPRESSION_LABELS: Record<ExpressionMode, string> = {
   jsonpath: "JSONPath",
-  regex: "Regular expression",
   selector: "CSS selector",
 };
 
 const EXPRESSION_PLACEHOLDERS: Record<ExpressionMode, string> = {
   jsonpath: "$..price",
-  regex: 'data-price="([\\d.]+)"',
-  selector: ".price, [itemprop='price'] …",
+  selector: ".price, [data-price]::attr(data-price) …",
 };
 
 /**
@@ -228,15 +225,23 @@ export function ListingSettingsForm({
 
       {extractor === "auto" ? null : (
         <Field htmlFor={expressionId} label={`${EXPRESSION_LABELS[extractor]} for the price`}>
-          <Input
-            autoComplete="off"
-            id={expressionId}
-            maxLength={MAX_EXPRESSION_LENGTH}
-            onChange={onExpressionChange}
-            placeholder={EXPRESSION_PLACEHOLDERS[extractor]}
-            spellCheck={false}
-            value={expression}
-          />
+          <div className="flex flex-col gap-1">
+            <Input
+              autoComplete="off"
+              id={expressionId}
+              maxLength={MAX_EXPRESSION_LENGTH}
+              onChange={onExpressionChange}
+              placeholder={EXPRESSION_PLACEHOLDERS[extractor]}
+              spellCheck={false}
+              value={expression}
+            />
+            {extractor === "selector" ? (
+              <p className="text-muted-foreground">
+                For an attribute value, use <code>[data-price]::attr(data-price)</code>. Include a
+                currency symbol or code if the page provides no currency elsewhere.
+              </p>
+            ) : null}
+          </div>
         </Field>
       )}
 

@@ -127,7 +127,7 @@ export const listings = pgTable(
     currency: char("currency", { length: 3 }),
     /** Conditional-request cache validators from the last successful fetch. */
     etag: text("etag"),
-    /** CSS, a regular expression or a JSONPath — `extractor` says which. */
+    /** CSS (optionally `::attr(name)`) or JSONPath — `extractor` says which. */
     expression: text("expression"),
     /** `auto` runs the full fallback chain; anything else pins one strategy. */
     extractor: text("extractor").$type<ListingExtractor>().default("auto").notNull(),

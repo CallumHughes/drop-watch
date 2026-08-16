@@ -1,12 +1,13 @@
 /**
  * Configured CSS selector — the last resort, and the one the add-product
  * selector picker drives. Takes the first matching element, pulls its
- * machine-readable value if it has one, and regex-extracts a price from the
- * text otherwise.
+ * machine-readable value if it has one, and parses a price from the text
+ * otherwise. A terminal `::attr(name)` suffix reads an explicit attribute.
  *
  * An invalid selector is a user-input error, not a crash: it returns null.
  */
 
+import { parseSelectorExpression } from "./expression-guard";
 import { parsePrice } from "./price";
 import type { CheerioSelection, PriceCandidate, StrategyContext } from "./types";
 
@@ -22,9 +23,14 @@ export function extractBySelector({
     return null;
   }
 
+  const parsedExpression = parseSelectorExpression(expression);
+  if ("error" in parsedExpression) {
+    return null;
+  }
+
   let matched: CheerioSelection;
   try {
-    matched = $(expression);
+    matched = $(parsedExpression.selector);
   } catch {
     return null;
   }
@@ -34,7 +40,9 @@ export function extractBySelector({
 
   for (const element of matched.toArray()) {
     const node = $(element);
-    const raw = node.attr("content") ?? node.attr("value") ?? node.text();
+    const raw = parsedExpression.attribute
+      ? node.attr(parsedExpression.attribute)
+      : (node.attr("content") ?? node.attr("value") ?? node.text());
     const text = raw?.replace(WHITESPACE, " ").trim();
     if (!text) {
       continue;

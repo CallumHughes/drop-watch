@@ -55,7 +55,7 @@ export type ExtractionEvidence =
   | { type: "opengraph:page-metadata" }
   | {
       matchCount: number;
-      type: "selector:configured" | "regex:configured" | "jsonpath:configured";
+      type: "selector:configured" | "jsonpath:configured";
     };
 
 export interface Extracted {
@@ -81,12 +81,12 @@ export interface StrategyContext {
   /** The parsed document, loaded once and shared by every strategy. */
   $: CheerioAPI;
   /**
-   * The configured extraction expression — a CSS selector, a regular expression
-   * or a JSONPath, depending on which strategy is reading it. Every expression
-   * strategy is skipped without one.
+   * The configured extraction expression — a CSS selector or JSONPath,
+   * depending on which strategy is reading it. Every expression strategy is
+   * skipped without one.
    */
   expression?: string;
-  /** The raw body. `regex` matches against this, not the DOM, so attributes count. */
+  /** The raw body, used to discover embedded JSON documents. */
   html: string;
   /** BCP 47 hint for ambiguous price separators. */
   locale?: string;

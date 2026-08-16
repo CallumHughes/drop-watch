@@ -88,8 +88,9 @@ primitives:
     summary: >
       Price and availability extraction. The automatic chain runs JSON-LD,
       microdata and OpenGraph in precedence order; a listing may instead be
-      pinned to one expression strategy — CSS selector, regular expression over
-      the raw body, or a JSONPath over the page's embedded JSON. This package
+      pinned to one expression strategy — a CSS selector (optionally reading an
+      attribute with `::attr(name)`) or a JSONPath over the page's embedded JSON.
+      This package
       owns the list of strategy names, which is why `listings.extractor` is a
       text column rather than a pg enum.
     code:

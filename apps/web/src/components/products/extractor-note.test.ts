@@ -29,12 +29,6 @@ describe("extractorNote", () => {
       render: "browser",
     },
     {
-      expected: 'Will be tracked with the regular expression data-price="([0-9.]+)".',
-      expression: 'data-price="([0-9.]+)"',
-      mode: "regex",
-      render: "http",
-    },
-    {
       expected: "Will be tracked with the JSONPath $..price.",
       expression: "$..price",
       mode: "jsonpath",

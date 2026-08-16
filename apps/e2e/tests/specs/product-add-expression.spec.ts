@@ -1,18 +1,19 @@
 import { expect, test } from "../fixtures";
 
+const CHECK_TIMEOUT_MS = 45_000;
+
 /**
- * The two pages a CSS selector cannot handle: one whose price is only ever an
- * attribute value, and one whose price only exists inside an embedded JSON
- * payload. Both must fall through the automatic chain and then be rescued by
- * the picker.
+ * Two pages that must fall through the automatic chain: one whose price only
+ * exists in an attribute value, and one whose price only exists in an embedded
+ * JSON payload. The picker rescues both.
  */
 
-test("tracks an attribute-only price with a regular expression", async ({
+test("tracks an attribute-only price with a selector attribute", async ({
   addProduct,
-  dashboard,
   fixtureProduct,
+  productDetail,
 }) => {
-  await fixtureProduct.publish({ price: "42.50", template: "regex-only" });
+  await fixtureProduct.publish({ price: "42.50", template: "attribute-only" });
 
   await test.step("the automatic chain finds nothing and offers the picker", async () => {
     await addProduct.goto();
@@ -20,21 +21,18 @@ test("tracks an attribute-only price with a regular expression", async ({
     await expect(addProduct.noAutoMatchNote).toBeVisible();
   });
 
-  await test.step("a CSS selector cannot reach a value that is never text", async () => {
-    await addProduct.selectorInput.fill(".price");
-    await expect(addProduct.page.getByText("no price could be read")).toBeVisible();
+  await test.step("the selector attribute syntax reads the currency-bearing value", async () => {
+    await addProduct.selectorInput.fill("[data-price]::attr(data-price)");
+    await expect(addProduct.strategyNote).toContainText("CSS selector");
   });
 
-  await test.step("a regular expression reads it out of the attribute", async () => {
-    await addProduct.mode("Regular expression").click();
-    await addProduct.regexInput.fill('data-price="([\\d.]+)"');
-    await expect(addProduct.strategyNote).toContainText("regular expression");
-  });
-
-  await test.step("saving works from the regex path", async () => {
+  await test.step("the worker reuses the saved selector and records its price", async () => {
     await addProduct.track();
-    await dashboard.goto();
-    await expect(dashboard.productLink(fixtureProduct.title)).toBeVisible();
+    await productDetail.checkNow();
+    await expect(productDetail.currentPrice).toHaveText("£42.50", {
+      timeout: CHECK_TIMEOUT_MS,
+    });
+    await expect(productDetail.lastChecked).not.toHaveText("never");
   });
 });
 
@@ -62,20 +60,4 @@ test("tracks a price that only exists in embedded JSON with a JSONPath", async (
     await dashboard.goto();
     await expect(dashboard.productLink(fixtureProduct.title)).toBeVisible();
   });
-});
-
-test("refuses a regular expression that could hang the worker", async ({
-  addProduct,
-  fixtureProduct,
-}) => {
-  await fixtureProduct.publish({ price: "42.50", template: "regex-only" });
-
-  await addProduct.goto();
-  await addProduct.loadPreview(fixtureProduct.url);
-  await addProduct.mode("Regular expression").click();
-  await addProduct.regexInput.fill("(a+)+$");
-
-  // The picker and the save path run the same guard, so this can never be
-  // typed here and then accepted on submit.
-  await expect(addProduct.page.getByText("more than one way")).toBeVisible();
 });

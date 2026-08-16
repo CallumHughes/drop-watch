@@ -37,9 +37,9 @@ export const MAX_EXPRESSION_LENGTH = 500;
 /**
  * The refines every extraction-carrying schema shares.
  *
- * `expression` holds a CSS selector, a regular expression or a JSONPath, and
- * `extractor` says which — so "is this valid?" is one question with three
- * answers, asked here rather than restated on each schema. `checkExpression`
+ * `expression` holds a CSS selector (optionally ending in `::attr(name)`) or
+ * a JSONPath, and `extractor` says which — so "is this valid?" is one question
+ * with two answers, asked here rather than restated on each schema. `checkExpression`
  * is the same function the add-product picker calls, so a pattern the picker
  * accepted can never fail on save.
  */
@@ -95,7 +95,7 @@ export const productCreateInput = z
   .object({
     currency: z.string().length(3).nullable().optional(),
     dropPercent: z.number().int().min(MIN_DROP_PERCENT).max(MAX_DROP_PERCENT).nullable().optional(),
-    /** CSS, a regular expression or a JSONPath — `extractor` says which. */
+    /** CSS (optionally `::attr(name)`) or JSONPath — `extractor` says which. */
     expression: z.string().max(MAX_EXPRESSION_LENGTH).nullable().optional(),
     /** Pinning to a strategy makes a rotted expression fail loudly. */
     extractor: z.enum(LISTING_EXTRACTORS).default("auto"),

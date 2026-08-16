@@ -18,7 +18,6 @@ export const EXTRACTOR_STRATEGIES = [
   "microdata",
   "opengraph",
   "selector",
-  "regex",
   "jsonpath",
 ] as const;
 
@@ -28,7 +27,7 @@ export type ExtractorStrategy = (typeof EXTRACTOR_STRATEGIES)[number];
  * The strategies driven by a user-supplied expression — the ones a listing can
  * be pinned to. The rest read the page's own structured data and take no input.
  */
-export const EXPRESSION_MODES = ["selector", "regex", "jsonpath"] as const;
+export const EXPRESSION_MODES = ["selector", "jsonpath"] as const;
 
 export type ExpressionMode = (typeof EXPRESSION_MODES)[number];
 

@@ -1,58 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { checkExpression, checkJsonPathExpression, checkRegexExpression } from "./expression-guard";
+import {
+  checkExpression,
+  checkJsonPathExpression,
+  checkSelectorExpression,
+  parseSelectorExpression,
+} from "./expression-guard";
 
-describe("checkRegexExpression", () => {
+describe("selector attribute expressions", () => {
+  it("splits a terminal attribute suffix away from the selector", () => {
+    expect(parseSelectorExpression("  [data-price]::attr(data-price)  ")).toEqual({
+      attribute: "data-price",
+      selector: "[data-price]",
+    });
+  });
+
+  it("keeps ordinary selectors unchanged", () => {
+    expect(parseSelectorExpression("  p.price_color  ")).toEqual({ selector: "p.price_color" });
+    expect(parseSelectorExpression('[data-kind="::attr"]')).toEqual({
+      selector: '[data-kind="::attr"]',
+    });
+  });
+
   it.each([
-    'data-price="([\\d.]+)"',
-    '"price"\\s*:\\s*"?(?<price>[\\d.]+)',
-    "[\\s\\S]*?price",
-    // Alternation is fine; it is *repeated* alternation that backtracks.
-    "(?:£|\\$)([\\d,.]+)",
-    "[a|b]+",
-    "(a\\|b)+",
-  ])("accepts %s", (expression) => {
-    expect(checkRegexExpression(expression)).toEqual({ ok: true });
+    "::attr(data-price)",
+    "[data-price]::attr()",
+    "[data-price]::attr(data price)",
+    "[data-price]::attr(data-price) trailing",
+    "[data-price]::attr(data-price)::attr(content)",
+  ])("rejects malformed suffix %s", (expression) => {
+    expect(checkSelectorExpression(expression)).toMatchObject({ ok: false });
   });
 
-  it("rejects an empty expression", () => {
-    expect(checkRegexExpression("   ")).toEqual({ error: "no expression", ok: false });
-  });
-
-  it("rejects a pattern that will not compile", () => {
-    const check = checkRegexExpression("([0-9]+");
-    expect(check.ok).toBe(false);
-    expect(check.ok === false && check.error).toContain("not a valid regular expression");
-  });
-
-  it("rejects a pattern longer than the column allows", () => {
-    const check = checkRegexExpression("a".repeat(501));
-    expect(check.ok === false && check.error).toContain("longer than 500 characters");
-  });
-
-  it.each(["(a+)+", "(a*)*$", "(a|aa)+", "(\\d+)+x", "([\\s\\S]*)*", "(a+){2,}$", "(a|aa){1,3}$"])(
-    "rejects the catastrophic shape %s",
-    (expression) => {
-      // A user's regex runs in the shared worker process, so one backtracker
-      // stalls every listing's checks rather than only its own.
-      const check = checkRegexExpression(expression);
-      expect(check.ok).toBe(false);
-      expect(check.ok === false && check.error).toContain("more than one way");
-    }
-  );
-
-  it("does not mistake a quantified group with a bounded body for a backtracker", () => {
-    expect(checkRegexExpression("(ab)+")).toEqual({ ok: true });
-    expect(checkRegexExpression("(a{1,3})+")).toEqual({ ok: true });
-    expect(checkRegexExpression("(ab){2,4}")).toEqual({ ok: true });
-  });
-
-  it("does not read an escaped paren as a group", () => {
-    expect(checkRegexExpression("\\(a+\\)+")).toEqual({ ok: true });
-  });
-
-  it("does not read a paren inside a character class as a group", () => {
-    expect(checkRegexExpression("[(]a+")).toEqual({ ok: true });
+  it("accepts surrounding whitespace around a valid attribute expression", () => {
+    expect(checkSelectorExpression("  [data-price]::attr(data-price)  ")).toEqual({ ok: true });
   });
 });
 
@@ -76,13 +57,12 @@ describe("checkJsonPathExpression", () => {
 
 describe("checkExpression", () => {
   it("dispatches on the mode", () => {
-    expect(checkExpression("regex", "(a+)+").ok).toBe(false);
     expect(checkExpression("jsonpath", "nope").ok).toBe(false);
+    expect(checkExpression("selector", "[data-price]::attr()").ok).toBe(false);
   });
 
   it("passes a CSS selector through, because only cheerio can judge it", () => {
-    // This module is loaded by the browser bundle and cannot import cheerio;
-    // `testExpression` reports the selector verdict instead.
+    // This module is loaded by the browser bundle and cannot import cheerio.
     expect(checkExpression("selector", "p.price:has(")).toEqual({ ok: true });
   });
 });

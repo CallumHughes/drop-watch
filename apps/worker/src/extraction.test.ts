@@ -33,7 +33,7 @@ describe("extractionOptions", () => {
     expect(extractionOptions(listing())).toEqual({ strategies: STRATEGY_ORDER });
   });
 
-  it.each(["selector", "regex", "jsonpath"] as const)(
+  it.each(["selector", "jsonpath"] as const)(
     "pins a %s listing to that strategy alone",
     (extractor) => {
       // Pinned means it fails loudly when the expression rots, rather than
@@ -46,15 +46,15 @@ describe("extractionOptions", () => {
   );
 
   it("does not forward an expression to the auto chain", () => {
-    // With one generalised column, `auto` plus a regex would otherwise hand
-    // that regex to the CSS engine as the chain's trailing selector link.
-    expect(extractionOptions(listing({ expression: 'data-price="(\\d+)"' }))).toEqual({
+    // With one generalised column, `auto` plus an expression would otherwise
+    // hand that expression to the chain's trailing selector link.
+    expect(extractionOptions(listing({ expression: "$.offers.price" }))).toEqual({
       strategies: STRATEGY_ORDER,
     });
   });
 
   it("falls back to the chain when a pinned listing has no expression", () => {
-    expect(extractionOptions(listing({ extractor: "regex" }))).toEqual({
+    expect(extractionOptions(listing({ extractor: "selector" }))).toEqual({
       strategies: STRATEGY_ORDER,
     });
   });

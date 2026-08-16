@@ -837,6 +837,38 @@ describe("extract — configured selector", () => {
     });
   });
 
+  it("reads a currency-bearing attribute with a terminal ::attr(name) suffix", () => {
+    const attributeHtml = page("", '<div data-price="GBP 42.50">ignore this text</div>');
+
+    expect(
+      extract(attributeHtml, {
+        expression: "  [data-price]::attr(data-price)  ",
+        strategies: ["selector"],
+      })
+    ).toMatchObject({ currency: "GBP", ok: true, price: "42.50", strategy: "selector" });
+  });
+
+  it("preserves content, value, and text fallbacks for ordinary selectors", () => {
+    const fallbackHtml = page(
+      "",
+      '<meta class="from-content" content="GBP 10.00" />\n       <input class="from-value" value="GBP 20.00" />\n       <span class="from-text">GBP 30.00</span>'
+    );
+
+    expect(
+      extract(fallbackHtml, { expression: "  .from-content  ", strategies: ["selector"] })
+    ).toMatchObject({ currency: "GBP", ok: true, price: "10.00" });
+    expect(
+      extract(fallbackHtml, { expression: ".from-value", strategies: ["selector"] })
+    ).toMatchObject({ currency: "GBP", ok: true, price: "20.00" });
+    expect(
+      extract(fallbackHtml, { expression: ".from-text", strategies: ["selector"] })
+    ).toMatchObject({
+      currency: "GBP",
+      ok: true,
+      price: "30.00",
+    });
+  });
+
   it("is skipped when no expression is configured", () => {
     const result = extract(html);
     expect(result.ok).toBe(false);

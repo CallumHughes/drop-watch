@@ -5,14 +5,14 @@ import { testExpression } from "./index";
 /**
  * A page with no structured data at all — the case the picker exists for. Two
  * `.price` elements, so match counts are meaningful; the price also appears in
- * a `data-price` attribute and an inline JSON blob, which are the two places a
- * CSS selector cannot reach.
+ * a `data-price` attribute and an inline JSON blob, which exercise the two
+ * configured-expression modes.
  */
 const PAGE = `<!doctype html><html lang="en"><head>
   <title>A Light in the Attic | Books to Scrape</title>
   <meta property="og:image" content="/media/cover.jpg">
 </head><body>
-  <article class="product_page" data-price="51.77">
+  <article class="product_page" data-price="GBP 51.77">
     <h1>A Light in the Attic</h1>
     <p class="price_color">£51.77</p>
     <p class="instock availability">In stock (22 available)</p>
@@ -75,7 +75,7 @@ describe("testExpression — selector", () => {
 
     expect(test.matchCount).toBe(1);
     expect(test.result).toEqual({
-      error: "matched, but no price could be read from the matched text",
+      error: "matched, but no price could be read from the selected value",
       ok: false,
     });
   });
@@ -107,11 +107,11 @@ describe("testExpression — selector", () => {
   });
 });
 
-describe("testExpression — regex", () => {
-  it("reads the value out of an attribute a selector cannot reach", () => {
+describe("testExpression — selector attributes", () => {
+  it("reads a currency-bearing value from an explicit attribute", () => {
     const test = testExpression(PAGE, {
-      expression: 'data-price="([\\d.]+)"',
-      mode: "regex",
+      expression: "  [data-price]::attr(data-price)  ",
+      mode: "selector",
       url: URL,
     });
 
@@ -119,74 +119,33 @@ describe("testExpression — regex", () => {
     expect(test.matchCount).toBe(1);
     expect(test.result).toMatchObject({
       confidence: "high",
-      evidence: { matchCount: 1, type: "regex:configured" },
+      currency: "GBP",
+      evidence: { matchCount: 1, type: "selector:configured" },
       ok: true,
       price: "51.77",
-      strategy: "regex",
+      strategy: "selector",
     });
   });
 
-  it("shows the capture as the value and the whole match as its context", () => {
-    const test = testExpression(PAGE, { expression: 'data-price="([\\d.]+)"', mode: "regex" });
-
-    expect(test.samples).toEqual([{ context: 'data-price="51.77"', value: "51.77" }]);
-  });
-
-  it("prefers a named price group over group 1", () => {
+  it("shows the attribute value and matched element in picker samples", () => {
     const test = testExpression(PAGE, {
-      expression: 'data-(?<label>price)="(?<price>[\\d.]+)"',
-      mode: "regex",
+      expression: "[data-price]::attr(data-price)",
+      mode: "selector",
     });
 
-    expect(test.result).toMatchObject({ ok: true, price: "51.77" });
-    expect(test.samples[0]?.value).toBe("51.77");
-  });
-
-  it("reads an optional currency group", () => {
-    const test = testExpression(PAGE, {
-      expression: '"price":(?<price>[\\d.]+),"currency":"(?<currency>[A-Z]{3})"',
-      mode: "regex",
+    expect(test.samples).toHaveLength(1);
+    expect(test.samples[0]).toMatchObject({
+      context: expect.stringContaining('data-price="GBP 51.77"'),
+      value: "GBP 51.77",
     });
-
-    expect(test.result).toMatchObject({ currency: "GBP", ok: true, price: "51.77" });
   });
 
-  it("reports a pattern that will not compile as invalid, not as no-match", () => {
-    const test = testExpression(PAGE, { expression: "([0-9]+", mode: "regex" });
+  it("reports a malformed attribute suffix as invalid", () => {
+    const test = testExpression(PAGE, { expression: "[data-price]::attr()", mode: "selector" });
 
     expect(test.invalidExpression).toBe(true);
-    expect(test.invalidReason).toContain("not a valid regular expression");
+    expect(test.invalidReason).toContain("::attr(name)");
     expect(test.matchCount).toBe(0);
-  });
-
-  it("refuses a pattern that nests unbounded quantifiers", () => {
-    const test = testExpression(PAGE, { expression: "(a+)+$", mode: "regex" });
-
-    expect(test.invalidExpression).toBe(true);
-    expect(test.invalidReason).toContain("more than one way");
-  });
-
-  it("counts high-cardinality matches without losing a later price", () => {
-    const repeated = `${"x".repeat(10_000)}data-price="42.50"`;
-    const test = testExpression(repeated, {
-      expression: 'x|data-price="([\\d.]+)"',
-      mode: "regex",
-    });
-
-    expect(test.matchCount).toBe(10_001);
-    expect(test.samples).toHaveLength(5);
-    expect(test.result).toMatchObject({ ok: true, price: "42.50" });
-  });
-
-  it("separates matching nothing from matching without a price", () => {
-    expect(testExpression(PAGE, { expression: "nothing-here", mode: "regex" }).result).toEqual({
-      error: "matched nothing on this page",
-      ok: false,
-    });
-    expect(testExpression(PAGE, { expression: "(Light)", mode: "regex" }).result).toEqual({
-      error: "matched, but no price could be read from the matched text",
-      ok: false,
-    });
   });
 });
 

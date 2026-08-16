@@ -12,13 +12,12 @@
  */
 
 import { load } from "cheerio";
-import { checkExpression } from "./expression-guard";
+import { checkExpression, parseSelectorExpression } from "./expression-guard";
 import { describeJsonValue } from "./json-documents";
 import { extractJsonLd } from "./jsonld";
 import { extractByJsonPath, jsonPathMatches } from "./jsonpath";
 import { extractMicrodata } from "./microdata";
 import { extractOpenGraph, extractPageMetadata } from "./opengraph";
-import { extractByRegex, regexValue, scanRegexMatches } from "./regex";
 import { extractBySelector } from "./selector";
 import type {
   CheerioSelection,
@@ -57,7 +56,7 @@ const MAX_SAMPLE_CHARS = 300;
 /**
  * Fallback order. Fixed by the plan; callers may narrow it, not reorder it.
  *
- * `regex` and `jsonpath` are deliberately absent. Both need an expression the
+ * `jsonpath` is deliberately absent. It needs an expression the
  * user wrote, so in a chain that runs without one they could only ever no-op —
  * they are reachable by pinning a listing to them, not by falling back.
  */
@@ -73,20 +72,19 @@ const STRATEGIES: Record<ExtractorStrategy, Strategy> = {
   jsonpath: extractByJsonPath,
   microdata: extractMicrodata,
   opengraph: extractOpenGraph,
-  regex: extractByRegex,
   selector: extractBySelector,
 };
 
 export interface ExtractOptions {
   /**
-   * The configured extraction expression — CSS, a regular expression or a
-   * JSONPath, read by whichever strategy the caller pinned. Every expression
+   * The configured extraction expression — CSS or JSONPath, read by whichever
+   * strategy the caller pinned. Every expression
    * strategy no-ops without it.
    */
   expression?: string;
   /** BCP 47 hint for ambiguous price separators, e.g. "de-DE". */
   locale?: string;
-  /** Narrows the chain — e.g. `["regex"]` for a listing configured that way. */
+  /** Narrows the chain — e.g. `["selector"]` for a listing configured that way. */
   strategies?: readonly ExtractorStrategy[];
   /** Page URL, used to resolve a relative image URL to an absolute one. */
   url?: string;
@@ -168,12 +166,12 @@ export function extract(html: string, options: ExtractOptions = {}): ExtractionR
 /** One thing a candidate expression matched, as the picker displays it. */
 export interface ExpressionMatch {
   /**
-   * What produced the value — the element's markup, the whole regex match, or
-   * the JSON document the path resolved in. Truncated to
+   * What produced the value — the element's markup or the JSON document the
+   * path resolved in. Truncated to
    * {@link MAX_SAMPLE_CHARS}.
    */
   context: string;
-  /** The value itself: collapsed element text, the capture, or the JSON value. */
+  /** The value itself: element text, an explicit attribute, or a resolved JSON value. */
   value: string;
 }
 
@@ -183,8 +181,8 @@ export interface ExpressionMatch {
  */
 export interface ExpressionTest {
   /**
-   * The string is not valid in its mode — bad CSS, a regex that will not
-   * compile, an unparseable path. Distinct from "matched nothing" because it is
+   * The string is not valid in its mode — bad CSS or an unparseable path.
+   * Distinct from "matched nothing" because it is
    * what every half-typed expression looks like, not a wrong one.
    */
   invalidExpression: boolean;
@@ -244,9 +242,6 @@ export function testExpression(html: string, options: TestExpressionOptions): Ex
   }
 
   const context = buildContext(html, { ...options, expression });
-  if (options.mode === "regex") {
-    return regexTest(context, expression, options.url);
-  }
   if (options.mode === "jsonpath") {
     return jsonPathTest(context, expression, options.url);
   }
@@ -272,7 +267,7 @@ function unreadableError(strategy: ExpressionMode): string {
   if (strategy === "jsonpath") {
     return "resolved, but no price could be read from the value";
   }
-  return "matched, but no price could be read from the matched text";
+  return "matched, but no price could be read from the selected value";
 }
 
 function selectorTest(
@@ -280,9 +275,14 @@ function selectorTest(
   selector: string,
   url: string | undefined
 ): ExpressionTest {
+  const parsedExpression = parseSelectorExpression(selector);
+  if ("error" in parsedExpression) {
+    return failed(parsedExpression.error, parsedExpression.error);
+  }
+
   let matched: CheerioSelection;
   try {
-    matched = context.$(selector);
+    matched = context.$(parsedExpression.selector);
   } catch {
     const reason = `not a valid CSS selector: ${selector}`;
     return failed(reason, reason);
@@ -294,26 +294,17 @@ function selectorTest(
     .map((element) => ({
       context: truncate(context.$.html(context.$(element)), MAX_SAMPLE_CHARS),
       value: truncate(
-        context.$(element).text().replace(COLLAPSE_WHITESPACE, " ").trim(),
+        (parsedExpression.attribute
+          ? context.$(element).attr(parsedExpression.attribute)
+          : context.$(element).text()
+        )
+          ?.replace(COLLAPSE_WHITESPACE, " ")
+          .trim() ?? "",
         MAX_SAMPLE_CHARS
       ),
     }));
 
   return toTest(context, "selector", matched.length, samples, "matched nothing on this page", url);
-}
-
-function regexTest(
-  context: StrategyContext,
-  expression: string,
-  url: string | undefined
-): ExpressionTest {
-  const scan = scanRegexMatches(context.html, expression, MAX_SAMPLES);
-  const samples = scan.samples.map((match) => ({
-    context: truncate(match[0].replace(COLLAPSE_WHITESPACE, " ").trim(), MAX_SAMPLE_CHARS),
-    value: truncate(regexValue(match), MAX_SAMPLE_CHARS),
-  }));
-
-  return toTest(context, "regex", scan.matchCount, samples, "matched nothing on this page", url);
 }
 
 function jsonPathTest(
