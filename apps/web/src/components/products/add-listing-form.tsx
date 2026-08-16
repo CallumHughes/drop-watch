@@ -41,10 +41,11 @@ export function AddListingForm({
     })
   );
 
-  const { chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const { chosen, mode, preview, savingWithExpression, transportReload, trimmedExpression } = flow;
+  const isTransportReloadPending = transportReload?.isPending ?? false;
   const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
-    if (!(preview && chosen)) {
+    if (!(preview && chosen) || isTransportReloadPending) {
       return;
     }
     addListing.mutate({
@@ -55,7 +56,15 @@ export function AddListingForm({
       render: preview.render,
       url: preview.url,
     });
-  }, [addListing, chosen, preview, productId, savedMode, trimmedExpression]);
+  }, [
+    addListing,
+    chosen,
+    isTransportReloadPending,
+    preview,
+    productId,
+    savedMode,
+    trimmedExpression,
+  ]);
 
   const note = extractorNote({
     expression: savedMode ? trimmedExpression : null,
@@ -75,7 +84,11 @@ export function AddListingForm({
           <CardContent className="flex flex-col gap-4">
             <p className="text-muted-foreground text-xs">{note}</p>
             <div>
-              <Button disabled={!chosen || addListing.isPending} onClick={onSave} type="button">
+              <Button
+                disabled={!chosen || addListing.isPending || isTransportReloadPending}
+                onClick={onSave}
+                type="button"
+              >
                 {addListing.isPending ? "Saving…" : "Add store"}
               </Button>
             </div>
