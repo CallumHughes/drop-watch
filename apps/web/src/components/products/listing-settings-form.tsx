@@ -1,12 +1,15 @@
 "use client";
 
+import type { ExpressionMode } from "@drop-watch/api/routers/preview";
 import type { Listing } from "@drop-watch/api/routers/products";
 import {
+  MAX_EXPRESSION_LENGTH,
   MAX_INTERVAL_MINUTES,
   MAX_JITTER_PERCENT,
-  MAX_SELECTOR_LENGTH,
   MIN_INTERVAL_MINUTES,
+  PINNED_NEEDS_EXPRESSION,
 } from "@drop-watch/api/schemas/products";
+import { LISTING_EXTRACTORS, type ListingExtractor } from "@drop-watch/core/extract/strategies";
 import { Button } from "@drop-watch/ui/components/button";
 import { Checkbox } from "@drop-watch/ui/components/checkbox";
 import { Input } from "@drop-watch/ui/components/input";
@@ -18,6 +21,23 @@ import { toast } from "sonner";
 import { orpc } from "@/utils/orpc";
 
 import { browserToggleState } from "./render-mode";
+
+/** How each mode reads in the settings editor. `auto` is not an expression. */
+const EXTRACTOR_LABELS: Record<ListingExtractor, string> = {
+  auto: "Automatically (recommended)",
+  jsonpath: "JSONPath into the page's JSON",
+  selector: "CSS selector",
+};
+
+const EXPRESSION_LABELS: Record<ExpressionMode, string> = {
+  jsonpath: "JSONPath",
+  selector: "CSS selector",
+};
+
+const EXPRESSION_PLACEHOLDERS: Record<ExpressionMode, string> = {
+  jsonpath: "$..price",
+  selector: ".price, [data-price]::attr(data-price) …",
+};
 
 /**
  * A labelled control. The caller owns the id and hands the same one to its
@@ -63,13 +83,14 @@ export function ListingSettingsForm({
   const intervalId = useId();
   const jitterId = useId();
   const localeId = useId();
-  const selectorId = useId();
+  const expressionId = useId();
+  const extractorId = useId();
   const renderHintId = useId();
 
   const [intervalMinutes, setIntervalMinutes] = useState(String(listing.intervalMinutes));
   const [jitterPercent, setJitterPercent] = useState(String(listing.jitterPercent));
   const [extractor, setExtractor] = useState(listing.extractor);
-  const [selector, setSelector] = useState(listing.selector ?? "");
+  const [expression, setExpression] = useState(listing.expression ?? "");
   const [locale, setLocale] = useState(listing.locale ?? "");
   const [renderMode, setRenderMode] = useState(listing.render);
 
@@ -100,14 +121,14 @@ export function ListingSettingsForm({
   const onJitterChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setJitterPercent(event.target.value);
   }, []);
-  const onSelectorChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setSelector(event.target.value);
+  const onExpressionChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setExpression(event.target.value);
   }, []);
   const onLocaleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setLocale(event.target.value);
   }, []);
-  const toggleSelectorMode = useCallback((checked: boolean) => {
-    setExtractor(checked ? "selector" : "auto");
+  const onExtractorChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    setExtractor(event.target.value as ListingExtractor);
   }, []);
   const toggleBrowserRender = useCallback((checked: boolean) => {
     setRenderMode(checked ? "browser" : "http");
@@ -116,19 +137,20 @@ export function ListingSettingsForm({
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (extractor === "selector" && selector.trim() === "") {
-        toast.error("A selector-mode listing needs a selector");
+      const pinned = extractor !== "auto";
+      if (pinned && expression.trim() === "") {
+        toast.error(PINNED_NEEDS_EXPRESSION);
         return;
       }
       update.mutate(
         {
+          expression: pinned ? expression.trim() : null,
           extractor,
           id: listing.id,
           intervalMinutes: Number(intervalMinutes),
           jitterPercent: Number(jitterPercent),
           locale: locale.trim() === "" ? null : locale.trim(),
           render: renderMode,
-          selector: extractor === "selector" ? selector.trim() : null,
         },
         {
           onError: (error) => {
@@ -143,6 +165,7 @@ export function ListingSettingsForm({
       );
     },
     [
+      expression,
       extractor,
       intervalMinutes,
       jitterPercent,
@@ -151,7 +174,6 @@ export function ListingSettingsForm({
       onSaved,
       queryClient,
       renderMode,
-      selector,
       update,
     ]
   );
@@ -186,24 +208,42 @@ export function ListingSettingsForm({
         </Field>
       </div>
 
-      <Label className="gap-2">
-        <Checkbox checked={extractor === "selector"} onCheckedChange={toggleSelectorMode} />
-        Use a CSS selector instead of automatic extraction
-      </Label>
+      <Field htmlFor={extractorId} label="How the price is found">
+        <select
+          className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
+          id={extractorId}
+          onChange={onExtractorChange}
+          value={extractor}
+        >
+          {LISTING_EXTRACTORS.map((mode) => (
+            <option key={mode} value={mode}>
+              {EXTRACTOR_LABELS[mode]}
+            </option>
+          ))}
+        </select>
+      </Field>
 
-      {extractor === "selector" ? (
-        <Field htmlFor={selectorId} label="CSS selector for the price">
-          <Input
-            autoComplete="off"
-            id={selectorId}
-            maxLength={MAX_SELECTOR_LENGTH}
-            onChange={onSelectorChange}
-            placeholder=".price, [itemprop='price'] …"
-            spellCheck={false}
-            value={selector}
-          />
+      {extractor === "auto" ? null : (
+        <Field htmlFor={expressionId} label={`${EXPRESSION_LABELS[extractor]} for the price`}>
+          <div className="flex flex-col gap-1">
+            <Input
+              autoComplete="off"
+              id={expressionId}
+              maxLength={MAX_EXPRESSION_LENGTH}
+              onChange={onExpressionChange}
+              placeholder={EXPRESSION_PLACEHOLDERS[extractor]}
+              spellCheck={false}
+              value={expression}
+            />
+            {extractor === "selector" ? (
+              <p className="text-muted-foreground">
+                For an attribute value, use <code>[data-price]::attr(data-price)</code>. Include a
+                currency symbol or code if the page provides no currency elsewhere.
+              </p>
+            ) : null}
+          </div>
         </Field>
-      ) : null}
+      )}
 
       <div className="flex flex-col gap-1">
         <Label className="items-start gap-2">

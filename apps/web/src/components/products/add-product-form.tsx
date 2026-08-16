@@ -100,27 +100,29 @@ export function AddProductForm() {
     setTargetPrice(event.target.value);
   }, []);
 
-  const { chosen, preview, savingWithSelector, trimmedSelector } = flow;
+  const { chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
     if (!(preview && chosen)) {
       return;
     }
     create.mutate({
       currency: chosen.currency,
-      extractor: savingWithSelector ? "selector" : "auto",
+      expression: savedMode ? trimmedExpression : null,
+      extractor: savedMode ?? "auto",
       imageUrl: chosen.imageUrl,
       render: preview.render,
-      selector: savingWithSelector ? trimmedSelector : null,
       targetPrice: targetPrice.trim() === "" ? null : targetPrice.trim(),
       title: chosen.title,
       url: preview.url,
     });
-  }, [chosen, create, preview, savingWithSelector, targetPrice, trimmedSelector]);
+  }, [chosen, create, preview, savedMode, targetPrice, trimmedExpression]);
 
   const note = extractorNote({
+    expression: savedMode ? trimmedExpression : null,
     hasPrice: chosen !== null,
+    mode: savedMode,
     render: preview?.render ?? "http",
-    selector: savingWithSelector ? trimmedSelector : null,
   });
 
   return (

@@ -7,6 +7,11 @@
  * one variant as selected. `browser-no-match` starts with the same usable
  * ambiguity but removes it when rendered, while `selector` exercises the
  * hand-picked fallback.
+ *
+ * `attribute-only` and `json-blob` cover the two manual paths: a price that is
+ * only ever an attribute value, and one that only exists inside an embedded
+ * JSON payload. Neither carries structured data, so the automatic chain must
+ * come up empty on both.
  */
 
 export interface FixtureProductState {
@@ -15,7 +20,14 @@ export interface FixtureProductState {
   currency: string;
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
-  template: "browser-no-match" | "js" | "jsonld" | "rendered-selected-sku" | "selector";
+  template:
+    | "browser-no-match"
+    | "js"
+    | "json-blob"
+    | "jsonld"
+    | "attribute-only"
+    | "rendered-selected-sku"
+    | "selector";
   title: string;
 }
 
@@ -183,6 +195,61 @@ function selectorPage(state: FixtureProductState): string {
 `;
 }
 
+/**
+ * The price exists only as an attribute value — never as text. The explicit
+ * selector attribute syntax can read it, while the automatic chain cannot.
+ */
+function attributeOnlyPage(state: FixtureProductState): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+</head>
+<body>
+  <main data-price="${state.currency} ${state.price}">
+    <h1>${escapeHtml(state.title)}</h1>
+    <div class="stock">${state.availability === "InStock" ? "In stock" : "Out of stock"}</div>
+    <p class="price">See basket for price</p>
+  </main>
+</body>
+</html>
+`;
+}
+
+/**
+ * The price exists only inside an embedded JSON payload, the way a
+ * single-page storefront hydrates one.
+ */
+function jsonBlobPage(state: FixtureProductState): string {
+  const payload = JSON.stringify({
+    props: {
+      pageProps: {
+        product: {
+          currency: state.currency,
+          name: state.title,
+          price: state.price,
+        },
+      },
+    },
+  });
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+    <div class="stock">${state.availability === "InStock" ? "In stock" : "Out of stock"}</div>
+  </main>
+  <script id="__NEXT_DATA__" type="application/json">${payload}</script>
+</body>
+</html>
+`;
+}
+
 export function renderProductPage(state: FixtureProductState, url: string): string {
   if (state.template === "jsonld") {
     return jsonLdPage(state, url);
@@ -192,6 +259,12 @@ export function renderProductPage(state: FixtureProductState, url: string): stri
   }
   if (state.template === "rendered-selected-sku") {
     return ambiguousVariantPage(state, "select");
+  }
+  if (state.template === "attribute-only") {
+    return attributeOnlyPage(state);
+  }
+  if (state.template === "json-blob") {
+    return jsonBlobPage(state);
   }
   return state.template === "js" ? javascriptPage(state, url) : selectorPage(state);
 }

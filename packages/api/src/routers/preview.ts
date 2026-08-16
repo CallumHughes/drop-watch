@@ -1,11 +1,11 @@
 /**
  * The add-product preview: load a URL through the automatic transport policy,
  * run the identical extraction chain the worker runs, and hold the winning body
- * in memory so a selector can be picked without touching the network again.
+ * in memory so an expression can be picked without touching the network again.
  *
  * `page` is the only procedure here that reaches out to the internet;
- * `testSelector` and `source` are pure reads of the cached body, which is what
- * makes the picker safe to drive from every keystroke.
+ * `testExpression` and `source` are pure reads of the cached body, which is
+ * what makes the picker safe to drive from every keystroke.
  * The chain itself is `@drop-watch/core/extract` — the same
  * module `apps/worker` calls — so the preview cannot drift from what a
  * scheduled check will later record.
@@ -14,7 +14,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { extract, testSelector } from "@drop-watch/core/extract";
+import { extract, testExpression } from "@drop-watch/core/extract";
+import { EXPRESSION_MODES } from "@drop-watch/core/extract/strategies";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import { checkUrl } from "@drop-watch/core/net/guard";
 import { type RetrieveResult, renderPage } from "@drop-watch/core/render";
@@ -25,6 +26,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import {
+  type ExpressionPreview,
   orchestratePreview,
   type PagePreview,
   PREVIEW_REQUEST_MODES,
@@ -34,18 +36,17 @@ import {
   previewFailure,
   previewTransports,
   previewUrlRejection,
-  type SelectorPreview,
+  toExpressionPreview,
   toPreviewExtraction,
-  toSelectorPreview,
 } from "../preview";
-import type { RenderMode } from "../schemas/products";
+import { MAX_EXPRESSION_LENGTH, type RenderMode } from "../schemas/products";
 
 /**
  * Re-exported so `apps/web` can name these shapes without depending on
  * `@drop-watch/core` — the UI reads the API, not the extraction engine.
  */
-export type { SelectorMatch } from "@drop-watch/core/extract";
-export type { PagePreview, PreviewExtraction, SelectorPreview } from "../preview";
+export type { ExpressionMatch, ExpressionMode } from "@drop-watch/core/extract";
+export type { ExpressionPreview, PagePreview, PreviewExtraction } from "../preview";
 
 /**
  * Long enough to read a page's markup and work out a selector, short enough
@@ -72,8 +73,6 @@ const PREVIEW_ESCALATING_RETRIES = 0;
  * browser. The selector still runs against the full document server-side.
  */
 const MAX_SOURCE_CHARS = 400_000;
-
-const MAX_SELECTOR_LENGTH = 500;
 
 /**
  * One cache per process, stashed on `globalThis` for the same reason the
@@ -260,36 +259,43 @@ export const previewRouter = {
     }),
 
   /**
-   * Runs one candidate selector against the cached body. **No fetch happens
-   * here** — that is the point of the cache, and it is what makes calling this
-   * on every edit reasonable.
+   * Runs one candidate expression against the cached body, in whichever mode
+   * the picker is on. **No fetch happens here** — that is the point of the
+   * cache, and it is what makes calling this on every edit reasonable.
+   *
+   * The syntax and safety checks `testExpression` runs are the same ones
+   * `productCreateInput` runs, so an expression the picker accepts is exactly
+   * one that can be saved.
    */
-  testSelector: protectedProcedure
+  testExpression: protectedProcedure
     .input(
       previewIdInput.extend({
+        expression: z.string().max(MAX_EXPRESSION_LENGTH),
         locale: z.string().max(35).optional(),
-        selector: z.string().max(MAX_SELECTOR_LENGTH),
+        mode: z.enum(EXPRESSION_MODES),
       })
     )
-    .handler(({ input }): SelectorPreview => {
+    .handler(({ input }): ExpressionPreview => {
       const entry = requireEntry(input.previewId);
-      const test = testSelector(entry.html, {
-        selector: input.selector,
+      const test = testExpression(entry.html, {
+        expression: input.expression,
+        mode: input.mode,
         url: entry.url,
         ...(input.locale ? { locale: input.locale } : {}),
       });
       // `fetched: false` is not decoration: it is the line that proves the
       // picker never re-downloads the page.
-      const log = createLogger({ action: "preview_test_selector", previewId: input.previewId });
+      const log = createLogger({ action: "preview_test_expression", previewId: input.previewId });
       log.set({
+        expression: input.expression,
         fetched: false,
         htmlBytes: entry.html.length,
         matchCount: test.matchCount,
+        mode: input.mode,
         ok: test.result.ok,
-        selector: input.selector,
       });
-      log.info("selector tested against cached html");
+      log.info("expression tested against cached html");
       log.emit();
-      return toSelectorPreview(test);
+      return toExpressionPreview(test);
     }),
 };

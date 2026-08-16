@@ -16,6 +16,7 @@ export class AddProductPage {
   /** Provenance displayed when the successful preview came from the renderer sidecar. */
   readonly browserRenderProvenance: Locator;
   readonly selectorInput: Locator;
+  readonly jsonPathInput: Locator;
   readonly trackButton: Locator;
   readonly page: Page;
 
@@ -28,7 +29,13 @@ export class AddProductPage {
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
     this.browserRenderProvenance = page.getByText("rendered in a browser");
     this.selectorInput = page.getByLabel("CSS selector for the price");
+    this.jsonPathInput = page.getByLabel("JSONPath for the price");
     this.trackButton = page.getByRole("button", { name: "Track this product" });
+  }
+
+  /** The picker's mode buttons — "CSS selector" and "JSONPath". */
+  mode(name: "CSS selector" | "JSONPath"): Locator {
+    return this.page.getByRole("button", { exact: true, name });
   }
 
   async goto(): Promise<void> {

@@ -9,10 +9,10 @@
  */
 
 import type {
+  ExpressionMatch,
+  ExpressionTest,
   ExtractionResult,
   ExtractorStrategy,
-  SelectorMatch,
-  SelectorTest,
 } from "@drop-watch/core/extract";
 import type { UrlVerdict } from "@drop-watch/core/net/guard";
 import type { RetrieveResult } from "@drop-watch/core/render";
@@ -455,30 +455,34 @@ export function toPreviewExtraction(result: ExtractionResult): PreviewExtraction
 }
 
 /**
- * What one candidate selector comes back as.
+ * What one candidate expression comes back as.
  *
  * Deliberately the same `extraction` / `extractionError` pair as
  * {@link PagePreview}: whichever way a price was found, the confirm step reads
  * one shape, and the two halves of the flow cannot drift apart.
  */
-export interface SelectorPreview {
+export interface ExpressionPreview {
   extraction: PreviewExtraction | null;
   extractionError: string | null;
   /**
-   * The selector is not valid CSS. Worth its own flag because it is what every
-   * half-typed selector looks like, and should not read as "wrong selector".
+   * The expression is not valid in its mode — bad CSS or an unparseable path.
+   * Worth its own flag because it is what every
+   * half-typed expression looks like, and should not read as "wrong expression".
    */
-  invalidSelector: boolean;
+  invalidExpression: boolean;
+  /** Why it is invalid, so the picker can say more than "keep typing". */
+  invalidReason: string;
   matchCount: number;
-  /** The first few matched elements, for confirming the right one was hit. */
-  samples: SelectorMatch[];
+  /** The first few matches, for confirming the right one was hit. */
+  samples: ExpressionMatch[];
 }
 
-export function toSelectorPreview(test: SelectorTest): SelectorPreview {
+export function toExpressionPreview(test: ExpressionTest): ExpressionPreview {
   return {
     extraction: toPreviewExtraction(test.result),
     extractionError: test.result.ok ? null : test.result.error,
-    invalidSelector: test.invalidSelector,
+    invalidExpression: test.invalidExpression,
+    invalidReason: test.invalidReason,
     matchCount: test.matchCount,
     samples: test.samples,
   };

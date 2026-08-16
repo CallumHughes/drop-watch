@@ -12,8 +12,8 @@
  * deliberately unable to fail the check — see `./alerting`.
  */
 
-import type { ExtractionResult, ExtractorStrategy } from "@drop-watch/core/extract";
-import { extract, STRATEGY_ORDER } from "@drop-watch/core/extract";
+import type { ExtractionResult } from "@drop-watch/core/extract";
+import { extract } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import type { RetrieveResult } from "@drop-watch/core/render";
@@ -25,6 +25,7 @@ import { env } from "@drop-watch/env/worker";
 import { eq } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
+import { extractionOptions } from "./extraction";
 import { type CheckOutcome, toCheckOutcome } from "./outcome";
 import { renderTarget, unconfiguredRenderResult } from "./retrieve";
 import { nextCheckAt } from "./schedule";
@@ -41,12 +42,6 @@ export type CheckSource = "scheduled" | "manual";
  * otherwise double-fetch the same page. Cheap belt to pg-boss's braces.
  */
 const inFlight = new Set<string>();
-
-function strategiesFor(listing: Listing): readonly ExtractorStrategy[] {
-  // A listing pinned to `selector` should fail loudly when its selector rots,
-  // not quietly start reporting whatever JSON-LD the page happens to carry.
-  return listing.extractor === "selector" ? ["selector"] : STRATEGY_ORDER;
-}
 
 /** `undefined` rather than `null`, because that is what the fetch layer takes. */
 function conditionalRequest(listing: Listing): { etag?: string; lastModified?: string } {
@@ -177,10 +172,9 @@ function extractFrom(listing: Listing, fetched: RetrieveResult): ExtractionResul
     return null;
   }
   return extract(fetched.body, {
-    strategies: strategiesFor(listing),
+    ...extractionOptions(listing),
     url: fetched.url,
     ...(listing.locale ? { locale: listing.locale } : {}),
-    ...(listing.selector ? { selector: listing.selector } : {}),
   });
 }
 

@@ -7,6 +7,7 @@
  * string. Never a float, and never round-tripped through `Number`.
  */
 
+import type { ExtractorStrategy, ListingExtractor } from "@drop-watch/core/extract/strategies";
 import type { AlertRule } from "@drop-watch/core/rules";
 import { relations, sql } from "drizzle-orm";
 import {
@@ -26,9 +27,6 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
-
-/** `auto` runs the full fallback chain; `selector` forces the configured CSS selector. */
-export const extractorMode = pgEnum("extractor_mode", ["auto", "selector"]);
 
 /** `browser` routes the check through the Playwright sidecar in `apps/renderer`. */
 export const renderMode = pgEnum("render_mode", ["http", "browser"]);
@@ -70,8 +68,15 @@ export const checkRunStatus = pgEnum("check_run_status", [
   "timeout",
 ]);
 
-/** Which link in the extraction chain produced a price. Mirrors `ExtractorStrategy`. */
-export type ExtractorUsed = "jsonld" | "microdata" | "opengraph" | "selector";
+/**
+ * Which link in the extraction chain produced a price.
+ *
+ * Taken straight from `@drop-watch/core` rather than restated, because a copy
+ * here is a copy that can drift. That package owns the list of strategies —
+ * which is also why `listings.extractor` below is a text column and not a pg
+ * enum: adding a strategy should be a TypeScript change, not a migration.
+ */
+export type ExtractorUsed = ExtractorStrategy;
 
 /**
  * A tracked item: identity and alert configuration. Scrape-shaped detail
@@ -122,7 +127,10 @@ export const listings = pgTable(
     currency: char("currency", { length: 3 }),
     /** Conditional-request cache validators from the last successful fetch. */
     etag: text("etag"),
-    extractor: extractorMode("extractor").default("auto").notNull(),
+    /** CSS (optionally `::attr(name)`) or JSONPath — `extractor` says which. */
+    expression: text("expression"),
+    /** `auto` runs the full fallback chain; anything else pins one strategy. */
+    extractor: text("extractor").$type<ListingExtractor>().default("auto").notNull(),
     id: uuid("id").primaryKey().defaultRandom(),
     intervalMinutes: integer("interval_minutes").default(180).notNull(),
     /** Spread of the reschedule, so listings on one interval do not stampede. */
@@ -135,8 +143,6 @@ export const listings = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
     render: renderMode("render").default("http").notNull(),
-    /** CSS selector used when `extractor = 'selector'`. */
-    selector: text("selector"),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())

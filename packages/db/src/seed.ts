@@ -83,9 +83,9 @@ const SEED_ENTRIES: SeedEntry[] = [
     listings: [
       {
         // No structured data on this page at all — the selector chain is the point.
+        expression: "p.price_color",
         extractor: "selector",
         intervalMinutes: 1440,
-        selector: "p.price_color",
         url: "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
       },
     ],
