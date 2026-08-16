@@ -41,6 +41,7 @@ export function Field({
 
 /** What the chain found, plus the manual override when one is being worked on. */
 function PreviewPanel({
+  browserReload,
   expression,
   isTesting,
   mode,
@@ -50,6 +51,7 @@ function PreviewPanel({
   preview,
   test,
 }: {
+  browserReload: PreviewFlowState["browserReload"];
   expression: string;
   isTesting: boolean;
   mode: ExpressionMode | null;
@@ -75,7 +77,13 @@ function PreviewPanel({
           <>
             <PreviewSummary extraction={preview.extraction} url={preview.url} />
             <div>
-              <Button onClick={onTogglePicker} size="sm" type="button" variant="outline">
+              <Button
+                disabled={browserReload.isPending}
+                onClick={onTogglePicker}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
                 {mode === null ? "Pick the price myself" : "Use the automatic result"}
               </Button>
             </div>
@@ -94,6 +102,7 @@ function PreviewPanel({
             onExpressionChange={onExpressionChange}
             onModeChange={onModeChange}
             previewId={preview.previewId}
+            reloadInBrowser={preview.render === "http" ? browserReload : undefined}
             test={test}
             url={preview.url}
           />
@@ -111,6 +120,7 @@ function PreviewPanel({
  */
 export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
   const urlId = useId();
+  const isLoadingPreview = flow.fetchPreview.isPending || flow.browserReload.isPending;
   const fetchButtonLabel = flow.fetchPreview.isPending ? "Loading…" : "Load preview";
 
   return (
@@ -124,7 +134,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
           <div className="flex gap-2">
             <Input
               autoComplete="url"
-              disabled={flow.fetchPreview.isPending}
+              disabled={isLoadingPreview}
               id={urlId}
               onChange={flow.onUrlChange}
               placeholder="https://example.com/product/thing"
@@ -132,7 +142,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
               type="url"
               value={flow.url}
             />
-            <Button disabled={flow.fetchPreview.isPending} type="submit">
+            <Button disabled={isLoadingPreview} type="submit">
               {fetchButtonLabel}
             </Button>
           </div>
@@ -141,6 +151,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
 
       {flow.preview ? (
         <PreviewPanel
+          browserReload={flow.browserReload}
           expression={flow.expression}
           isTesting={flow.isTesting}
           mode={flow.mode}

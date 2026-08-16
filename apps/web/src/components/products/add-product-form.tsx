@@ -20,6 +20,7 @@ import { usePreviewFlow } from "./use-preview-flow";
 /** The confirm step: an optional target, and what is about to be written. */
 function SavePanel({
   chosen,
+  isSaveDisabled,
   isSaving,
   note,
   onSave,
@@ -27,6 +28,7 @@ function SavePanel({
   targetPrice,
 }: {
   chosen: PreviewExtraction | null;
+  isSaveDisabled: boolean;
   isSaving: boolean;
   note: string;
   onSave: () => void;
@@ -58,7 +60,7 @@ function SavePanel({
         <p className="text-muted-foreground text-xs">{note}</p>
 
         <div>
-          <Button disabled={!chosen || isSaving} onClick={onSave} type="button">
+          <Button disabled={!chosen || isSaveDisabled} onClick={onSave} type="button">
             {isSaving ? "Saving…" : "Track this product"}
           </Button>
         </div>
@@ -100,10 +102,10 @@ export function AddProductForm() {
     setTargetPrice(event.target.value);
   }, []);
 
-  const { chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
+  const { browserReload, chosen, mode, preview, savingWithExpression, trimmedExpression } = flow;
   const savedMode = savingWithExpression ? mode : null;
   const onSave = useCallback(() => {
-    if (!(preview && chosen)) {
+    if (!(preview && chosen) || browserReload.isPending) {
       return;
     }
     create.mutate({
@@ -116,7 +118,7 @@ export function AddProductForm() {
       title: chosen.title,
       url: preview.url,
     });
-  }, [chosen, create, preview, savedMode, targetPrice, trimmedExpression]);
+  }, [browserReload.isPending, chosen, create, preview, savedMode, targetPrice, trimmedExpression]);
 
   const note = extractorNote({
     expression: savedMode ? trimmedExpression : null,
@@ -131,6 +133,7 @@ export function AddProductForm() {
       {preview ? (
         <SavePanel
           chosen={chosen}
+          isSaveDisabled={create.isPending || browserReload.isPending}
           isSaving={create.isPending}
           note={note}
           onSave={onSave}

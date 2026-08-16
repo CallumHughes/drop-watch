@@ -1,6 +1,7 @@
 "use client";
 
 import type { ExpressionMode, ExpressionPreview } from "@drop-watch/api/routers/preview";
+import { Button } from "@drop-watch/ui/components/button";
 import { Input } from "@drop-watch/ui/components/input";
 import type { ChangeEvent } from "react";
 import { useCallback, useId } from "react";
@@ -127,6 +128,53 @@ function Verdict({ test, url }: { test: ExpressionPreview; url: string }) {
   );
 }
 
+function BrowserReload({
+  reload,
+}: {
+  reload: {
+    disabled: boolean;
+    error: string | null;
+    isPending: boolean;
+    onReload: () => void;
+    unavailable: boolean;
+  };
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div>
+        <Button
+          disabled={reload.disabled || reload.isPending}
+          onClick={reload.onReload}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {reload.isPending ? "Reloading in browser…" : "Reload in browser"}
+        </Button>
+      </div>
+      {reload.unavailable ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          Browser rendering is not configured on this instance. Set <code>RENDER_URL</code> and
+          restart to enable it.
+        </p>
+      ) : null}
+      {reload.isPending ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          Loading the page in a browser. Your HTTP preview remains available while this runs.
+        </p>
+      ) : null}
+      {reload.error ? (
+        <p className="text-destructive text-xs" role="alert">
+          Could not reload in a browser: {reload.error}{" "}
+          {reload.disabled
+            ? "This action is unavailable for the rest of this form."
+            : "You can try again."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * The manual escape hatch: choose how to point at the price, type it, and see
  * immediately what it matches and what price falls out of it.
@@ -143,6 +191,7 @@ export function ExpressionPicker({
   onExpressionChange,
   onModeChange,
   previewId,
+  reloadInBrowser,
   test,
   url,
 }: {
@@ -152,6 +201,13 @@ export function ExpressionPicker({
   onExpressionChange: (expression: string) => void;
   onModeChange: (mode: ExpressionMode) => void;
   previewId: string;
+  reloadInBrowser?: {
+    disabled: boolean;
+    error: string | null;
+    isPending: boolean;
+    onReload: () => void;
+    unavailable: boolean;
+  };
   test: ExpressionPreview | undefined;
   url: string;
 }) {
@@ -206,6 +262,8 @@ export function ExpressionPicker({
         <p className="text-muted-foreground text-xs">Testing…</p>
       ) : null}
       {test && !isPending ? <Verdict test={test} url={url} /> : null}
+
+      {reloadInBrowser ? <BrowserReload reload={reloadInBrowser} /> : null}
 
       <PreviewSource previewId={previewId} />
     </div>

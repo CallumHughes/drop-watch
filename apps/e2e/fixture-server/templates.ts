@@ -1,12 +1,13 @@
 /**
  * HTML for the fake retailer pages the fixture server serves.
  *
- * Five variants cover the automatic preview's transport decisions: `jsonld`
+ * Six variants cover the automatic preview's transport decisions: `jsonld`
  * is confident in the HTTP response, `js` only gains JSON-LD after rendering,
  * and `rendered-selected-sku` starts ambiguous before the rendered DOM marks
  * one variant as selected. `browser-no-match` starts with the same usable
- * ambiguity but removes it when rendered, while `selector` exercises the
- * hand-picked fallback.
+ * ambiguity but removes it when rendered. `manual-browser-reload` begins as a
+ * confident HTTP result, then changes its JSON-LD price in the browser DOM;
+ * `selector` exercises the hand-picked fallback.
  *
  * `attribute-only` and `json-blob` cover the two manual paths: a price that is
  * only ever an attribute value, and one that only exists inside an embedded
@@ -26,6 +27,7 @@ export interface FixtureProductState {
     | "json-blob"
     | "jsonld"
     | "attribute-only"
+    | "manual-browser-reload"
     | "rendered-selected-sku"
     | "selector";
   title: string;
@@ -79,6 +81,45 @@ function jsonLdPage(state: FixtureProductState, url: string): string {
     <h1>${escapeHtml(state.title)}</h1>
     <p>${displayPrice(state)}</p>
   </main>
+</body>
+</html>
+`;
+}
+
+/** The price exposed only after a user explicitly reloads this page in a browser. */
+const MANUAL_BROWSER_RELOAD_PRICE = "75.00";
+/** Leaves time for the E2E suite to observe the pending browser reload state. */
+const MANUAL_BROWSER_RELOAD_DELAY_MS = 250;
+
+/**
+ * The source response has a confident JSON-LD price, but client JavaScript
+ * corrects it shortly after load, before the renderer captures the DOM. This
+ * lets the E2E suite prove that a manual browser reload supersedes a
+ * successful HTTP preview without racing its pending UI state.
+ */
+function manualBrowserReloadPage(state: FixtureProductState, url: string): string {
+  const data = productJsonLd(state, url);
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <script type="application/ld+json">${JSON.stringify(data)}</script>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+  </main>
+  <script>
+    window.setTimeout(() => {
+      const structuredData = document.querySelector('script[type="application/ld+json"]');
+      if (structuredData?.textContent) {
+        const product = JSON.parse(structuredData.textContent);
+        product.offers.price = "${MANUAL_BROWSER_RELOAD_PRICE}";
+        structuredData.textContent = JSON.stringify(product);
+      }
+    }, ${MANUAL_BROWSER_RELOAD_DELAY_MS});
+  </script>
 </body>
 </html>
 `;
@@ -253,6 +294,9 @@ function jsonBlobPage(state: FixtureProductState): string {
 export function renderProductPage(state: FixtureProductState, url: string): string {
   if (state.template === "jsonld") {
     return jsonLdPage(state, url);
+  }
+  if (state.template === "manual-browser-reload") {
+    return manualBrowserReloadPage(state, url);
   }
   if (state.template === "browser-no-match") {
     return ambiguousVariantPage(state, "remove");

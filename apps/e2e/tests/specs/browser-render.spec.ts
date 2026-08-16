@@ -21,6 +21,41 @@ test("confident HTTP preview skips browser rendering and saves HTTP mode", async
   });
 });
 
+test("manual browser reload replaces an HTTP preview and saves browser mode", async ({
+  addProduct,
+  fixtureProduct,
+  productDetail,
+}) => {
+  await fixtureProduct.publish({ template: "manual-browser-reload" });
+
+  await test.step("the automatic preview keeps the confident HTTP price", async () => {
+    await addProduct.goto();
+    await addProduct.loadPreview(fixtureProduct.url);
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).toBeVisible();
+    await expect(addProduct.browserRenderProvenance).not.toBeVisible();
+  });
+
+  await test.step("the expression picker reloads the preview in a browser", async () => {
+    await addProduct.pickMyselfButton.click();
+    await expect(addProduct.reloadInBrowserButton).toBeVisible();
+    await addProduct.reloadInBrowserButton.click();
+    await expect(addProduct.reloadInBrowserButton).toHaveText("Reloading in browser…");
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).toBeVisible();
+    await expect(addProduct.trackButton).toBeDisabled();
+    await expect(addProduct.page.getByText("£75.00", { exact: true })).toBeVisible();
+    await expect(addProduct.page.getByText("£100.00", { exact: true })).not.toBeVisible();
+    await expect(addProduct.browserRenderProvenance).toBeVisible();
+  });
+
+  await test.step("tracking saves the browser render mode", async () => {
+    await addProduct.track();
+
+    const listing = productDetail.listingRow(fixtureProduct.url);
+    await listing.edit();
+    await expect(listing.settings().browserRenderCheckbox).toBeChecked();
+  });
+});
+
 test("missing HTTP price renders JavaScript and saves browser mode", async ({
   addProduct,
   fixtureProduct,
