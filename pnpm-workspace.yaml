@@ -11,11 +11,11 @@ catalog:
   zod: ^4.4.3
   typescript: ^6
   lucide-react: ^1.30.0
-  next: ^16.3.0
+  next: ^16.3.1
   next-themes: ^0.4.6
   react: ^19.2.7
   react-dom: ^19.2.7
-  sonner: ^2.0.7
+  sonner: ^2.0.8
   "@orpc/server": ^1.14.15
   "@orpc/client": ^1.14.15
   "@orpc/openapi": ^1.14.15
@@ -23,15 +23,15 @@ catalog:
   "@orpc/zod": ^1.14.15
   "@types/node": ^24.13.3
   "@types/pg": ^8.21.0
-  "@hono/node-server": ^2.1.0
+  "@hono/node-server": ^2.1.1
   drizzle-orm: ^0.45.2
-  evlog: ^2.24.0
-  hono: ^4.12.34
-  pg: ^8.22.0
+  evlog: ^2.26.0
+  hono: ^4.13.2
+  pg: ^8.23.0
   pg-boss: ^12.27.0
   playwright: 1.62.1
-  better-auth: 1.6.26
-  resend: ^6.18.1
+  better-auth: 1.6.29
+  resend: ^6.20.0
   "@react-email/components": ^1.0.12
   "@react-email/render": ^2.1.0
   "@tailwindcss/postcss": ^4.3.2
