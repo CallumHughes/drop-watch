@@ -562,6 +562,36 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("treats name and value on one structured property as aliases", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small rug",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+          size: { "@type": "SizeSpecification", name: "Small", value: "S" },
+        },
+        {
+          "@type": "Product",
+          name: "Large rug",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: { "@type": "SizeSpecification", name: "Large", value: "L" },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=L" })).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large rug",
+    });
+  });
+
   it("does not treat a multi-valued property as selected variant evidence", () => {
     const html = page(
       ldScript({
@@ -779,6 +809,40 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("keeps a conflicting repeated unknown parameter as a confidence limiter", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small widget",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+          size: "S",
+        },
+        {
+          "@type": "Product",
+          name: "Large widget",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: "L",
+        },
+      ])
+    );
+
+    expect(
+      extract(html, {
+        url: "https://shop.example.com/widget?size=L&variant=1&variant=2",
+      })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large widget",
+    });
+  });
+
   it("leaves conflicting repeated semantic values ambiguous", () => {
     const html = page(
       ldScript([
@@ -864,6 +928,41 @@ describe("extract — JSON-LD", () => {
       evidence: { candidateCount: 2, type: "jsonld:exact-url" },
       price: "10.00",
       title: "Exact URL variant",
+    });
+  });
+
+  it("prefers a semantic variant over an exact URL that contradicts the query", () => {
+    const requestedUrl = "https://shop.example.com/rug?size=185x275&system=rug-cvr";
+    const html = page(
+      ldScript({
+        "@type": "ProductGroup",
+        hasVariant: [
+          {
+            "@type": "Product",
+            name: "Default rug",
+            offers: { price: "89.25", priceCurrency: "GBP", url: requestedUrl },
+            size: "60x90",
+          },
+          {
+            "@type": "Product",
+            name: "Requested rug",
+            offers: { price: "449.25", priceCurrency: "GBP" },
+            size: "185x275",
+          },
+        ],
+        variesBy: ["size"],
+      })
+    );
+
+    expect(extract(html, { url: requestedUrl })).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "449.25",
+      title: "Requested rug",
     });
   });
 

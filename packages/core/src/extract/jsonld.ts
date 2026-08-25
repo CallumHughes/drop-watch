@@ -277,6 +277,25 @@ function variantValues(product: JsonRecord, property: string): string[] {
   return [...new Set(values)];
 }
 
+function selectableVariantValues(product: JsonRecord, property: string): string[] {
+  const rawValue = product[property];
+  if (!Array.isArray(rawValue)) {
+    return variantValues(product, property);
+  }
+  const valuesByEntry = rawValue
+    .map((entry) => {
+      const values: string[] = [];
+      appendVariantValues(entry, property, values);
+      return [...new Set(values)];
+    })
+    .filter((values) => values.length > 0);
+  if (valuesByEntry.length === 1) {
+    return valuesByEntry[0] ?? [];
+  }
+  const distinctValues = [...new Set(valuesByEntry.flat())];
+  return distinctValues.length === 1 ? distinctValues : [];
+}
+
 function queryValuesByProperty(pageUrl: UrlIdentity): Map<string, string[]> | null {
   for (const parameter of pageUrl.ambiguousParameters) {
     if (VARIANT_PARAMETER_PROPERTIES.has(parameter)) {
@@ -306,26 +325,37 @@ function queryValuesByProperty(pageUrl: UrlIdentity): Map<string, string[]> | nu
   return values;
 }
 
-function matchesVariantParameters(product: JsonRecord, pageUrl: UrlIdentity | undefined): string[] {
+interface VariantParameterResult {
+  conflict: boolean;
+  matches: string[];
+}
+
+function variantParameterResult(
+  product: JsonRecord,
+  pageUrl: UrlIdentity | undefined
+): VariantParameterResult {
   if (!pageUrl) {
-    return [];
+    return { conflict: false, matches: [] };
   }
   const queryValues = queryValuesByProperty(pageUrl);
   if (!queryValues || queryValues.size === 0) {
-    return [];
+    return { conflict: false, matches: [] };
   }
   const matches: string[] = [];
   for (const [property, values] of queryValues) {
-    const productValues = variantValues(product, property);
-    if (
-      productValues.length !== 1 ||
-      !values.every((value) => productValues.includes(normalizedVariantValue(value, property)))
-    ) {
-      return [];
+    const productValues = selectableVariantValues(product, property);
+    if (productValues.length === 0) {
+      return { conflict: false, matches: [] };
+    }
+    const propertyMatches = values.every((value) =>
+      productValues.includes(normalizedVariantValue(value, property))
+    );
+    if (!propertyMatches) {
+      return { conflict: true, matches: [] };
     }
     matches.push(property);
   }
-  return matches;
+  return { conflict: false, matches };
 }
 
 function comparableVariantProperties(product: JsonRecord): ReadonlySet<string> {
@@ -464,7 +494,7 @@ function semanticEvidenceIsTrusted(
   if (!pageUrl || matchedParams.length === 0) {
     return false;
   }
-  const hasUnknownParameter = [...pageUrl.parameters.keys()].some(
+  const hasUnknownParameter = [...pageUrl.parameters.keys(), ...pageUrl.ambiguousParameters].some(
     (parameter) => !VARIANT_PARAMETER_PROPERTIES.has(parameter)
   );
   if (!context) {
@@ -486,11 +516,13 @@ interface OfferWithProduct {
   selectedSkuMatch: boolean;
   urlMatch: UrlMatch;
   variantContext?: VariantContext;
+  variantParameterConflict: boolean;
   variantParameterMatches: string[];
   variantParametersTrusted: boolean;
 }
 
 interface OfferBuckets {
+  conflictingExactUrlMatches: OfferWithProduct[];
   exactUrlMatches: OfferWithProduct[];
   originPathnameMatches: OfferWithProduct[];
   remaining: OfferWithProduct[];
@@ -501,10 +533,12 @@ interface OfferBuckets {
 function addToOfferBucket(candidate: OfferWithProduct, buckets: OfferBuckets): void {
   if (candidate.selectedSkuMatch) {
     buckets.selectedSkuMatches.push(candidate);
-  } else if (candidate.urlMatch === "exact") {
+  } else if (candidate.urlMatch === "exact" && !candidate.variantParameterConflict) {
     buckets.exactUrlMatches.push(candidate);
   } else if (candidate.variantParameterMatches.length > 0) {
     buckets.variantParameterMatches.push(candidate);
+  } else if (candidate.urlMatch === "exact") {
+    buckets.conflictingExactUrlMatches.push(candidate);
   } else if (candidate.urlMatch === "origin-pathname") {
     buckets.originPathnameMatches.push(candidate);
   } else {
@@ -524,7 +558,7 @@ function offerWithProduct(
     selected !== undefined &&
     (offerSku === selected || (offerSku === undefined && skuFrom(product.sku) === selected));
   const urlMatch = pageUrlMatch(product, offer, pageUrl);
-  const variantParameterMatches = matchesVariantParameters(product, pageUrl);
+  const variantParameters = variantParameterResult(product, pageUrl);
   return {
     comparableVariantProperties: comparableVariantProperties(product),
     isProduct: typeNames(product).includes("product"),
@@ -533,10 +567,11 @@ function offerWithProduct(
     selectedSkuMatch,
     urlMatch,
     variantContext: contexts.get(product),
-    variantParameterMatches,
+    variantParameterConflict: variantParameters.conflict,
+    variantParameterMatches: variantParameters.matches,
     variantParametersTrusted: semanticEvidenceIsTrusted(
       pageUrl,
-      variantParameterMatches,
+      variantParameters.matches,
       contexts.get(product)
     ),
   };
@@ -553,6 +588,7 @@ function rankOffers(
   contexts: WeakMap<JsonRecord, VariantContext>
 ): OfferWithProduct[] {
   const buckets: OfferBuckets = {
+    conflictingExactUrlMatches: [],
     exactUrlMatches: [],
     originPathnameMatches: [],
     remaining: [],
@@ -574,6 +610,7 @@ function rankOffers(
     ...buckets.selectedSkuMatches,
     ...buckets.exactUrlMatches,
     ...buckets.variantParameterMatches,
+    ...buckets.conflictingExactUrlMatches,
     ...buckets.originPathnameMatches,
     ...buckets.remaining,
   ];
@@ -667,6 +704,9 @@ function confidenceForJsonLd(
   }
   if (isAggregateOrRange(winning.offer)) {
     return { confidence: "low", evidence: { candidateCount, type: "jsonld:aggregate-offer" } };
+  }
+  if (winning.variantParameterConflict) {
+    return { confidence: "low", evidence: { candidateCount, type: "jsonld:conflict" } };
   }
   if (winning.selectedSkuMatch) {
     return uniqueMatchConfidence(candidateCount, selectedMatches.length, "jsonld:selected-sku");
