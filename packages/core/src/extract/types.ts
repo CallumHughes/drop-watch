@@ -32,6 +32,11 @@ export type ExtractionConfidence = "high" | "low";
 export type ExtractionEvidence =
   | {
       candidateCount: number;
+      matchedParams: string[];
+      type: "jsonld:variant-params";
+    }
+  | {
+      candidateCount: number;
       type:
         | "jsonld:selected-sku"
         | "jsonld:exact-url"

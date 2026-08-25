@@ -322,6 +322,500 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("uses a unique ProductGroup size match for a Ruggable-shaped query", () => {
+    const sizes = [
+      "61x91",
+      "61x183",
+      "91x152",
+      "91x244",
+      "122x183",
+      "122x275",
+      "152x213",
+      "152x244",
+      "183x274",
+      "244x305",
+      "185 × 275",
+    ];
+    const html = page(
+      ldScript({
+        "@type": "ProductGroup",
+        hasVariant: sizes.map((size, index) => ({
+          "@type": "Product",
+          name: `Morris & Co. Pimpernel Jade Tufted Rug ${size}`,
+          offers: {
+            price: index === sizes.length - 1 ? "449.25" : String(100 + index),
+            priceCurrency: "GBP",
+          },
+          size,
+        })),
+        name: "Morris & Co. Pimpernel Jade Tufted Rug",
+        variesBy: ["https://schema.org/size"],
+      })
+    );
+
+    expect(
+      extract(html, {
+        url: "https://ruggable.co.uk/products/pimpernel?size=185x275&system=rug-cvr&utm_source=email",
+      })
+    ).toMatchObject({
+      confidence: "high",
+      currency: "GBP",
+      evidence: {
+        candidateCount: 11,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "449.25",
+      title: "Morris & Co. Pimpernel Jade Tufted Rug 185 × 275",
+    });
+  });
+
+  it("does not treat an empty JSON-LD URL as the current page URL", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small variant",
+          offers: { price: "10.00", priceCurrency: "GBP", url: "" },
+          size: "small",
+        },
+        {
+          "@type": "Product",
+          name: "Large variant",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: "large",
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?size=large" })).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large variant",
+    });
+  });
+
+  it("does not treat a fragment-only JSON-LD URL as the current page URL", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small variant",
+          offers: { price: "10.00", priceCurrency: "GBP", url: "#reviews" },
+          size: "small",
+        },
+        {
+          "@type": "Product",
+          name: "Large variant",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: "large",
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?size=large" })).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large variant",
+    });
+  });
+
+  it("treats conflicting color aliases as one ambiguous semantic property", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          color: ["Blue", "Navy"],
+          name: "Array variant",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+        },
+        {
+          "@type": "Product",
+          color: "Red",
+          name: "Red variant",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+        },
+      ])
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?color=blue&colour=navy" })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
+      price: "10.00",
+      title: "Array variant",
+    });
+  });
+
+  it("collapses equivalent color aliases before semantic matching", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          color: "Red",
+          name: "Red variant",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+        },
+        {
+          "@type": "Product",
+          color: ["Blue", { name: "Navy" }],
+          name: "Blue variant",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+        },
+      ])
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?color=BLUE&colour=%20blue%20" })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["color"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Blue variant",
+    });
+  });
+
+  it("matches the approved generic query-property mappings with canonical evidence", () => {
+    const mappingCases = [
+      { parameter: "size", property: "size", query: "185 × 275", value: "185x275" },
+      { parameter: "color", property: "color", query: "navy", value: "Navy" },
+      { parameter: "colour", property: "color", query: "navy", value: "Navy" },
+      { parameter: "material", property: "material", query: "wool", value: "Wool" },
+      { parameter: "pattern", property: "pattern", query: "striped", value: "Striped" },
+      { parameter: "sku", property: "sku", query: "sku-target", value: "sku-target" },
+      { parameter: "mpn", property: "mpn", query: "mpn-target", value: "mpn-target" },
+      { parameter: "model", property: "model", query: "model-target", value: "model-target" },
+    ] as const;
+
+    for (const mapping of mappingCases) {
+      const html = page(
+        ldScript([
+          {
+            "@type": "Product",
+            name: "Other variant",
+            offers: { price: "10.00", priceCurrency: "GBP" },
+            [mapping.property]: `other-${mapping.value}`,
+          },
+          {
+            "@type": "Product",
+            name: "Mapped variant",
+            offers: { price: "20.00", priceCurrency: "GBP" },
+            [mapping.property]: mapping.value,
+          },
+        ])
+      );
+
+      expect(
+        extract(html, {
+          url: `https://shop.example.com/widget?${mapping.parameter}=${encodeURIComponent(mapping.query)}`,
+        })
+      ).toMatchObject({
+        confidence: "high",
+        evidence: {
+          candidateCount: 2,
+          matchedParams: [mapping.property],
+          type: "jsonld:variant-params",
+        },
+        price: "20.00",
+        title: "Mapped variant",
+      });
+    }
+  });
+
+  it("reads variant values from arrays and explicit value/name objects", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        color: [{ name: "Navy" }, { value: "Blue" }],
+        material: { value: "Wool" },
+        name: "Structured variant",
+        offers: { price: "20.00", priceCurrency: "GBP" },
+      })
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?color=blue&material=wool" })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 1,
+        matchedParams: ["color", "material"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Structured variant",
+    });
+  });
+
+  it("does not stringify arbitrary variant objects", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          color: { label: "Blue" },
+          name: "Unstructured variant",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+        },
+        {
+          "@type": "Product",
+          color: "Blue",
+          name: "Structured variant",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?color=blue" })).toMatchObject({
+      confidence: "low",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["color"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Structured variant",
+    });
+  });
+
+  it("uses ProductGroup variesBy context through @id references in @graph", () => {
+    const html = page(
+      ldScript({
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@id": "#group",
+            "@type": "ProductGroup",
+            hasVariant: [{ "@id": "#small" }, { "@id": "#large" }],
+            variesBy: ["https://schema.org/size"],
+          },
+          {
+            "@id": "#small",
+            "@type": "Product",
+            name: "Small rug",
+            offers: { price: "10.00", priceCurrency: "GBP" },
+            size: "small",
+          },
+          {
+            "@id": "#large",
+            "@type": "Product",
+            name: "Large rug",
+            offers: { price: "20.00", priceCurrency: "GBP" },
+            size: "large",
+          },
+        ],
+      })
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/rug?size=large&system=rug-cvr" })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large rug",
+    });
+  });
+
+  it("collapses semantically equivalent repeated query values", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Large rug",
+        offers: { price: "20.00", priceCurrency: "GBP" },
+        size: "185x275",
+      })
+    );
+
+    expect(
+      extract(html, {
+        url: "https://shop.example.com/rug?size=185%20%C3%97%20275&size=185x275",
+      })
+    ).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 1,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+    });
+  });
+
+  it("keeps a partial multi-dimension ProductGroup match low confidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "ProductGroup",
+        hasVariant: [
+          {
+            "@type": "Product",
+            color: "red",
+            name: "Large red",
+            offers: { price: "20.00", priceCurrency: "GBP" },
+            size: "large",
+          },
+          {
+            "@type": "Product",
+            color: "blue",
+            name: "Small blue",
+            offers: { price: "10.00", priceCurrency: "GBP" },
+            size: "small",
+          },
+        ],
+        variesBy: ["size", "color"],
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=large" })).toMatchObject({
+      confidence: "low",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large red",
+    });
+  });
+
+  it("keeps semantic confidence low when a same-group contender omits the property", () => {
+    const html = page(
+      ldScript({
+        "@type": "ProductGroup",
+        hasVariant: [
+          {
+            "@type": "Product",
+            name: "Large rug",
+            offers: { price: "20.00", priceCurrency: "GBP" },
+            size: "large",
+          },
+          {
+            "@type": "Product",
+            name: "Unspecified rug",
+            offers: { price: "10.00", priceCurrency: "GBP" },
+          },
+        ],
+        variesBy: ["size"],
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=large" })).toMatchObject({
+      confidence: "low",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large rug",
+    });
+  });
+
+  it("keeps an unknown parameter neutral but low confidence without variesBy context", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small blue widget",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+          size: "small",
+        },
+        {
+          "@type": "Product",
+          name: "Large blue widget",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: "large",
+        },
+      ])
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?size=large&system=rug-cvr" })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large blue widget",
+    });
+  });
+
+  it("leaves conflicting repeated semantic values ambiguous", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small widget",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+          size: "small",
+        },
+        {
+          "@type": "Product",
+          name: "Large widget",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: "large",
+        },
+      ])
+    );
+
+    expect(
+      extract(html, { url: "https://shop.example.com/widget?size=small&size=large" })
+    ).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
+      price: "10.00",
+      title: "Small widget",
+    });
+  });
+
+  it("reports a semantic conflict with a stronger selected SKU", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Red widget",
+          offers: { price: "10.00", priceCurrency: "GBP", sku: "red" },
+          size: "small",
+        },
+        {
+          "@type": "Product",
+          name: "Blue widget",
+          offers: { price: "20.00", priceCurrency: "GBP", sku: "blue" },
+          size: "large",
+        },
+      ]),
+      '<button data-sku="blue" data-sku-selected="true">Blue</button>'
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?size=small" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:conflict" },
+      price: "20.00",
+      title: "Blue widget",
+    });
+  });
+
   it("uses a matching Offer URL path before earlier Products", () => {
     const html = page(
       ldScript([
@@ -407,7 +901,7 @@ describe("extract — JSON-LD", () => {
     });
   });
 
-  it("ignores malformed and relative JSON-LD URLs", () => {
+  it("resolves relative JSON-LD URLs against the final page URL", () => {
     const html = page(
       ldScript([
         {
@@ -424,8 +918,8 @@ describe("extract — JSON-LD", () => {
     );
 
     expect(extract(html, { url: "https://shop.example.com/widget/current" })).toMatchObject({
-      confidence: "low",
-      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:exact-url" },
       price: "99.00",
       title: "First variant",
     });
