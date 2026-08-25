@@ -210,11 +210,12 @@ function pageUrlMatch(
 
   let originPathnameMatches = false;
   for (const value of [product.url, offer.url]) {
-    const candidateUrl = urlIdentity(value, pageUrl.baseUrl);
+    const absoluteCandidateUrl = urlIdentity(value);
+    const candidateUrl = absoluteCandidateUrl ?? urlIdentity(value, pageUrl.baseUrl);
     if (candidateUrl?.full === pageUrl.full) {
       return "exact";
     }
-    if (candidateUrl?.originPathname === pageUrl.originPathname) {
+    if (absoluteCandidateUrl?.originPathname === pageUrl.originPathname) {
       originPathnameMatches = true;
     }
   }
@@ -288,9 +289,6 @@ function queryValuesByProperty(pageUrl: UrlIdentity): Map<string, string[]> | nu
     if (!property) {
       continue;
     }
-    if (pageUrl.ambiguousParameters.has(parameter)) {
-      return null;
-    }
     const propertyValues = values.get(property) ?? [];
     const normalizedValue = normalizedVariantValue(value, property);
     if (propertyValues.length > 0) {
@@ -320,7 +318,7 @@ function matchesVariantParameters(product: JsonRecord, pageUrl: UrlIdentity | un
   for (const [property, values] of queryValues) {
     const productValues = variantValues(product, property);
     if (
-      productValues.length === 0 ||
+      productValues.length !== 1 ||
       !values.every((value) => productValues.includes(normalizedVariantValue(value, property)))
     ) {
       return [];
@@ -606,10 +604,9 @@ function hasSelectedUrlConflict(
   );
 }
 
-function hasStrongSignalVariantConflict(
+function hasSelectedVariantConflict(
   hint: SelectedSkuHint,
   selectedMatches: PricedOffer[],
-  exactUrlMatches: PricedOffer[],
   variantParameterMatches: PricedOffer[]
 ): boolean {
   if (variantParameterMatches.length === 0) {
@@ -619,10 +616,7 @@ function hasStrongSignalVariantConflict(
     hint.sku !== undefined &&
     selectedMatches.length > 0 &&
     !variantParameterMatches.some((candidate) => candidate.selectedSkuMatch);
-  const exactUrlConflict =
-    exactUrlMatches.length > 0 &&
-    !variantParameterMatches.some((candidate) => candidate.urlMatch === "exact");
-  return selectedConflict || exactUrlConflict;
+  return selectedConflict;
 }
 
 function uniqueMatchConfidence(
@@ -664,7 +658,7 @@ function confidenceForJsonLd(
   if (
     hint.conflict ||
     hasSelectedUrlConflict(hint, selectedMatches, exactUrlMatches) ||
-    hasStrongSignalVariantConflict(hint, selectedMatches, exactUrlMatches, variantParameterMatches)
+    hasSelectedVariantConflict(hint, selectedMatches, variantParameterMatches)
   ) {
     return { confidence: "low", evidence: { candidateCount, type: "jsonld:conflict" } };
   }

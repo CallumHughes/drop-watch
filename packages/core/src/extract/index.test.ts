@@ -469,7 +469,7 @@ describe("extract — JSON-LD", () => {
         },
         {
           "@type": "Product",
-          color: ["Blue", { name: "Navy" }],
+          color: ["Blue", { name: " blue " }],
           name: "Blue variant",
           offers: { price: "20.00", priceCurrency: "GBP" },
         },
@@ -537,11 +537,11 @@ describe("extract — JSON-LD", () => {
     }
   });
 
-  it("reads variant values from arrays and explicit value/name objects", () => {
+  it("reads single-valued arrays and explicit value/name objects", () => {
     const html = page(
       ldScript({
         "@type": "Product",
-        color: [{ name: "Navy" }, { value: "Blue" }],
+        color: [{ name: "Blue" }, { value: " blue " }],
         material: { value: "Wool" },
         name: "Structured variant",
         offers: { price: "20.00", priceCurrency: "GBP" },
@@ -559,6 +559,24 @@ describe("extract — JSON-LD", () => {
       },
       price: "20.00",
       title: "Structured variant",
+    });
+  });
+
+  it("does not treat a multi-valued property as selected variant evidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Generic rug offer",
+        offers: { price: "89.25", priceCurrency: "GBP" },
+        size: ["60x90", "185x275"],
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=185x275" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:queried-url" },
+      price: "89.25",
+      title: "Generic rug offer",
     });
   });
 
@@ -816,6 +834,39 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("does not let a sibling parameter match demote an exact URL winner", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Exact URL variant",
+          offers: {
+            price: "10.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?color=red",
+          },
+        },
+        {
+          "@type": "Product",
+          color: "Red",
+          name: "Semantic sibling",
+          offers: {
+            price: "20.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/widget?color=red&x=1",
+          },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget?color=red" })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:exact-url" },
+      price: "10.00",
+      title: "Exact URL variant",
+    });
+  });
+
   it("uses a matching Offer URL path before earlier Products", () => {
     const html = page(
       ldScript([
@@ -922,6 +973,27 @@ describe("extract — JSON-LD", () => {
       evidence: { candidateCount: 2, type: "jsonld:exact-url" },
       price: "99.00",
       title: "First variant",
+    });
+  });
+
+  it("keeps a singleton high confidence when a relative URL only matches its pathname", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Singleton widget",
+        offers: {
+          price: "10.00",
+          priceCurrency: "GBP",
+          url: "/widget?ref=home",
+        },
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/widget" })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 1, type: "jsonld:singleton" },
+      price: "10.00",
+      title: "Singleton widget",
     });
   });
 
