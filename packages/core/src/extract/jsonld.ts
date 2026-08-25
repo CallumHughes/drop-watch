@@ -277,23 +277,63 @@ function variantValues(product: JsonRecord, property: string): string[] {
   return [...new Set(values)];
 }
 
+interface SelectableVariantValues {
+  ambiguous: boolean;
+  values: string[];
+}
+
+function isSplitAliasArray(value: unknown[]): boolean {
+  if (value.length !== VALUE_KEYS.length) {
+    return false;
+  }
+  const seenKeys = new Set<(typeof VALUE_KEYS)[number]>();
+  for (const entry of value) {
+    if (!isRecord(entry)) {
+      return false;
+    }
+    const entryKeys = VALUE_KEYS.filter((key) => key in entry);
+    const [entryKey] = entryKeys;
+    if (entryKeys.length !== 1 || !entryKey || seenKeys.has(entryKey)) {
+      return false;
+    }
+    seenKeys.add(entryKey);
+  }
+  return seenKeys.size === VALUE_KEYS.length;
+}
+
+function selectableValuesFrom(value: unknown, property: string): SelectableVariantValues {
+  if (typeof value === "string" || (typeof value === "number" && Number.isFinite(value))) {
+    const normalized = normalizedVariantValue(value, property);
+    return { ambiguous: false, values: normalized.length > 0 ? [normalized] : [] };
+  }
+  if (Array.isArray(value)) {
+    const entries = value.map((entry) => selectableValuesFrom(entry, property));
+    if (entries.some((entry) => entry.ambiguous)) {
+      return { ambiguous: true, values: [] };
+    }
+    const values = [...new Set(entries.flatMap((entry) => entry.values))];
+    const isOneEntry = entries.filter((entry) => entry.values.length > 0).length <= 1;
+    const ambiguous = values.length > 1 && !(isOneEntry || isSplitAliasArray(value));
+    return { ambiguous, values: ambiguous ? [] : values };
+  }
+  if (!isRecord(value)) {
+    return { ambiguous: false, values: [] };
+  }
+  const entries = VALUE_KEYS.filter((key) => key in value).map((key) =>
+    selectableValuesFrom(value[key], property)
+  );
+  if (entries.some((entry) => entry.ambiguous)) {
+    return { ambiguous: true, values: [] };
+  }
+  return {
+    ambiguous: false,
+    values: [...new Set(entries.flatMap((entry) => entry.values))],
+  };
+}
+
 function selectableVariantValues(product: JsonRecord, property: string): string[] {
-  const rawValue = product[property];
-  if (!Array.isArray(rawValue)) {
-    return variantValues(product, property);
-  }
-  const valuesByEntry = rawValue
-    .map((entry) => {
-      const values: string[] = [];
-      appendVariantValues(entry, property, values);
-      return [...new Set(values)];
-    })
-    .filter((values) => values.length > 0);
-  if (valuesByEntry.length === 1) {
-    return valuesByEntry[0] ?? [];
-  }
-  const distinctValues = [...new Set(valuesByEntry.flat())];
-  return distinctValues.length === 1 ? distinctValues : [];
+  const result = selectableValuesFrom(product[property], property);
+  return result.ambiguous ? [] : result.values;
 }
 
 function queryValuesByProperty(pageUrl: UrlIdentity): Map<string, string[]> | null {
@@ -577,6 +617,23 @@ function offerWithProduct(
   };
 }
 
+function hasTrustedVariantConflict(
+  candidate: OfferWithProduct,
+  candidates: OfferWithProduct[]
+): boolean {
+  const context = candidate.variantContext;
+  return (
+    candidate.variantParameterConflict &&
+    context !== undefined &&
+    candidates.some(
+      (other) =>
+        other !== candidate &&
+        other.variantContext?.group === context.group &&
+        other.variantParameterMatches.length > 0
+    )
+  );
+}
+
 /**
  * Ranking is global because a selected variant can live after an earlier Product
  * node. Each bucket preserves the existing product-first/document order.
@@ -596,6 +653,7 @@ function rankOffers(
     variantParameterMatches: [],
   };
   const seenOffers = new Set<JsonRecord>();
+  const candidates: OfferWithProduct[] = [];
 
   for (const product of rankNodes(nodes)) {
     for (const offer of offerCandidates(product)) {
@@ -603,8 +661,17 @@ function rankOffers(
         continue;
       }
       seenOffers.add(offer);
-      addToOfferBucket(offerWithProduct(product, offer, selected, pageUrl, contexts), buckets);
+      candidates.push(offerWithProduct(product, offer, selected, pageUrl, contexts));
     }
+  }
+  for (const candidate of candidates) {
+    addToOfferBucket(
+      {
+        ...candidate,
+        variantParameterConflict: hasTrustedVariantConflict(candidate, candidates),
+      },
+      buckets
+    );
   }
   return [
     ...buckets.selectedSkuMatches,

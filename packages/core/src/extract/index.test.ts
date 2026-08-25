@@ -592,6 +592,36 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("treats split name and value objects as aliases for one variant", () => {
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          name: "Small rug",
+          offers: { price: "10.00", priceCurrency: "GBP" },
+          size: [{ name: "Small" }, { value: "S" }],
+        },
+        {
+          "@type": "Product",
+          name: "Large rug",
+          offers: { price: "20.00", priceCurrency: "GBP" },
+          size: [{ name: "Large" }, { value: "L" }],
+        },
+      ])
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=L" })).toMatchObject({
+      confidence: "high",
+      evidence: {
+        candidateCount: 2,
+        matchedParams: ["size"],
+        type: "jsonld:variant-params",
+      },
+      price: "20.00",
+      title: "Large rug",
+    });
+  });
+
   it("does not treat a multi-valued property as selected variant evidence", () => {
     const html = page(
       ldScript({
@@ -599,6 +629,27 @@ describe("extract — JSON-LD", () => {
         name: "Generic rug offer",
         offers: { price: "89.25", priceCurrency: "GBP" },
         size: ["60x90", "185x275"],
+      })
+    );
+
+    expect(extract(html, { url: "https://shop.example.com/rug?size=185x275" })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:queried-url" },
+      price: "89.25",
+      title: "Generic rug offer",
+    });
+  });
+
+  it("does not treat a nested multi-valued property as selected variant evidence", () => {
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        name: "Generic rug offer",
+        offers: { price: "89.25", priceCurrency: "GBP" },
+        size: {
+          "@type": "SizeSpecification",
+          name: ["60x90", "185x275"],
+        },
       })
     );
 
@@ -963,6 +1014,56 @@ describe("extract — JSON-LD", () => {
       },
       price: "449.25",
       title: "Requested rug",
+    });
+  });
+
+  it("keeps an exact product winner when its display name differs from the query slug", () => {
+    const requestedUrl = "https://shop.example.com/tee?color=navy-blue";
+    const html = page(
+      ldScript([
+        {
+          "@type": "Product",
+          color: "Navy Blue",
+          name: "The Tee",
+          offers: { price: "45.00", priceCurrency: "GBP", url: requestedUrl },
+        },
+        {
+          "@type": "Product",
+          color: "navy-blue",
+          name: "Matching Socks",
+          offers: {
+            price: "6.00",
+            priceCurrency: "GBP",
+            url: "https://shop.example.com/socks",
+          },
+        },
+      ])
+    );
+
+    expect(extract(html, { url: requestedUrl })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 2, type: "jsonld:exact-url" },
+      price: "45.00",
+      title: "The Tee",
+    });
+  });
+
+  it("keeps an exact singleton high confidence when its display name differs from a code", () => {
+    const requestedUrl = "https://shop.example.com/tee?color=blk";
+    const html = page(
+      ldScript({
+        "@type": "Product",
+        color: "Black",
+        name: "The Tee",
+        offers: { price: "45.00", priceCurrency: "GBP", url: requestedUrl },
+      })
+    );
+
+    expect(extract(html, { url: requestedUrl })).toMatchObject({
+      confidence: "high",
+      evidence: { candidateCount: 1, type: "jsonld:exact-url" },
+      price: "45.00",
+      title: "The Tee",
     });
   });
 
