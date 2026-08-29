@@ -367,6 +367,7 @@ function queryValuesByProperty(pageUrl: UrlIdentity): Map<string, string[]> | nu
 
 interface VariantParameterResult {
   conflict: boolean;
+  conflictProperties: string[];
   matches: string[];
 }
 
@@ -375,27 +376,27 @@ function variantParameterResult(
   pageUrl: UrlIdentity | undefined
 ): VariantParameterResult {
   if (!pageUrl) {
-    return { conflict: false, matches: [] };
+    return { conflict: false, conflictProperties: [], matches: [] };
   }
   const queryValues = queryValuesByProperty(pageUrl);
   if (!queryValues || queryValues.size === 0) {
-    return { conflict: false, matches: [] };
+    return { conflict: false, conflictProperties: [], matches: [] };
   }
   const matches: string[] = [];
   for (const [property, values] of queryValues) {
     const productValues = selectableVariantValues(product, property);
     if (productValues.length === 0) {
-      return { conflict: false, matches: [] };
+      return { conflict: false, conflictProperties: [], matches: [] };
     }
     const propertyMatches = values.every((value) =>
       productValues.includes(normalizedVariantValue(value, property))
     );
     if (!propertyMatches) {
-      return { conflict: true, matches: [] };
+      return { conflict: true, conflictProperties: [property], matches: [] };
     }
     matches.push(property);
   }
-  return { conflict: false, matches };
+  return { conflict: false, conflictProperties: [], matches };
 }
 
 function comparableVariantProperties(product: JsonRecord): ReadonlySet<string> {
@@ -557,6 +558,7 @@ interface OfferWithProduct {
   urlMatch: UrlMatch;
   variantContext?: VariantContext;
   variantParameterConflict: boolean;
+  variantParameterConflictProperties: string[];
   variantParameterMatches: string[];
   variantParametersTrusted: boolean;
 }
@@ -608,6 +610,7 @@ function offerWithProduct(
     urlMatch,
     variantContext: contexts.get(product),
     variantParameterConflict: variantParameters.conflict,
+    variantParameterConflictProperties: variantParameters.conflictProperties,
     variantParameterMatches: variantParameters.matches,
     variantParametersTrusted: semanticEvidenceIsTrusted(
       pageUrl,
@@ -622,15 +625,19 @@ function hasTrustedVariantConflict(
   candidates: OfferWithProduct[]
 ): boolean {
   const context = candidate.variantContext;
+  const conflictsWithDeclaredAxis = candidate.variantParameterConflictProperties.some((property) =>
+    context?.variesBy.has(property)
+  );
   return (
     candidate.variantParameterConflict &&
     context !== undefined &&
-    candidates.some(
-      (other) =>
-        other !== candidate &&
-        other.variantContext?.group === context.group &&
-        other.variantParameterMatches.length > 0
-    )
+    (conflictsWithDeclaredAxis ||
+      candidates.some(
+        (other) =>
+          other !== candidate &&
+          other.variantContext?.group === context.group &&
+          other.variantParameterMatches.length > 0
+      ))
   );
 }
 

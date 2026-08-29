@@ -1017,6 +1017,37 @@ describe("extract — JSON-LD", () => {
     });
   });
 
+  it("treats an unavailable value on a declared variant axis as a conflict", () => {
+    const requestedUrl = "https://shop.example.com/rug?size=999x999";
+    const html = page(
+      ldScript({
+        "@type": "ProductGroup",
+        hasVariant: [
+          {
+            "@type": "Product",
+            name: "Default rug",
+            offers: { price: "89.25", priceCurrency: "GBP", url: requestedUrl },
+            size: "60x90",
+          },
+          {
+            "@type": "Product",
+            name: "Large rug",
+            offers: { price: "449.25", priceCurrency: "GBP" },
+            size: "185x275",
+          },
+        ],
+        variesBy: ["size"],
+      })
+    );
+
+    expect(extract(html, { url: requestedUrl })).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:conflict" },
+      price: "89.25",
+      title: "Default rug",
+    });
+  });
+
   it("keeps an exact product winner when its display name differs from the query slug", () => {
     const requestedUrl = "https://shop.example.com/tee?color=navy-blue";
     const html = page(
