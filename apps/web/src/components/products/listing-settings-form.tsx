@@ -19,8 +19,10 @@ import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
-
+import { listingExtractionSettings } from "./listing-repair";
+import { PreviewFlow } from "./preview-flow";
 import { browserToggleState } from "./render-mode";
+import { usePreviewFlow } from "./use-preview-flow";
 
 /** How each mode reads in the settings editor. `auto` is not an expression. */
 const EXTRACTOR_LABELS: Record<ListingExtractor, string> = {
@@ -93,6 +95,8 @@ export function ListingSettingsForm({
   const [expression, setExpression] = useState(listing.expression ?? "");
   const [locale, setLocale] = useState(listing.locale ?? "");
   const [renderMode, setRenderMode] = useState(listing.render);
+  const [repairOpen, setRepairOpen] = useState(false);
+  const repairFlow = usePreviewFlow({ initialUrl: listing.url, locale });
 
   // This form only mounts inside the expanded editor, so the query fires on
   // open rather than paying for it on every dashboard load.
@@ -133,18 +137,49 @@ export function ListingSettingsForm({
   const toggleBrowserRender = useCallback((checked: boolean) => {
     setRenderMode(checked ? "browser" : "http");
   }, []);
+  const loadRepairPreview = repairFlow.loadPreview;
+  const repairPending =
+    repairOpen &&
+    (repairFlow.fetchPreview.isPending ||
+      repairFlow.isTesting ||
+      Boolean(repairFlow.transportReload?.isPending));
+  const repairCanApply = Boolean(repairFlow.preview && repairFlow.chosen && !repairPending);
+  const openRepair = useCallback(() => {
+    setRepairOpen(true);
+    loadRepairPreview();
+  }, [loadRepairPreview]);
+  const cancelRepair = useCallback(() => {
+    setRepairOpen(false);
+    repairFlow.reset();
+  }, [repairFlow.reset]);
+  const applyRepair = useCallback(() => {
+    const repaired = listingExtractionSettings(repairFlow, {
+      expression: null,
+      extractor: "auto",
+      render: renderMode,
+    });
+    if (!(repaired && repairCanApply)) {
+      toast.error("Test exactly one price match before applying this repair.");
+      return;
+    }
+    setExtractor(repaired.extractor);
+    setExpression(repaired.expression ?? "");
+    setRenderMode(repaired.render);
+    setRepairOpen(false);
+    repairFlow.reset();
+  }, [repairCanApply, repairFlow, renderMode]);
 
   const onSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const pinned = extractor !== "auto";
-      if (pinned && expression.trim() === "") {
+      const nextExpression = extractor === "auto" ? null : expression.trim();
+      if (extractor !== "auto" && !nextExpression) {
         toast.error(PINNED_NEEDS_EXPRESSION);
         return;
       }
       update.mutate(
         {
-          expression: pinned ? expression.trim() : null,
+          expression: nextExpression,
           extractor,
           id: listing.id,
           intervalMinutes: Number(intervalMinutes),
@@ -223,6 +258,47 @@ export function ListingSettingsForm({
         </select>
       </Field>
 
+      <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
+        <div>
+          <p className="font-medium text-xs">Repair this listing’s price extraction</p>
+          <p className="text-muted-foreground text-xs">
+            Re-preview the current URL, test a CSS selector or JSONPath, and save the verified
+            extraction without recreating this listing.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={repairPending}
+            onClick={openRepair}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            {repairFlow.fetchPreview.isPending ? "Re-previewing…" : "Re-preview and repair"}
+          </Button>
+          {repairOpen ? (
+            <Button onClick={cancelRepair} size="sm" type="button" variant="ghost">
+              Cancel repair
+            </Button>
+          ) : null}
+        </div>
+        {repairOpen ? (
+          <>
+            <PreviewFlow flow={repairFlow} lockUrl />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button disabled={!repairCanApply} onClick={applyRepair} size="sm" type="button">
+                Apply repair
+              </Button>
+              {repairFlow.preview && !repairFlow.chosen && !repairPending ? (
+                <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+                  Test exactly one price match before applying this repair.
+                </p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </div>
+
       {extractor === "auto" ? null : (
         <Field htmlFor={expressionId} label={`${EXPRESSION_LABELS[extractor]} for the price`}>
           <div className="flex flex-col gap-1">
@@ -278,7 +354,7 @@ export function ListingSettingsForm({
       </div>
 
       <div>
-        <Button disabled={update.isPending} size="sm" type="submit">
+        <Button disabled={update.isPending || repairPending} size="sm" type="submit">
           {update.isPending ? "Saving…" : "Save listing settings"}
         </Button>
       </div>
