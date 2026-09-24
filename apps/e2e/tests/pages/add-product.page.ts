@@ -5,6 +5,7 @@ const STRATEGY_NOTE_PATTERN = /found by/;
 const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
 const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/;
 const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/;
+const AUTOMATIC_REPAIR_PATTERN = /automatic price is low-confidence or ambiguous/;
 
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {
@@ -19,6 +20,8 @@ export class AddProductPage {
   readonly reloadWithHttpButton: Locator;
   /** Shown when the automatic chain found nothing and the picker is the next step. */
   readonly noAutoMatchNote: Locator;
+  /** Guardrail shown when automatic extraction found an unsafe candidate. */
+  readonly automaticRepairWarning: Locator;
   /** Provenance displayed when the successful preview came from the renderer sidecar. */
   readonly browserRenderProvenance: Locator;
   readonly selectorInput: Locator;
@@ -39,6 +42,7 @@ export class AddProductPage {
       name: HTTP_RELOAD_BUTTON_PATTERN,
     });
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
+    this.automaticRepairWarning = page.getByText(AUTOMATIC_REPAIR_PATTERN);
     this.browserRenderProvenance = page.getByText("rendered in a browser");
     this.selectorInput = page.getByLabel("CSS selector for the price");
     this.jsonPathInput = page.getByLabel("JSONPath for the price");

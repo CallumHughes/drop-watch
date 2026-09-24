@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { extract, testExpression } from "@drop-watch/core/extract";
+import { testExpression } from "@drop-watch/core/extract";
 import { EXPRESSION_MODES } from "@drop-watch/core/extract/strategies";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import { checkUrl } from "@drop-watch/core/net/guard";
@@ -27,6 +27,7 @@ import { z } from "zod";
 import { protectedProcedure } from "../index";
 import {
   type ExpressionPreview,
+  extractPreviewPage,
   orchestratePreview,
   type PagePreview,
   PREVIEW_REQUEST_MODES,
@@ -40,6 +41,8 @@ import {
   toPreviewExtraction,
 } from "../preview";
 import { MAX_EXPRESSION_LENGTH, type RenderMode } from "../schemas/products";
+
+const MAX_LOCALE_LENGTH = 35;
 
 /**
  * Re-exported so `apps/web` can name these shapes without depending on
@@ -153,7 +156,13 @@ export const previewRouter = {
    * add flow reads that copy.
    */
   page: protectedProcedure
-    .input(z.object({ render: z.enum(PREVIEW_REQUEST_MODES).default("auto"), url: urlInput }))
+    .input(
+      z.object({
+        locale: z.string().max(MAX_LOCALE_LENGTH).nullable().optional(),
+        render: z.enum(PREVIEW_REQUEST_MODES).default("auto"),
+        url: urlInput,
+      })
+    )
     .handler(async ({ input }): Promise<PagePreview> => {
       const log = createLogger({ action: "preview_page", url: input.url });
       const configurationRejection = previewConfigurationRejection(input.render, env.RENDER_URL);
@@ -173,7 +182,7 @@ export const previewRouter = {
           ? PREVIEW_ESCALATING_RETRIES
           : PREVIEW_MAX_RETRIES;
       const outcome = await orchestratePreview({
-        extractPage: (html, url) => extract(html, { url }),
+        extractPage: (html, url) => extractPreviewPage(html, url, input.locale),
         render: input.render,
         renderUrl: env.RENDER_URL,
         retrieve: async (transport) =>

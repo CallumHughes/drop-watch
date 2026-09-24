@@ -13,6 +13,7 @@ import { useId } from "react";
 import { productHost } from "@/lib/format";
 
 import { ExpressionPicker } from "./expression-picker";
+import { automaticPreviewRepairMessage } from "./preview-confidence";
 import { PreviewSummary } from "./preview-summary";
 import type { PreviewFlow as PreviewFlowState } from "./use-preview-flow";
 
@@ -95,6 +96,7 @@ function PreviewPanel({
   onModeChange,
   onTogglePicker,
   preview,
+  requiresManualRepair,
   test,
   transportReload,
 }: {
@@ -105,6 +107,7 @@ function PreviewPanel({
   onModeChange: (mode: ExpressionMode) => void;
   onTogglePicker: () => void;
   preview: PagePreview;
+  requiresManualRepair: boolean;
   test: ExpressionPreview | undefined;
   transportReload: PreviewFlowState["transportReload"];
 }) {
@@ -123,17 +126,23 @@ function PreviewPanel({
         {preview.extraction ? (
           <>
             <PreviewSummary extraction={preview.extraction} url={preview.url} />
-            <div>
-              <Button
-                disabled={transportReload?.isPending}
-                onClick={onTogglePicker}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {mode === null ? "Pick the price myself" : "Use the automatic result"}
-              </Button>
-            </div>
+            {requiresManualRepair ? (
+              <p className="text-amber-700 text-sm dark:text-amber-300" role="alert">
+                {automaticPreviewRepairMessage(preview)}
+              </p>
+            ) : (
+              <div>
+                <Button
+                  disabled={transportReload?.isPending}
+                  onClick={onTogglePicker}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {mode === null ? "Pick the price myself" : "Use the automatic result"}
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <p className="text-sm">
@@ -166,36 +175,56 @@ function PreviewPanel({
  * it. The caller renders its own save step below this, reading
  * `flow.chosen`/`flow.preview` once a price is on the screen.
  */
-export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
+export function PreviewFlow({
+  flow,
+  lockUrl = false,
+}: {
+  flow: PreviewFlowState;
+  lockUrl?: boolean;
+}) {
   const urlId = useId();
   const isLoadingPreview = flow.fetchPreview.isPending || Boolean(flow.transportReload?.isPending);
   const fetchButtonLabel = flow.fetchPreview.isPending ? "Loading…" : "Load preview";
 
   return (
     <>
-      <form className="flex flex-col gap-2" onSubmit={flow.onFetch}>
-        <Field
-          hint="We’ll look for the most reliable price we can find on this page."
-          htmlFor={urlId}
-          label="Product URL"
-        >
-          <div className="flex gap-2">
-            <Input
-              autoComplete="url"
-              disabled={isLoadingPreview}
-              id={urlId}
-              onChange={flow.onUrlChange}
-              placeholder="https://example.com/product/thing"
-              required
-              type="url"
-              value={flow.url}
-            />
-            <Button disabled={isLoadingPreview} type="submit">
-              {fetchButtonLabel}
+      {lockUrl ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-muted-foreground text-xs">
+            Re-preview this listing URL to test a replacement CSS selector or JSONPath against its
+            current page.
+          </p>
+          <div>
+            <Button disabled={isLoadingPreview} onClick={flow.loadPreview} type="button">
+              {fetchButtonLabel === "Loading…" ? "Re-previewing…" : "Re-preview listing"}
             </Button>
           </div>
-        </Field>
-      </form>
+        </div>
+      ) : (
+        <form className="flex flex-col gap-2" onSubmit={flow.onFetch}>
+          <Field
+            hint="We’ll look for the most reliable price we can find on this page."
+            htmlFor={urlId}
+            label="Product URL"
+          >
+            <div className="flex gap-2">
+              <Input
+                autoComplete="url"
+                disabled={isLoadingPreview}
+                id={urlId}
+                onChange={flow.onUrlChange}
+                placeholder="https://example.com/product/thing"
+                required
+                type="url"
+                value={flow.url}
+              />
+              <Button disabled={isLoadingPreview} type="submit">
+                {fetchButtonLabel}
+              </Button>
+            </div>
+          </Field>
+        </form>
+      )}
 
       {flow.preview ? (
         <PreviewPanel
@@ -206,6 +235,7 @@ export function PreviewFlow({ flow }: { flow: PreviewFlowState }) {
           onModeChange={flow.onModeChange}
           onTogglePicker={flow.togglePicker}
           preview={flow.preview}
+          requiresManualRepair={flow.automaticRepairRequired}
           test={flow.expressionTest.data}
           transportReload={flow.transportReload}
         />
