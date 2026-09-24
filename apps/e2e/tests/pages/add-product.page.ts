@@ -66,7 +66,7 @@ export class AddProductPage {
   async track(): Promise<string> {
     await this.trackButton.click();
     await this.page.waitForURL(PRODUCT_URL_PATTERN);
-    const id = PRODUCT_URL_PATTERN.exec(this.page.url())?.groups?.id;
+    const id = this.page.url().match(PRODUCT_URL_PATTERN)?.groups?.id;
     if (!id) {
       throw new Error(`expected a product URL, got ${this.page.url()}`);
     }

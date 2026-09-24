@@ -265,7 +265,7 @@ export function parsePrice(
   }
 
   const text = normalizeSpaces(input);
-  const run = NUMBER_RUN.exec(text);
+  const run = text.match(NUMBER_RUN);
   if (!run) {
     return null;
   }
