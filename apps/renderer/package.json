@@ -23,7 +23,7 @@
   "devDependencies": {
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
-    "rolldown": "^1.2.9",
+    "rolldown": "^1.2.11",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
