@@ -49,8 +49,8 @@ catalogs:
       specifier: 1.7.5
       version: 1.7.5
     dotenv:
-      specifier: ^17.4.2
-      version: 17.4.2
+      specifier: ^18.0.4
+      version: 18.0.4
     drizzle-orm:
       specifier: ^0.45.2
       version: 0.45.2
@@ -249,7 +249,7 @@ importers:
         version: 1.7.5(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.4)(pg@8.23.0))(next@16.3.5(@babel/core@7.29.7)(@playwright/test@1.63.0)(@types/node@24.13.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@4.1.10(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.1)))
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.4
       evlog:
         specifier: 'catalog:'
         version: 2.29.0(@orpc/server@1.15.1)(express@5.2.1)(hono@4.13.8)(next@16.3.5(@babel/core@7.29.7)(@playwright/test@1.63.0)(@types/node@24.13.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(vite@7.3.6(@types/node@24.13.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.1))
@@ -380,7 +380,7 @@ importers:
         version: 1.15.1(@orpc/contract@1.15.1)(@orpc/server@1.15.1)(zod@4.6.5)
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.4
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.23.1)(kysely@0.29.4)(pg@8.23.0)
@@ -420,7 +420,7 @@ importers:
         version: 1.7.5(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.4)(pg@8.23.0))(next@16.3.5(@babel/core@7.29.7)(@playwright/test@1.63.0)(@types/node@24.13.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@4.1.10(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.1)))
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.4
       evlog:
         specifier: 'catalog:'
         version: 2.29.0(@orpc/server@1.15.1)(express@5.2.1)(hono@4.13.8)(next@16.3.5(@babel/core@7.29.7)(@playwright/test@1.63.0)(@types/node@24.13.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)(vite@7.3.6(@types/node@24.13.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.1))
@@ -484,7 +484,7 @@ importers:
         version: 1.7.5(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@types/pg@8.23.1)(kysely@0.29.4)(pg@8.23.0))(next@16.3.5(@babel/core@7.29.7)(@playwright/test@1.63.0)(@types/node@24.13.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@4.1.10(@types/node@24.13.5)(vite@7.3.6(@types/node@24.13.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.13)(yaml@2.9.1)))
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.4
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.23.1)(kysely@0.29.4)(pg@8.23.0)
@@ -573,7 +573,7 @@ importers:
         version: 0.13.11(typescript@6.0.3)(zod@4.6.5)
       dotenv:
         specifier: 'catalog:'
-        version: 17.4.2
+        version: 18.0.4
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -3092,6 +3092,11 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
+
+  dotenv@18.0.4:
+    resolution: {integrity: sha512-jGt9uI5BIxpVO15kvy+iEFqNAwxYClKWnkptLjSNPnFLC003Imd0ofr3aEVsbpHdSBdSsbcApNIlz4nbyGMwdA==}
+    engines: {node: '>=12'}
+    hasBin: true
 
   drizzle-kit@0.31.10:
     resolution: {integrity: sha512-7OZcmQUrdGI+DUNNsKBn1aW8qSoKuTH7d0mYgSP8bAzdFzKoovxEFnoGQp2dVs82EOJeYycqRtciopszwUf8bw==}
@@ -6888,6 +6893,8 @@ snapshots:
       is-obj: 2.0.0
 
   dotenv@17.4.2: {}
+
+  dotenv@18.0.4: {}
 
   drizzle-kit@0.31.10:
     dependencies:
