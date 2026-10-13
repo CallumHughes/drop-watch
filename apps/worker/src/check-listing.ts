@@ -22,9 +22,15 @@ import { db } from "@drop-watch/db";
 import type { Listing, NewCheckRun, NewPricePoint, Product } from "@drop-watch/db/schema/products";
 import { checkRuns, listings, pricePoints, products } from "@drop-watch/db/schema/products";
 import { env } from "@drop-watch/env/worker";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
+import {
+  completePersistedCheck,
+  type PersistResult,
+  STALE_CHECK_DISCARD_MESSAGE,
+  validatorUpdate,
+} from "./check-persistence";
 import { extractionOptions } from "./extraction";
 import { type CheckOutcome, toCheckOutcome } from "./outcome";
 import { renderTarget, unconfiguredRenderResult } from "./retrieve";
@@ -102,14 +108,14 @@ function buildWrite(
   currency: string | null,
   outcome: CheckOutcome
 ): CheckWrite {
-  const listingUpdate: Partial<Listing> = {
-    // Only overwrite validators we actually received; a 304 without an ETag
-    // must not wipe the one that produced it.
-    ...(fetched.etag ? { etag: fetched.etag } : {}),
-    ...(fetched.lastModified ? { lastModified: fetched.lastModified } : {}),
-  };
+  const accepted = writeAccepted(outcome, extraction, currency);
+  const listingUpdate: Partial<Listing> = validatorUpdate(fetched, accepted);
 
-  if (!(outcome.recordPricePoint && extraction?.ok && currency)) {
+  if (
+    !(outcome.recordPricePoint && extraction?.ok) ||
+    extraction.confidence !== "high" ||
+    !currency
+  ) {
     return { listingUpdate, pricePoint: null, productUpdate: {} };
   }
 
@@ -146,6 +152,16 @@ function buildWrite(
   }
 
   return { listingUpdate, pricePoint, productUpdate };
+}
+
+function writeAccepted(
+  outcome: CheckOutcome,
+  extraction: ExtractionResult | null,
+  currency: string | null
+): boolean {
+  return Boolean(
+    outcome.recordPricePoint && extraction?.ok && extraction.confidence === "high" && currency
+  );
 }
 
 /**
@@ -205,19 +221,34 @@ function persist(
   checkRun: NewCheckRun,
   write: CheckWrite,
   scheduledFor: Date
-): Promise<void> {
+): Promise<PersistResult> {
   return db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(listings)
+      .set({ ...write.listingUpdate, nextCheckAt: scheduledFor })
+      .where(
+        and(
+          eq(listings.id, listing.id),
+          // PostgreSQL stores timestamptz with microseconds while a JS Date
+          // carries milliseconds. Truncating the database side avoids
+          // rejecting every row loaded from defaultNow, while still detecting
+          // edits whose updatedAt moved to another millisecond.
+          sql`date_trunc('milliseconds', ${listings.updatedAt}) = ${listing.updatedAt}`
+        )
+      )
+      .returning({ id: listings.id });
+    if (!claimed) {
+      return "stale";
+    }
+
     if (write.pricePoint) {
       await tx.insert(pricePoints).values(write.pricePoint);
     }
     await tx.insert(checkRuns).values(checkRun);
-    await tx
-      .update(listings)
-      .set({ ...write.listingUpdate, nextCheckAt: scheduledFor })
-      .where(eq(listings.id, listing.id));
     if (Object.keys(write.productUpdate).length > 0) {
       await tx.update(products).set(write.productUpdate).where(eq(products.id, listing.productId));
     }
+    return "persisted";
   });
 }
 
@@ -272,7 +303,7 @@ async function runCheck(listingId: string, source: CheckSource): Promise<void> {
       ? buildWrite(listing, product, fetched, extraction, currency, outcome)
       : { listingUpdate: {}, pricePoint: null, productUpdate: {} };
 
-  await persist(
+  const persisted = await persist(
     listing,
     buildCheckRun(listing, startedAt, fetched.durationMs, outcome),
     write,
@@ -280,29 +311,39 @@ async function runCheck(listingId: string, source: CheckSource): Promise<void> {
   );
 
   log.set({
-    currency: write.pricePoint?.currency ?? null,
+    confidence: extraction?.ok ? extraction.confidence : null,
+    currency: persisted === "persisted" ? (write.pricePoint?.currency ?? null) : null,
     durationMs: fetched.durationMs,
+    evidence: extraction?.ok ? extraction.evidence : null,
     extractorUsed: outcome.extractorUsed ?? null,
     httpStatus: outcome.httpStatus ?? null,
-    inStock: write.pricePoint?.inStock ?? null,
-    nextCheckAt: scheduledFor.toISOString(),
+    inStock: persisted === "persisted" ? (write.pricePoint?.inStock ?? null) : null,
+    nextCheckAt: persisted === "persisted" ? scheduledFor.toISOString() : null,
     outcome: outcome.status,
-    price: write.pricePoint?.price ?? null,
+    price: persisted === "persisted" ? (write.pricePoint?.price ?? null) : null,
     render: listing.render,
   });
-  if (outcome.status === "ok") {
-    log.info("check complete");
-  } else {
-    log.warn(outcome.error ?? "check failed");
-  }
-  log.emit();
+  await completePersistedCheck(persisted, {
+    onPersisted: async () => {
+      if (outcome.status === "ok") {
+        log.info("check complete");
+      } else {
+        log.warn(outcome.error ?? "check failed");
+      }
+      log.emit();
 
-  // After the commit and after the log line: the measurement is safe whatever
-  // Home Assistant does next.
-  await runAlerting({
-    listing,
-    outcome,
-    pricePointWritten: write.pricePoint !== null,
-    product,
+      // After the commit and after the log line: the measurement is safe whatever
+      // Home Assistant does next.
+      await runAlerting({
+        listing,
+        outcome,
+        pricePointWritten: write.pricePoint !== null,
+        product,
+      });
+    },
+    onStale: () => {
+      log.warn(STALE_CHECK_DISCARD_MESSAGE);
+      log.emit();
+    },
   });
 }

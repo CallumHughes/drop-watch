@@ -1,4 +1,5 @@
 import type { ExtractionResult } from "@drop-watch/core/extract";
+import { extract } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { describe, expect, it } from "vitest";
 import { toCheckOutcome } from "./outcome";
@@ -75,6 +76,58 @@ describe("toCheckOutcome", () => {
     expect(outcome.recordPricePoint).toBe(false);
     expect(outcome.extractorUsed).toBe("selector");
     expect(outcome.error).toContain("no currency");
+  });
+
+  it("rejects an ambiguous John Lewis-style multi-candidate extraction", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify([
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: "Coat - Red",
+        offers: { price: "99.00", priceCurrency: "GBP", sku: "red" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: "Coat - Blue",
+        offers: { price: "109.00", priceCurrency: "GBP", sku: "blue" },
+      },
+    ])}</script>`;
+    const extraction = extract(html, { url: okFetch.url });
+
+    expect(extraction).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 2, type: "jsonld:multiple-candidates" },
+      ok: true,
+      strategy: "jsonld",
+    });
+
+    const outcome = toCheckOutcome(okFetch, extraction, "GBP");
+    expect(outcome).toMatchObject({
+      extractorUsed: "jsonld",
+      httpStatus: 200,
+      recordPricePoint: false,
+      status: "extract_failed",
+    });
+    expect(outcome.error).toContain("ambiguous");
+    expect(outcome.error).toContain("2 candidates");
+    expect(outcome.error).toContain("Configure a selector or JSONPath");
+  });
+
+  it("accepts a high-confidence pinned selector extraction", () => {
+    const extraction = extract('<span class="price">GBP 42.00</span>', {
+      expression: ".price",
+      strategies: ["selector"],
+      url: okFetch.url,
+    });
+
+    expect(extraction).toMatchObject({ confidence: "high", ok: true, strategy: "selector" });
+    expect(toCheckOutcome(okFetch, extraction, "GBP")).toEqual({
+      extractorUsed: "selector",
+      httpStatus: 200,
+      recordPricePoint: true,
+      status: "ok",
+    });
   });
 
   it("maps an HTTP failure to http_error and keeps the status code", () => {

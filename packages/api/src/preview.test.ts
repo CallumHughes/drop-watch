@@ -3,6 +3,7 @@ import type { RetrieveResult } from "@drop-watch/core/render";
 import { describe, expect, it } from "vitest";
 
 import {
+  extractPreviewPage,
   orchestratePreview,
   PreviewCache,
   type PreviewEntry,
@@ -12,10 +13,16 @@ import {
   previewFailure,
   previewTransports,
   previewUrlRejection,
+  toExpressionPreview,
   toPreviewExtraction,
 } from "./preview";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
+
+const AMBIGUOUS_LOCALE_PAGE = `<!doctype html><html><head>
+  <meta property="product:price:amount" content="1.234" />
+  <meta property="product:price:currency" content="EUR" />
+</head></html>`;
 
 function at(minutes: number): Date {
   return new Date(NOW.getTime() + minutes * 60_000);
@@ -111,6 +118,27 @@ describe("preview preflight", () => {
       message: "example.test resolves to 127.0.0.1, which is not public",
     });
     expect(previewUrlRejection({ ok: true })).toBeNull();
+  });
+});
+
+describe("extractPreviewPage", () => {
+  it("applies the supplied locale to automatic extraction", () => {
+    expect(
+      extractPreviewPage(AMBIGUOUS_LOCALE_PAGE, "https://example.com/item", "en-GB")
+    ).toMatchObject({
+      currency: "EUR",
+      ok: true,
+      price: "1.234",
+      strategy: "opengraph",
+    });
+    expect(
+      extractPreviewPage(AMBIGUOUS_LOCALE_PAGE, "https://example.com/item", "de-DE")
+    ).toMatchObject({
+      currency: "EUR",
+      ok: true,
+      price: "1234",
+      strategy: "opengraph",
+    });
   });
 });
 
@@ -537,7 +565,9 @@ describe("toPreviewExtraction", () => {
   it("flattens absent optionals to null so the UI has one answer, not two", () => {
     expect(toPreviewExtraction(extracted("high", { strategy: "selector" }))).toEqual({
       availability: null,
+      confidence: "high",
       currency: null,
+      evidence: { type: "opengraph:page-metadata" },
       imageUrl: null,
       inStock: null,
       price: "12.99",
@@ -561,12 +591,32 @@ describe("toPreviewExtraction", () => {
       )
     ).toEqual({
       availability: "OutOfStock",
+      confidence: "high",
       currency: "GBP",
+      evidence: { type: "opengraph:page-metadata" },
       imageUrl: "https://example.com/a.jpg",
       inStock: false,
       price: "1234.56",
       strategy: "jsonld",
       title: "A Thing",
+    });
+  });
+
+  it("preserves confidence and evidence for an expression-test preview", () => {
+    const result = toExpressionPreview({
+      invalidExpression: false,
+      invalidReason: "",
+      matchCount: 1,
+      result: extracted("high", {
+        evidence: { matchCount: 1, type: "selector:configured" },
+        strategy: "selector",
+      }),
+      samples: [],
+    });
+
+    expect(result.extraction).toMatchObject({
+      confidence: "high",
+      evidence: { matchCount: 1, type: "selector:configured" },
     });
   });
 });

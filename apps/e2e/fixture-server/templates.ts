@@ -13,11 +13,20 @@
  * only ever an attribute value, and one that only exists inside an embedded
  * JSON payload. Neither carries structured data, so the automatic chain must
  * come up empty on both.
+ *
+ * `ambiguous-sizes` models a storefront whose selected, visible size has one
+ * price while JSON-LD contains multiple size offers. Its document order is
+ * mutable so a test can reproduce the false drops caused by treating the
+ * first structured-data offer as the selected variant.
  */
 
 export interface FixtureProductState {
   /** schema.org availability, e.g. "InStock" or "OutOfStock". */
   availability: "InStock" | "OutOfStock";
+  /** Cheaper unselected variant used by the ambiguous-sizes template. */
+  cheapPrice?: string;
+  /** Put the cheap offer first in JSON-LD, independently of the visible variant. */
+  cheapVariantFirst?: boolean;
   currency: string;
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
@@ -27,6 +36,7 @@ export interface FixtureProductState {
     | "json-blob"
     | "jsonld"
     | "attribute-only"
+    | "ambiguous-sizes"
     | "manual-browser-reload"
     | "rendered-selected-sku"
     | "selector";
@@ -236,6 +246,47 @@ function selectorPage(state: FixtureProductState): string {
 `;
 }
 
+const DEFAULT_CHEAP_VARIANT_PRICE = "99.00";
+
+/**
+ * The large size is visibly selected and its price has a stable, one-match
+ * selector. JSON-LD deliberately gives no selected-SKU or URL evidence, so
+ * both orders remain low-confidence even though automatic extraction still
+ * returns a candidate.
+ */
+function ambiguousSizesPage(state: FixtureProductState): string {
+  const selectedVariant = variantJsonLd(state, state.price, "large");
+  const cheapVariant = variantJsonLd(
+    state,
+    state.cheapPrice ?? DEFAULT_CHEAP_VARIANT_PRICE,
+    "small"
+  );
+  const variants = state.cheapVariantFirst
+    ? [cheapVariant, selectedVariant]
+    : [selectedVariant, cheapVariant];
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <script type="application/ld+json">${JSON.stringify(variants)}</script>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+    <label for="size">Size</label>
+    <select id="size">
+      <option>Small</option>
+      <option selected>Large</option>
+    </select>
+    <p data-testid="price-now">${displayPrice(state)}</p>
+  </main>
+</body>
+</html>
+`;
+}
+
 /**
  * The price exists only as an attribute value — never as text. The explicit
  * selector attribute syntax can read it, while the automatic chain cannot.
@@ -306,6 +357,9 @@ export function renderProductPage(state: FixtureProductState, url: string): stri
   }
   if (state.template === "attribute-only") {
     return attributeOnlyPage(state);
+  }
+  if (state.template === "ambiguous-sizes") {
+    return ambiguousSizesPage(state);
   }
   if (state.template === "json-blob") {
     return jsonBlobPage(state);
