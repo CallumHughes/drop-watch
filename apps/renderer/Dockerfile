@@ -13,7 +13,7 @@
 # image tag on the runner stage and the npm install there, so the two can
 # never drift apart. Declared before the first FROM so it is in scope for
 # the `FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble` below.
-ARG PLAYWRIGHT_VERSION=1.62.1
+ARG PLAYWRIGHT_VERSION=1.64.0
 
 FROM node:24-slim AS base
 RUN npm install --global pnpm@11
