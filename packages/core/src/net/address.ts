@@ -101,7 +101,7 @@ function ipv4ToInt(octets: readonly number[]): number {
  * 10 rather than 8, which blocks an octal-looking address rather than passing it.
  */
 function parseIpv4(value: string): number[] | null {
-  const match = IPV4_PATTERN.exec(value);
+  const match = value.match(IPV4_PATTERN);
   if (!match) {
     return null;
   }

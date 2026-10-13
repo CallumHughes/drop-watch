@@ -21,8 +21,8 @@
   "dependencies": {
     "cheerio": "^1.2.0",
     "domhandler": "^6.0.1",
-    "p-queue": "^9.3.3",
-    "undici": "^8.10.0",
+    "p-queue": "^9.3.5",
+    "undici": "^8.11.2",
     "zod": "catalog:"
   },
   "devDependencies": {

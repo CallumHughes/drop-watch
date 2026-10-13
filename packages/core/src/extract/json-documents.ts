@@ -109,6 +109,7 @@ function scanInlineAssignments(source: string, documents: JsonDocument[]): void 
   const code = executableCode(source);
   INLINE_ASSIGNMENT.lastIndex = 0;
   let match = INLINE_ASSIGNMENT.exec(code);
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: exec returns null when no assignments remain.
   while (match !== null) {
     if (documents.length >= MAX_DOCUMENTS) {
       return;
