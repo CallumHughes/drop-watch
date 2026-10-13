@@ -16,14 +16,14 @@
     "@hono/node-server": "catalog:",
     "evlog": "catalog:",
     "hono": "catalog:",
-    "p-queue": "^9.3.3",
+    "p-queue": "^9.3.5",
     "playwright": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
-    "rolldown": "^1.2.9",
+    "rolldown": "^1.2.13",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
