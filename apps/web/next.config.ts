@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   // Overridable so a second dev server (the e2e suite's, on its own port) can
   // run beside `pnpm dev` without the two fighting over one .next directory.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  experimental: {
+    // Off only where a stopped command would break the run — the e2e suite
+    // sets this; see apps/e2e/constants.ts.
+    agentUpgrade: process.env.NEXT_AGENT_UPGRADE_NUDGE === "off" ? false : "security",
+  },
   images: {
     // Product images come from whatever retailer the user is tracking, so the
     // host set is open by construction. They are served unoptimised: proxying

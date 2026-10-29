@@ -108,6 +108,10 @@ export const appEnv: Record<string, string> = {
   DATABASE_URL: E2E_DATABASE_URL,
   HA_URL: "",
   HA_WEBHOOK_ID: "",
+  // Next's agent-upgrade nudge aborts `next dev`/`next start` with exit 1 on
+  // its first run under an AI agent, which kills the Playwright web server
+  // before any spec runs. `pnpm dev` still reports advisories.
+  NEXT_AGENT_UPGRADE_NUDGE: "off",
   NEXT_DIST_DIR: ".next-e2e",
   // The third Playwright web server starts the renderer here. `web` consults
   // it when an automatic HTTP preview needs more confidence; browser-mode
