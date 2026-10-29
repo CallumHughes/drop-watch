@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { transportReloadControl } from "./use-preview-flow";
+import {
+  isCurrentPreviewRequest,
+  normalizePreviewLocale,
+  transportReloadControl,
+} from "./use-preview-flow";
+
+describe("normalizePreviewLocale", () => {
+  it("trims a locale and omits blank drafts", () => {
+    expect(normalizePreviewLocale(" de-DE ")).toBe("de-DE");
+    expect(normalizePreviewLocale("   ")).toBeUndefined();
+    expect(normalizePreviewLocale(undefined)).toBeUndefined();
+  });
+});
+
+describe("isCurrentPreviewRequest", () => {
+  it("ignores a response from a cancelled or superseded generation", () => {
+    expect(isCurrentPreviewRequest(2, 3)).toBe(false);
+    expect(isCurrentPreviewRequest(2, 2)).toBe(true);
+    expect(isCurrentPreviewRequest(undefined, 2)).toBe(false);
+  });
+});
 
 describe("transportReloadControl", () => {
   it("leaves browser reload enabled while capabilities are unknown or failed", () => {

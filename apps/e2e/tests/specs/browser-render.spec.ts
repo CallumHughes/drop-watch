@@ -135,10 +135,9 @@ test("rendered selected SKU resolves ambiguous HTTP and saves browser mode", asy
   });
 });
 
-test("browser no-match salvages ambiguous HTTP and saves HTTP mode", async ({
+test("browser no-match leaves the ambiguous HTTP fallback unsavable", async ({
   addProduct,
   fixtureProduct,
-  productDetail,
 }) => {
   await fixtureProduct.publish({ template: "browser-no-match" });
 
@@ -150,12 +149,9 @@ test("browser no-match salvages ambiguous HTTP and saves HTTP mode", async ({
     await expect(addProduct.browserRenderProvenance).not.toBeVisible();
   });
 
-  await test.step("tracking saves the HTTP mode that produced the preview", async () => {
-    await addProduct.track();
-
-    const listing = productDetail.listingRow(fixtureProduct.url);
-    await listing.edit();
-    await expect(listing.settings().browserRenderCheckbox).not.toBeChecked();
+  await test.step("the displayed fallback is still ambiguous, so it cannot be tracked", async () => {
+    await expect(addProduct.automaticRepairWarning).toBeVisible();
+    await expect(addProduct.trackButton).toBeDisabled();
   });
 });
 

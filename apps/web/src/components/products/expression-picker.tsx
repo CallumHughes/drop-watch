@@ -106,6 +106,25 @@ function MatchList({ samples }: { samples: ExpressionPreview["samples"] }) {
   );
 }
 
+function ExtractionVerdict({ test, url }: { test: ExpressionPreview; url: string }) {
+  if (test.extraction && test.matchCount === 1) {
+    return (
+      <div className="rounded-md border border-emerald-600/40 p-3">
+        <PreviewSummary extraction={test.extraction} url={url} />
+      </div>
+    );
+  }
+  if (test.matchCount > 1) {
+    return (
+      <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+        This expression matches {test.matchCount} values. Narrow the CSS selector or JSONPath to
+        exactly one price before applying it.
+      </p>
+    );
+  }
+  return <p className="text-muted-foreground text-xs">{test.extractionError}</p>;
+}
+
 function Verdict({ test, url }: { test: ExpressionPreview; url: string }) {
   if (test.invalidExpression) {
     return <p className="text-muted-foreground text-xs">{test.invalidReason}</p>;
@@ -116,13 +135,7 @@ function Verdict({ test, url }: { test: ExpressionPreview; url: string }) {
         {test.matchCount === 1 ? "1 match" : `${test.matchCount} matches`}
       </p>
       <MatchList samples={test.samples} />
-      {test.extraction ? (
-        <div className="rounded-md border border-emerald-600/40 p-3">
-          <PreviewSummary extraction={test.extraction} url={url} />
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-xs">{test.extractionError}</p>
-      )}
+      <ExtractionVerdict test={test} url={url} />
     </div>
   );
 }

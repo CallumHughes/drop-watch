@@ -11,9 +11,12 @@
 import type {
   ExpressionMatch,
   ExpressionTest,
+  ExtractionConfidence,
+  ExtractionEvidence,
   ExtractionResult,
   ExtractorStrategy,
 } from "@drop-watch/core/extract";
+import { extract } from "@drop-watch/core/extract";
 import type { UrlVerdict } from "@drop-watch/core/net/guard";
 import type { RetrieveResult } from "@drop-watch/core/render";
 import type { RenderMode } from "./schemas/products";
@@ -21,6 +24,15 @@ import type { RenderMode } from "./schemas/products";
 /** A one-off preview may choose a transport; saved listings cannot use `auto`. */
 export const PREVIEW_REQUEST_MODES = ["auto", "browser", "http"] as const;
 export type PreviewRequestMode = (typeof PREVIEW_REQUEST_MODES)[number];
+
+/** Runs the same extraction chain as a preview page attempt, with its locale hint. */
+export function extractPreviewPage(
+  html: string,
+  url: string,
+  locale: string | null | undefined
+): ExtractionResult {
+  return extract(html, { locale: locale || undefined, url });
+}
 
 export interface PreviewRejection {
   code: "BAD_REQUEST" | "PRECONDITION_FAILED";
@@ -412,7 +424,11 @@ export class PreviewCache {
 export interface PreviewExtraction {
   /** Bare schema.org token, e.g. "InStock". */
   availability: string | null;
+  /** Whether the extractor found enough evidence to auto-accept the result. */
+  confidence: ExtractionConfidence;
   currency: string | null;
+  /** Why the extractor accepted the result, preserved for the safety gate. */
+  evidence: ExtractionEvidence;
   imageUrl: string | null;
   inStock: boolean | null;
   /** Decimal string, exactly as it will be stored. */
@@ -445,7 +461,9 @@ export function toPreviewExtraction(result: ExtractionResult): PreviewExtraction
   }
   return {
     availability: result.availability ?? null,
+    confidence: result.confidence,
     currency: result.currency ?? null,
+    evidence: result.evidence,
     imageUrl: result.imageUrl ?? null,
     inStock: result.inStock ?? null,
     price: result.price,

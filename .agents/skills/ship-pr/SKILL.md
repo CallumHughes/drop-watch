@@ -49,7 +49,7 @@ gh pr merge <pr> --squash --delete-branch
 ```
 
 Keep the squash title in the repo's Conventional Commits style — e.g.
-`feat(worker): retry failed price fetches (#25)`. Never add a Codex
+`feat(worker): retry failed price fetches (#25)`. Never add an agent
 co-author trailer.
 
 There is no deploy workflow; merging to `main` only re-runs CI on the branch.

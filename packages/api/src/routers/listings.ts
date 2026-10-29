@@ -22,7 +22,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
-import { buildListingInsert, buildListingPatch } from "../listing-insert";
+import { buildListingInsert, buildListingUpdatePatch } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { listingCreateInput, listingUpdateInput } from "../schemas/listings";
 import {
@@ -138,24 +138,19 @@ export const listingsRouter = {
         throw new ORPCError("BAD_REQUEST", { message: EXPRESSION_IS_INVALID });
       }
 
-      const patch = buildListingPatch(input);
       const now = new Date();
       // Computed against the pre-update row: it is *this* edit's interval
       // that might pull the schedule in, compared to the schedule as it
       // stood before the patch below touches it.
       const pulledIn = pulledInNextCheckAt(listing, input.intervalMinutes, now);
+      const patch = buildListingUpdatePatch(listing, input, now, pulledIn);
 
-      // One transaction: a crash between the interval patch and the pull-in
-      // must not leave a shortened interval whose next check is still hours out.
+      // One transaction: a crash between the settings patch and the
+      // invalidation/reschedule must not leave a new configuration paired
+      // with stale validators or a late next check.
       await db.transaction(async (tx) => {
         if (Object.keys(patch).length > 0) {
           await tx.update(listings).set(patch).where(eq(listings.id, listing.id));
-        }
-        if (pulledIn !== undefined) {
-          await tx
-            .update(listings)
-            .set({ nextCheckAt: pulledIn })
-            .where(eq(listings.id, listing.id));
         }
       });
 

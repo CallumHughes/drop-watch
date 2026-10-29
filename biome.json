@@ -9,6 +9,7 @@
     "ignoreUnknown": false,
     "includes": [
       "!**/.claude",
+      "!**/.agents",
       "!**/.next",
       "!**/.next-e2e",
       "!**/test-results",

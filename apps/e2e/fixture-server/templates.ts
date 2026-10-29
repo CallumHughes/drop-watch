@@ -4,20 +4,34 @@
  * Six variants cover the automatic preview's transport decisions: `jsonld`
  * is confident in the HTTP response, `js` only gains JSON-LD after rendering,
  * and `rendered-selected-sku` starts ambiguous before the rendered DOM marks
- * one variant as selected. `browser-no-match` starts with the same usable
- * ambiguity but removes it when rendered. `manual-browser-reload` begins as a
- * confident HTTP result, then changes its JSON-LD price in the browser DOM;
- * `selector` exercises the hand-picked fallback.
+ * one variant as selected. `browser-no-match` is ambiguous the same way, but
+ * rendering deletes the candidates instead of resolving them, leaving the HTTP
+ * fallback unsavable. `manual-browser-reload` begins as a confident HTTP
+ * result, then changes its JSON-LD price in the browser DOM; `selector`
+ * exercises the hand-picked fallback.
+ *
+ * `opengraph-only` carries its single price in OpenGraph meta tags alone —
+ * unambiguous, but never high confidence, which is the pairing the recording
+ * gate has to get right.
  *
  * `attribute-only` and `json-blob` cover the two manual paths: a price that is
  * only ever an attribute value, and one that only exists inside an embedded
  * JSON payload. Neither carries structured data, so the automatic chain must
  * come up empty on both.
+ *
+ * `ambiguous-sizes` models a storefront whose selected, visible size has one
+ * price while JSON-LD contains multiple size offers. Its document order is
+ * mutable so a test can reproduce the false drops caused by treating the
+ * first structured-data offer as the selected variant.
  */
 
 export interface FixtureProductState {
   /** schema.org availability, e.g. "InStock" or "OutOfStock". */
   availability: "InStock" | "OutOfStock";
+  /** Cheaper unselected variant used by the ambiguous-sizes template. */
+  cheapPrice?: string;
+  /** Put the cheap offer first in JSON-LD, independently of the visible variant. */
+  cheapVariantFirst?: boolean;
   currency: string;
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
@@ -27,6 +41,8 @@ export interface FixtureProductState {
     | "json-blob"
     | "jsonld"
     | "attribute-only"
+    | "ambiguous-sizes"
+    | "opengraph-only"
     | "manual-browser-reload"
     | "rendered-selected-sku"
     | "selector";
@@ -146,9 +162,9 @@ function variantJsonLd(state: FixtureProductState, price: string, sku: string) {
 }
 
 /**
- * Raw HTML deliberately contains two usable prices with no URL evidence, so
- * HTTP extraction is ambiguous. Rendering either selects the blue SKU or
- * removes both candidates, exercising browser confirmation and HTTP salvage.
+ * Raw HTML deliberately contains two conflicting prices with no URL evidence,
+ * so HTTP extraction is low-confidence. Rendering either selects the blue SKU
+ * or removes both candidates: resolved, or still unsavable.
  */
 function ambiguousVariantPage(
   state: FixtureProductState,
@@ -236,6 +252,75 @@ function selectorPage(state: FixtureProductState): string {
 `;
 }
 
+const DEFAULT_CHEAP_VARIANT_PRICE = "99.00";
+
+/**
+ * The large size is visibly selected and its price has a stable, one-match
+ * selector. JSON-LD deliberately gives no selected-SKU or URL evidence, so
+ * both orders remain low-confidence even though automatic extraction still
+ * returns a candidate.
+ */
+function ambiguousSizesPage(state: FixtureProductState): string {
+  const selectedVariant = variantJsonLd(state, state.price, "large");
+  const cheapVariant = variantJsonLd(
+    state,
+    state.cheapPrice ?? DEFAULT_CHEAP_VARIANT_PRICE,
+    "small"
+  );
+  const variants = state.cheapVariantFirst
+    ? [cheapVariant, selectedVariant]
+    : [selectedVariant, cheapVariant];
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <script type="application/ld+json">${JSON.stringify(variants)}</script>
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+    <label for="size">Size</label>
+    <select id="size">
+      <option>Small</option>
+      <option selected>Large</option>
+    </select>
+    <p data-testid="price-now">${displayPrice(state)}</p>
+  </main>
+</body>
+</html>
+`;
+}
+
+/**
+ * One price, carried only by OpenGraph meta tags. The extraction chain rates
+ * every OpenGraph result low confidence because the tags corroborate nothing
+ * — but there is only one price on the page, so it is unambiguous and a check
+ * must still record it.
+ */
+function openGraphOnlyPage(state: FixtureProductState): string {
+  const availability = state.availability === "InStock" ? "instock" : "oos";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <meta property="og:title" content="${escapeHtml(state.title)}" />
+  <meta property="product:price:amount" content="${escapeHtml(state.price)}" />
+  <meta property="product:price:currency" content="${escapeHtml(state.currency)}" />
+  <meta property="product:availability" content="${availability}" />
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+    <p>${displayPrice(state)}</p>
+  </main>
+</body>
+</html>
+`;
+}
+
 /**
  * The price exists only as an attribute value — never as text. The explicit
  * selector attribute syntax can read it, while the automatic chain cannot.
@@ -306,6 +391,12 @@ export function renderProductPage(state: FixtureProductState, url: string): stri
   }
   if (state.template === "attribute-only") {
     return attributeOnlyPage(state);
+  }
+  if (state.template === "ambiguous-sizes") {
+    return ambiguousSizesPage(state);
+  }
+  if (state.template === "opengraph-only") {
+    return openGraphOnlyPage(state);
   }
   if (state.template === "json-blob") {
     return jsonBlobPage(state);

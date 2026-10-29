@@ -9,7 +9,8 @@
  * on the `check_run_status` enum in `@drop-watch/db/schema/products`.
  */
 
-import type { ExtractionResult } from "@drop-watch/core/extract";
+import type { ExtractionEvidence, ExtractionResult } from "@drop-watch/core/extract";
+import { isAmbiguousExtraction } from "@drop-watch/core/extract/evidence";
 import type { RetrieveResult } from "@drop-watch/core/render";
 import type { checkRunStatus, ExtractorUsed } from "@drop-watch/db/schema/products";
 
@@ -22,6 +23,22 @@ export interface CheckOutcome {
   /** True only when there is a price *and* a currency worth recording. */
   recordPricePoint: boolean;
   status: CheckRunStatus;
+}
+
+function evidenceDescription(evidence: ExtractionEvidence): string {
+  if ("candidateCount" in evidence) {
+    const candidates = evidence.candidateCount === 1 ? "candidate" : "candidates";
+    return `${evidence.type}, ${evidence.candidateCount} ${candidates}`;
+  }
+  if ("matchCount" in evidence) {
+    const matches = evidence.matchCount === 1 ? "match" : "matches";
+    return `${evidence.type}, ${evidence.matchCount} ${matches}`;
+  }
+  return evidence.type;
+}
+
+function ambiguousError(extraction: Extract<ExtractionResult, { ok: true }>): string {
+  return `ambiguous low-confidence extraction via ${extraction.strategy} (${evidenceDescription(extraction.evidence)}); no price point was recorded. Configure a selector or JSONPath to identify the intended price`;
 }
 
 /**
@@ -71,6 +88,19 @@ export function toCheckOutcome(
   if (!extraction.ok) {
     return {
       error: extraction.error,
+      httpStatus: fetched.httpStatus,
+      recordPricePoint: false,
+      status: "extract_failed",
+    };
+  }
+
+  // Ambiguity, not low confidence: a sole price on a URL with a query
+  // parameter, or an OpenGraph tag, is low-confidence but unambiguous and
+  // still worth recording. See `@drop-watch/core/extract/evidence`.
+  if (isAmbiguousExtraction(extraction)) {
+    return {
+      error: ambiguousError(extraction),
+      extractorUsed: extraction.strategy,
       httpStatus: fetched.httpStatus,
       recordPricePoint: false,
       status: "extract_failed",

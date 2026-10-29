@@ -85,6 +85,13 @@
       "when": 1786210893947,
       "tag": "0011_fuzzy_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793311071207,
+      "tag": "0012_cold_shooting_star",
+      "breakpoints": true
     }
   ]
 }
