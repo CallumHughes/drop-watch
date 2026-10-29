@@ -9,7 +9,7 @@ fi
 
 # Run formatter, capturing the exit code so we can still re-stage and report
 FORMAT_EXIT_CODE=0
-pnpm dlx ultracite fix || FORMAT_EXIT_CODE=$?
+pnpm run fix || FORMAT_EXIT_CODE=$?
 
 # Re-stage files that were already staged
 echo "$STAGED_FILES" | while IFS= read -r file; do
