@@ -3,6 +3,8 @@ packages:
   - packages/*
 # Makes engines.node a failed install rather than a warning.
 engineStrict: true
+overrides:
+  proxy-addr: 2.0.8
 allowBuilds:
   esbuild: true
   sharp: true
