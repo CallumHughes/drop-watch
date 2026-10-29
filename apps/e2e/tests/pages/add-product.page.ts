@@ -5,7 +5,7 @@ const STRATEGY_NOTE_PATTERN = /found by/;
 const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
 const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/;
 const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/;
-const AUTOMATIC_REPAIR_PATTERN = /automatic price is low-confidence or ambiguous/;
+const AUTOMATIC_REPAIR_PATTERN = /automatic price is ambiguous/;
 
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {

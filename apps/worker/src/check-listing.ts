@@ -14,6 +14,7 @@
 
 import type { ExtractionResult } from "@drop-watch/core/extract";
 import { extract } from "@drop-watch/core/extract";
+import { isAmbiguousExtraction } from "@drop-watch/core/extract/evidence";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import type { RetrieveResult } from "@drop-watch/core/render";
@@ -100,6 +101,36 @@ interface CheckWrite {
   productUpdate: Partial<Product>;
 }
 
+/** A high-confidence price and the currency it is denominated in. */
+interface AcceptedObservation {
+  currency: string;
+  extraction: Extract<ExtractionResult, { ok: true }>;
+}
+
+/**
+ * The single decision about whether an observation may be written. The
+ * validators and the price point have to agree about it — a body whose price
+ * was refused must not earn the ETag that would turn the next check into a
+ * healthy-looking 304 — so both read this rather than re-spelling it.
+ *
+ * The ambiguity check repeats `toCheckOutcome`'s, which already cleared
+ * `recordPricePoint`. It is here as the belt to that braces, and it must use
+ * the same predicate: gating this on `confidence` instead would drop the
+ * price of every unambiguous page the outcome had just accepted.
+ */
+function acceptedObservation(
+  outcome: CheckOutcome,
+  extraction: ExtractionResult | null,
+  currency: string | null
+): AcceptedObservation | null {
+  if (
+    !(outcome.recordPricePoint && extraction?.ok && !isAmbiguousExtraction(extraction) && currency)
+  ) {
+    return null;
+  }
+  return { currency, extraction };
+}
+
 function buildWrite(
   listing: Listing,
   product: Product,
@@ -108,60 +139,46 @@ function buildWrite(
   currency: string | null,
   outcome: CheckOutcome
 ): CheckWrite {
-  const accepted = writeAccepted(outcome, extraction, currency);
-  const listingUpdate: Partial<Listing> = validatorUpdate(fetched, accepted);
+  const accepted = acceptedObservation(outcome, extraction, currency);
+  const listingUpdate: Partial<Listing> = validatorUpdate(fetched, accepted !== null);
 
-  if (
-    !(outcome.recordPricePoint && extraction?.ok) ||
-    extraction.confidence !== "high" ||
-    !currency
-  ) {
+  if (!accepted) {
     return { listingUpdate, pricePoint: null, productUpdate: {} };
   }
 
   // Backfill only what is not already set — the user's own title, image or
   // currency edits outrank whatever a page says this week.
   if (!listing.currency) {
-    listingUpdate.currency = currency;
+    listingUpdate.currency = accepted.currency;
   }
 
   const productUpdate: Partial<Product> = {};
-  if (!product.title && extraction.title) {
-    productUpdate.title = extraction.title;
+  if (!product.title && accepted.extraction.title) {
+    productUpdate.title = accepted.extraction.title;
   }
-  if (!product.imageUrl && extraction.imageUrl) {
-    productUpdate.imageUrl = extraction.imageUrl;
+  if (!product.imageUrl && accepted.extraction.imageUrl) {
+    productUpdate.imageUrl = accepted.extraction.imageUrl;
   }
   // Product currency denominates targetPrice, so it gets the same backfill.
   if (!product.currency) {
-    productUpdate.currency = currency;
+    productUpdate.currency = accepted.currency;
   }
 
   const pricePoint: NewPricePoint = {
-    currency,
+    currency: accepted.currency,
     // Decimal string all the way from the parser into `numeric(12,2)`. Never
     // through Number.
     listingId: listing.id,
-    price: extraction.price,
+    price: accepted.extraction.price,
   };
-  if (extraction.availability !== undefined) {
-    pricePoint.availability = extraction.availability;
+  if (accepted.extraction.availability !== undefined) {
+    pricePoint.availability = accepted.extraction.availability;
   }
-  if (extraction.inStock !== undefined) {
-    pricePoint.inStock = extraction.inStock;
+  if (accepted.extraction.inStock !== undefined) {
+    pricePoint.inStock = accepted.extraction.inStock;
   }
 
   return { listingUpdate, pricePoint, productUpdate };
-}
-
-function writeAccepted(
-  outcome: CheckOutcome,
-  extraction: ExtractionResult | null,
-  currency: string | null
-): boolean {
-  return Boolean(
-    outcome.recordPricePoint && extraction?.ok && extraction.confidence === "high" && currency
-  );
 }
 
 /**
@@ -215,6 +232,9 @@ function buildCheckRun(
  * Everything a check produces, committed atomically. This is what makes a
  * killed worker safe: either the attempt is fully recorded and the listing is
  * rescheduled, or none of it happened and the listing is still due.
+ *
+ * A listing edited mid-check loses the claim and keeps only its `check_runs`
+ * row — see the stale branch for why that one survives.
  */
 function persist(
   listing: Listing,
@@ -238,6 +258,11 @@ function persist(
       )
       .returning({ id: listings.id });
     if (!claimed) {
+      // The attempt happened, so it stays in the audit log: without it a
+      // pressed "check now" shows nothing and the failure streak loses a
+      // step. Only the price, validators and reschedule are dropped — they
+      // would describe settings the listing no longer has.
+      await tx.insert(checkRuns).values(checkRun);
       return "stale";
     }
 

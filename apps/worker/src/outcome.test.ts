@@ -130,6 +130,38 @@ describe("toCheckOutcome", () => {
     });
   });
 
+  it("records a sole offer whose URL merely carries a query parameter", () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: "Rug",
+      offers: { price: "499.00", priceCurrency: "GBP" },
+    })}</script>`;
+    const extraction = extract(html, { url: "https://shop.example.com/p?ProductID=99" });
+
+    expect(extraction).toMatchObject({
+      confidence: "low",
+      evidence: { candidateCount: 1, type: "jsonld:queried-url" },
+    });
+    expect(toCheckOutcome(okFetch, extraction, "GBP")).toMatchObject({
+      recordPricePoint: true,
+      status: "ok",
+    });
+  });
+
+  it("records a lone OpenGraph price, which is never high confidence", () => {
+    const extraction = extract(
+      '<meta property="product:price:amount" content="24.99" /><meta property="product:price:currency" content="GBP" />',
+      { url: okFetch.url }
+    );
+
+    expect(extraction).toMatchObject({ confidence: "low", strategy: "opengraph" });
+    expect(toCheckOutcome(okFetch, extraction, "GBP")).toMatchObject({
+      recordPricePoint: true,
+      status: "ok",
+    });
+  });
+
   it("maps an HTTP failure to http_error and keeps the status code", () => {
     const httpError: FetchPageResult = {
       durationMs: 90,

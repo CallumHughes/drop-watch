@@ -1,7 +1,13 @@
 import type { ExpressionPreview, PreviewExtraction } from "@drop-watch/api/routers/preview";
 import { describe, expect, it } from "vitest";
 
-import { isSingleMatchExtraction, listingExtractionSettings } from "./listing-repair";
+import {
+  isSingleMatchExtraction,
+  type ListingExtractionSettings,
+  listingExtractionSettings,
+  repairActionLabel,
+  repairSummary,
+} from "./listing-repair";
 
 const extraction: PreviewExtraction = {
   availability: null,
@@ -101,5 +107,55 @@ describe("listingExtractionSettings", () => {
         current
       )
     ).toEqual({ expression: null, extractor: "auto", render: "http" });
+  });
+});
+
+describe("repairActionLabel", () => {
+  it("names the outcome so an automatic repair is not mistaken for a pinned one", () => {
+    expect(repairActionLabel(null)).toBe("Apply repair");
+    expect(repairActionLabel({ expression: ".price", extractor: "selector", render: "http" })).toBe(
+      "Apply tested CSS selector"
+    );
+    expect(
+      repairActionLabel({ expression: "$..price", extractor: "jsonpath", render: "http" })
+    ).toBe("Apply tested JSONPath");
+    expect(repairActionLabel({ expression: null, extractor: "auto", render: "http" })).toBe(
+      "Apply automatic extraction"
+    );
+  });
+});
+
+describe("repairSummary", () => {
+  const pinned: ListingExtractionSettings = {
+    expression: ".old-price",
+    extractor: "selector",
+    render: "browser",
+  };
+
+  it("warns that an automatic repair clears the saved expression", () => {
+    expect(repairSummary({ expression: null, extractor: "auto", render: "browser" }, pinned)).toBe(
+      "Applying will switch to automatic extraction and clear the saved CSS selector."
+    );
+  });
+
+  it("names the transport change as well", () => {
+    expect(repairSummary({ expression: null, extractor: "auto", render: "http" }, pinned)).toBe(
+      "Applying will switch to automatic extraction, clear the saved CSS selector and check over plain HTTP."
+    );
+  });
+
+  it("says nothing about clearing when the listing is already automatic", () => {
+    expect(
+      repairSummary(
+        { expression: null, extractor: "auto", render: "http" },
+        { expression: null, extractor: "auto", render: "http" }
+      )
+    ).toBe("Applying will switch to automatic extraction.");
+  });
+
+  it("describes a pinned repair without mentioning the replaced expression", () => {
+    expect(
+      repairSummary({ expression: ".new-price", extractor: "selector", render: "browser" }, pinned)
+    ).toBe("Applying will pin the tested CSS selector.");
   });
 });

@@ -3,7 +3,7 @@ import type { FetchPageResult } from "@drop-watch/core/fetch";
 export type PersistResult = "persisted" | "stale";
 
 export const STALE_CHECK_DISCARD_MESSAGE =
-  "check discarded because the listing changed while it was running; no price, validators, check run, or alert were written — the listing settings will be checked again";
+  "check discarded because the listing changed while it was running; the attempt was recorded but no price, validators, reschedule, or alert were written — the new listing settings will be checked again";
 
 /**
  * A 200 response only earns its cache validators when its price observation is

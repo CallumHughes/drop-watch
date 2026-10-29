@@ -10,6 +10,10 @@
  * result, then changes its JSON-LD price in the browser DOM; `selector`
  * exercises the hand-picked fallback.
  *
+ * `opengraph-only` carries its single price in OpenGraph meta tags alone —
+ * unambiguous, but never high confidence, which is the pairing the recording
+ * gate has to get right.
+ *
  * `attribute-only` and `json-blob` cover the two manual paths: a price that is
  * only ever an attribute value, and one that only exists inside an embedded
  * JSON payload. Neither carries structured data, so the automatic chain must
@@ -38,6 +42,7 @@ export interface FixtureProductState {
     | "jsonld"
     | "attribute-only"
     | "ambiguous-sizes"
+    | "opengraph-only"
     | "manual-browser-reload"
     | "rendered-selected-sku"
     | "selector";
@@ -289,6 +294,34 @@ function ambiguousSizesPage(state: FixtureProductState): string {
 }
 
 /**
+ * One price, carried only by OpenGraph meta tags. The extraction chain rates
+ * every OpenGraph result low confidence because the tags corroborate nothing
+ * — but there is only one price on the page, so it is unambiguous and a check
+ * must still record it.
+ */
+function openGraphOnlyPage(state: FixtureProductState): string {
+  const availability = state.availability === "InStock" ? "instock" : "oos";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(state.title)}</title>
+  <meta property="og:title" content="${escapeHtml(state.title)}" />
+  <meta property="product:price:amount" content="${escapeHtml(state.price)}" />
+  <meta property="product:price:currency" content="${escapeHtml(state.currency)}" />
+  <meta property="product:availability" content="${availability}" />
+</head>
+<body>
+  <main>
+    <h1>${escapeHtml(state.title)}</h1>
+    <p>${displayPrice(state)}</p>
+  </main>
+</body>
+</html>
+`;
+}
+
+/**
  * The price exists only as an attribute value — never as text. The explicit
  * selector attribute syntax can read it, while the automatic chain cannot.
  */
@@ -361,6 +394,9 @@ export function renderProductPage(state: FixtureProductState, url: string): stri
   }
   if (state.template === "ambiguous-sizes") {
     return ambiguousSizesPage(state);
+  }
+  if (state.template === "opengraph-only") {
+    return openGraphOnlyPage(state);
   }
   if (state.template === "json-blob") {
     return jsonBlobPage(state);

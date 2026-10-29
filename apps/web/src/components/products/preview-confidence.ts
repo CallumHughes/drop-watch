@@ -3,36 +3,31 @@ import type {
   PagePreview,
   PreviewExtraction,
 } from "@drop-watch/api/routers/preview";
-
-const AMBIGUOUS_EVIDENCE = /ambiguous|conflict|multiple/i;
-
-function hasAmbiguousEvidence(evidence: PreviewExtraction["evidence"]): boolean {
-  const hasMultipleCandidates = "candidateCount" in evidence && evidence.candidateCount > 1;
-  return hasMultipleCandidates || Boolean(AMBIGUOUS_EVIDENCE.test(evidence.type));
-}
+import { isAmbiguousExtraction } from "@drop-watch/core/extract/evidence";
 
 /**
- * Automatic extraction may be saved only when the API explicitly vouches for
- * high confidence. Evidence is displayed as diagnosis, but confidence is the
- * authoritative safety decision because a selected candidate may be one of
- * several legitimate candidates.
+ * Automatic extraction may be saved unless the extractor saw more than one
+ * price it could have picked. This has to agree with the worker's gate or the
+ * preview would promise a price no check will ever record, so both read
+ * `isAmbiguousExtraction` rather than keeping their own rule.
+ *
+ * Deliberately not `confidence !== "high"`: confidence is also low when a
+ * single candidate simply has nothing corroborating it, which is unambiguous
+ * and recordable.
  */
 export function automaticPreviewNeedsRepair(preview: PagePreview): boolean {
   if (!preview.extraction) {
     return true;
   }
-  return preview.extraction.confidence !== "high";
+  return isAmbiguousExtraction(preview.extraction);
 }
 
 /** Explain why an automatic result needs a user-verified expression. */
 export function automaticPreviewRepairMessage(preview: PagePreview): string {
-  if (
-    preview.extraction &&
-    (preview.extraction.confidence === "low" || hasAmbiguousEvidence(preview.extraction.evidence))
-  ) {
-    return "The automatic price is low-confidence or ambiguous, so it cannot be saved as-is. Choose a CSS selector or JSONPath and wait for a successful test.";
+  if (preview.extraction) {
+    return "The automatic price is ambiguous — this page offers more than one price and nothing identifies which one is being sold. Choose a CSS selector or JSONPath and wait for a successful test.";
   }
-  return "This automatic result cannot be saved until its confidence is verified. Choose a CSS selector or JSONPath and wait for a successful test.";
+  return "No price could be read from this page automatically. Choose a CSS selector or JSONPath and wait for a successful test.";
 }
 
 /**

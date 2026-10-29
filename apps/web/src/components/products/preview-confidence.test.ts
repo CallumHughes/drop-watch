@@ -33,7 +33,7 @@ function preview(overrides: Record<string, unknown> = {}): PagePreview {
 describe("automatic preview confidence guard", () => {
   it("requires repair for a low-confidence automatic result", () => {
     expect(automaticPreviewNeedsRepair(preview())).toBe(true);
-    expect(automaticPreviewRepairMessage(preview())).toContain("low-confidence");
+    expect(automaticPreviewRepairMessage(preview())).toContain("ambiguous");
   });
 
   it("allows an explicitly high-confidence automatic result", () => {
@@ -52,7 +52,7 @@ describe("automatic preview confidence guard", () => {
 
   it("retains low-confidence multiple-candidate rejection", () => {
     expect(automaticPreviewNeedsRepair(preview())).toBe(true);
-    expect(automaticPreviewRepairMessage(preview())).toContain("low-confidence");
+    expect(automaticPreviewRepairMessage(preview())).toContain("ambiguous");
   });
 
   it("allows a high-confidence selected SKU among multiple candidates", () => {
@@ -107,6 +107,35 @@ describe("automatic preview confidence guard", () => {
 
     expect(selection.automaticRepairRequired).toBe(false);
     expect(selection.chosen).toBe(highConfidence.extraction);
+  });
+
+  it("allows a sole candidate whose URL merely carries a query parameter", () => {
+    expect(
+      automaticPreviewNeedsRepair(
+        preview({
+          extraction: {
+            ...preview().extraction,
+            confidence: "low",
+            evidence: { candidateCount: 1, type: "jsonld:queried-url" },
+          },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("allows a lone OpenGraph price, which is never high confidence", () => {
+    expect(
+      automaticPreviewNeedsRepair(
+        preview({
+          extraction: {
+            ...preview().extraction,
+            confidence: "low",
+            evidence: { type: "opengraph:page-metadata" },
+            strategy: "opengraph",
+          },
+        })
+      )
+    ).toBe(false);
   });
 
   it("keeps an empty automatic extraction in the manual path", () => {

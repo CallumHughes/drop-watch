@@ -1,6 +1,12 @@
 import type { Locator } from "@playwright/test";
 
 /**
+ * The apply button names its outcome — "Apply tested CSS selector", "Apply
+ * automatic extraction" — and reads "Apply repair" only while disabled.
+ */
+const APPLY_REPAIR_PATTERN = /^Apply /;
+
+/**
  * The inline per-listing settings editor a `ListingRow` opens via `edit()`.
  * Scoped to the row's own container (not the page), since two rows can be in
  * edit mode at once and their forms would otherwise be indistinguishable.
@@ -22,7 +28,7 @@ export class ListingSettingsForm {
     });
     this.extractorSelect = row.getByLabel("How the price is found");
     this.repairButton = row.getByRole("button", { name: "Re-preview and repair" });
-    this.applyRepairButton = row.getByRole("button", { name: "Apply repair" });
+    this.applyRepairButton = row.getByRole("button", { name: APPLY_REPAIR_PATTERN });
     this.saveButton = row.getByRole("button", { name: "Save listing settings" });
     this.singleMatchNote = row.getByText("1 match", { exact: true });
   }

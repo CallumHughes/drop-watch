@@ -10,6 +10,7 @@
  */
 
 import type { ExtractionEvidence, ExtractionResult } from "@drop-watch/core/extract";
+import { isAmbiguousExtraction } from "@drop-watch/core/extract/evidence";
 import type { RetrieveResult } from "@drop-watch/core/render";
 import type { checkRunStatus, ExtractorUsed } from "@drop-watch/db/schema/products";
 
@@ -36,7 +37,7 @@ function evidenceDescription(evidence: ExtractionEvidence): string {
   return evidence.type;
 }
 
-function lowConfidenceError(extraction: Extract<ExtractionResult, { ok: true }>): string {
+function ambiguousError(extraction: Extract<ExtractionResult, { ok: true }>): string {
   return `ambiguous low-confidence extraction via ${extraction.strategy} (${evidenceDescription(extraction.evidence)}); no price point was recorded. Configure a selector or JSONPath to identify the intended price`;
 }
 
@@ -93,9 +94,12 @@ export function toCheckOutcome(
     };
   }
 
-  if (extraction.confidence === "low") {
+  // Ambiguity, not low confidence: a sole price on a URL with a query
+  // parameter, or an OpenGraph tag, is low-confidence but unambiguous and
+  // still worth recording. See `@drop-watch/core/extract/evidence`.
+  if (isAmbiguousExtraction(extraction)) {
     return {
-      error: lowConfidenceError(extraction),
+      error: ambiguousError(extraction),
       extractorUsed: extraction.strategy,
       httpStatus: fetched.httpStatus,
       recordPricePoint: false,

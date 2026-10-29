@@ -266,16 +266,15 @@ export function usePreviewFlow({
     isSingleMatchExtraction(expressionTest.data)
       ? (expressionTest.data?.extraction ?? null)
       : null;
-  // Keep this separate from `automaticNeedsRepair`: the former belongs to the
-  // preview itself and must stay true after a manual expression succeeds, so a
-  // low-confidence result can never switch back to automatic mode.
+  // `automaticRepairRequired` belongs to the preview itself and must stay true
+  // after a manual expression succeeds, so a low-confidence result can never
+  // switch back to automatic mode.
   const selection = previewSelection({
     manualExtraction: expressionExtraction,
     mode,
     preview,
   });
   const { automaticRepairRequired, chosen } = selection;
-  const automaticNeedsRepair = automaticRepairRequired && expressionExtraction === null;
   const savingWithExpression = mode !== null && expressionExtraction !== null;
   const reset = useCallback(() => {
     previewRequestGeneration.current += 1;
@@ -289,7 +288,6 @@ export function usePreviewFlow({
   }, [initialUrl]);
 
   return {
-    automaticNeedsRepair,
     automaticRepairRequired,
     chosen,
     expression,

@@ -65,6 +65,10 @@ describe("completePersistedCheck", () => {
     expect(discarded).toBe(true);
     expect(alerted).toBe(false);
     expect(STALE_CHECK_DISCARD_MESSAGE).toContain("no price");
+    // The check run outlives the discard, so the message must not claim
+    // otherwise — see the stale branch of `persist`.
+    expect(STALE_CHECK_DISCARD_MESSAGE).toContain("the attempt was recorded");
+    expect(STALE_CHECK_DISCARD_MESSAGE).not.toContain("check run");
   });
 
   it("continues to alert only after persistence succeeds", async () => {
