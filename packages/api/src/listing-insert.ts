@@ -102,3 +102,50 @@ export function buildListingPatch(input: ListingUpdateInput): Partial<Listing> {
   }
   return patch;
 }
+
+/**
+ * Settings whose values change what a check can retrieve or extract. A
+ * conditional-request validator is only valid for the request/extraction
+ * configuration that produced it, so changing one of these settings requires
+ * a fresh request with no validators.
+ */
+type ExtractionSettingKey = "expression" | "extractor" | "locale" | "render";
+
+const EXTRACTION_SETTING_KEYS: ExtractionSettingKey[] = [
+  "extractor",
+  "expression",
+  "locale",
+  "render",
+];
+
+/** True only when an extraction-affecting key was supplied with a new value. */
+export function extractionSettingsChanged(
+  listing: Pick<Listing, ExtractionSettingKey>,
+  input: Pick<ListingUpdateInput, ExtractionSettingKey>
+): boolean {
+  return EXTRACTION_SETTING_KEYS.some(
+    (key) => input[key] !== undefined && input[key] !== listing[key]
+  );
+}
+
+/**
+ * Composes an update patch, including the schedule change calculated by the
+ * router. Extraction changes invalidate both conditional-request validators
+ * and take precedence over an interval pull-in: the new configuration must
+ * be tested immediately, not after the old interval or a newly calculated
+ * future timestamp.
+ */
+export function buildListingUpdatePatch(
+  listing: Pick<Listing, ExtractionSettingKey>,
+  input: ListingUpdateInput,
+  now: Date,
+  pulledIn: Date | undefined
+): Partial<Listing> {
+  const patch = buildListingPatch(input);
+  if (extractionSettingsChanged(listing, input)) {
+    Object.assign(patch, { etag: null, lastModified: null, nextCheckAt: now });
+  } else if (pulledIn !== undefined) {
+    patch.nextCheckAt = pulledIn;
+  }
+  return patch;
+}
