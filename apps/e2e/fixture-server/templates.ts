@@ -4,10 +4,11 @@
  * Six variants cover the automatic preview's transport decisions: `jsonld`
  * is confident in the HTTP response, `js` only gains JSON-LD after rendering,
  * and `rendered-selected-sku` starts ambiguous before the rendered DOM marks
- * one variant as selected. `browser-no-match` starts with the same usable
- * ambiguity but removes it when rendered. `manual-browser-reload` begins as a
- * confident HTTP result, then changes its JSON-LD price in the browser DOM;
- * `selector` exercises the hand-picked fallback.
+ * one variant as selected. `browser-no-match` is ambiguous the same way, but
+ * rendering deletes the candidates instead of resolving them, leaving the HTTP
+ * fallback unsavable. `manual-browser-reload` begins as a confident HTTP
+ * result, then changes its JSON-LD price in the browser DOM; `selector`
+ * exercises the hand-picked fallback.
  *
  * `attribute-only` and `json-blob` cover the two manual paths: a price that is
  * only ever an attribute value, and one that only exists inside an embedded
@@ -156,9 +157,9 @@ function variantJsonLd(state: FixtureProductState, price: string, sku: string) {
 }
 
 /**
- * Raw HTML deliberately contains two usable prices with no URL evidence, so
- * HTTP extraction is ambiguous. Rendering either selects the blue SKU or
- * removes both candidates, exercising browser confirmation and HTTP salvage.
+ * Raw HTML deliberately contains two conflicting prices with no URL evidence,
+ * so HTTP extraction is low-confidence. Rendering either selects the blue SKU
+ * or removes both candidates: resolved, or still unsavable.
  */
 function ambiguousVariantPage(
   state: FixtureProductState,

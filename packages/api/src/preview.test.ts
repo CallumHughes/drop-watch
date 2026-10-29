@@ -380,7 +380,7 @@ describe("orchestratePreview", () => {
       "retrieval failure",
       { durationMs: 5, error: "renderer unavailable", status: "renderer_error" } as const,
     ],
-  ])("salvages low-confidence HTTP after browser %s", async (_case, browserResult) => {
+  ])("falls back to low-confidence HTTP after browser %s", async (_case, browserResult) => {
     const { outcome } = await runScenario({
       browserResult,
       httpExtraction: extracted("low"),
