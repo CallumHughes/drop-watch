@@ -26,6 +26,8 @@ export class ProductDetailPage {
   readonly addStoreTrigger: Locator;
   /** The header's two-step delete trigger — not the per-listing "Remove". */
   readonly deleteProductButton: Locator;
+  /** The check log table — every attempt, with its status and failure detail. */
+  readonly checkRunLog: Locator;
   readonly confirmDeleteButton: Locator;
   readonly cancelDeleteButton: Locator;
   readonly page: Page;
@@ -48,6 +50,7 @@ export class ProductDetailPage {
     this.deleteProductButton = page.getByRole("button", { exact: true, name: "Delete product" });
     this.confirmDeleteButton = page.getByRole("button", { name: "Confirm delete" });
     this.cancelDeleteButton = page.getByRole("button", { exact: true, name: "Cancel" });
+    this.checkRunLog = page.getByRole("table");
   }
 
   async goto(productId: string): Promise<void> {

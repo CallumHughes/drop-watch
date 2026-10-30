@@ -88,10 +88,30 @@ leave the HTTP preview intact and can be retried, while an explicit
 configuration rejection disables browser reload for the rest of that add form.
 Returning to HTTP never depends on `RENDER_URL`.
 
-It is **not** for bot protection. Sites with active bot protection (Amazon in
-particular) are treated as unsupported — DropWatch does not escalate against
-them (`packages/core/src/fetch/index.ts:8-10`). A headless browser does not
-change that stance.
+It helps with *some* bot protection, as a side effect rather than a goal. Both
+transports present as an ordinary Chrome and neither advertises automation
+(`packages/core/src/net/identity.ts`). For the renderer that means three things,
+and all three are load-bearing — Imperva refuses each tell on the first request,
+before any page JavaScript runs:
+
+1. Its own Chromium's user agent with the `HeadlessChrome` marker removed.
+2. The same rename in the `Sec-CH-UA` client hints. A context user agent does
+   **not** cover this: Chromium builds that header from its own brand list, so a
+   plausible user agent still ships `"HeadlessChrome";v="156"` alongside it. It
+   is replaced over CDP, keeping Chromium's real versions and GREASE brand.
+3. Playwright's `--enable-automation` dropped, `AutomationControlled` disabled,
+   and a locale and timezone that agree with each other.
+
+Together those are the difference between a 403 and a product page on shops like
+Boots, Superdrug and Screwfix.
+
+There is no escalation past that point: no `playwright-extra`, no stealth
+plugins, no canvas or WebGL spoofing, no identity rotation, no proxy pools, no
+CAPTCHA solving. A shop determined to block scripted access still wins — Amazon
+among them. When one does, the preview and the check log name the protection
+vendor (`packages/core/src/extract/challenge.ts`) rather than reporting "no price
+found" against an interstitial, which would otherwise send you off to write a
+CSS selector for a page with no product on it.
 
 It is opt-in, via the `browser` compose profile — see [`.env.example`](../.env.example)
 and `RENDER_URL` above. Toggle it per listing from the store's settings editor

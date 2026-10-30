@@ -89,6 +89,7 @@ async function runScenario({
       transports.push(transport);
       return Promise.resolve(transport === "browser" ? browserResult : httpResult);
     },
+    url: "https://store.test/p/1",
   });
   return { outcome, transports };
 }
@@ -440,6 +441,7 @@ describe("orchestratePreview", () => {
         transports.push(transport);
         return Promise.resolve(fetched("<http />"));
       },
+      url: "https://store.test/p/1",
     });
 
     expect(outcome).toMatchObject({
@@ -460,6 +462,7 @@ describe("orchestratePreview", () => {
         transports.push(transport);
         return Promise.resolve(fetched("<browser />", "browser"));
       },
+      url: "https://store.test/p/1",
     });
 
     expect(outcome.kind).toBe("failed");
@@ -491,7 +494,7 @@ describe("orchestratePreview", () => {
     if (outcome.kind === "failed") {
       expect(outcome.fallbackReason).toBe("http_failed");
       expect(previewFailure(outcome.attempts)).toEqual({
-        code: "BAD_GATEWAY",
+        code: "UNPROCESSABLE_CONTENT",
         message:
           "Unable to retrieve the page (http: origin unreachable; browser: renderer unavailable).",
       });
@@ -500,9 +503,37 @@ describe("orchestratePreview", () => {
 
   it("blames no transport when none ran", () => {
     expect(previewFailure([])).toEqual({
-      code: "BAD_GATEWAY",
+      code: "UNPROCESSABLE_CONTENT",
       message: "Unable to retrieve the page (no transport ran).",
     });
+  });
+
+  // A 5xx is the one thing this must never answer with: a reverse proxy
+  // replaces the body of one with its own error page, and the message naming
+  // the real refusal is lost before it reaches the browser.
+  it("never reports a failure with a status a proxy would rewrite", async () => {
+    const { outcome } = await runScenario({
+      browserResult: { durationMs: 5, error: "HTTP 403", httpStatus: 403, status: "http_error" },
+      httpResult: { durationMs: 10, error: "timed out", status: "timeout" },
+    });
+
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed") {
+      expect(previewFailure(outcome.attempts).code).toBe("UNPROCESSABLE_CONTENT");
+    }
+  });
+
+  it("prefers a named bot-protection block over the bare transport error", async () => {
+    const { outcome } = await runScenario({
+      browserResult: { durationMs: 5, error: "HTTP 403", httpStatus: 403, status: "http_error" },
+      httpResult: { durationMs: 10, error: "HTTP 403", httpStatus: 403, status: "http_error" },
+    });
+
+    expect(outcome.kind).toBe("failed");
+    if (outcome.kind === "failed") {
+      expect(previewFailure(outcome.attempts).message).toContain("store.test blocked this request");
+      expect(previewFailure(outcome.attempts).message).not.toContain("HTTP 403");
+    }
   });
 });
 

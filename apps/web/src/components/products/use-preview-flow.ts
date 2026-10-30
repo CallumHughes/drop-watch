@@ -36,30 +36,75 @@ export function isCurrentPreviewRequest(
 }
 
 /**
+ * Why a browser attempt in this same preview already failed, or `null`.
+ *
+ * Automatic mode escalates to the browser on its own when HTTP is inconclusive.
+ * When that escalation fails we still show the HTTP body, so without this the
+ * panel would offer "Reload in browser" for an attempt that failed seconds ago
+ * and charge another render to reach the same refusal.
+ */
+export function failedBrowserAttempt(preview: PagePreview | null): string | null {
+  const attempt = preview?.attempts.find(
+    (candidate) => candidate.transport === "browser" && candidate.status !== "ok"
+  );
+  if (!attempt) {
+    return null;
+  }
+  return attempt.challenge ?? attempt.error ?? `the browser attempt reported ${attempt.status}`;
+}
+
+/**
  * A failed capability read is deliberately indistinguishable from loading here:
  * the browser request is still the authority on whether rendering can work.
  */
 export function transportReloadControl({
+  alreadyFailed,
   browserRender,
   currentRender,
   preconditionFailed,
 }: {
+  alreadyFailed: string | null;
   browserRender: boolean | undefined;
   currentRender: PagePreview["render"];
   preconditionFailed: boolean;
 }) {
   const target = currentRender === "http" ? "browser" : "http";
   const unavailable = target === "browser" && browserRender === false;
-  const disabled = target === "browser" && (unavailable || preconditionFailed);
-  return { disabled, target, unavailable };
+  const disabled =
+    target === "browser" && (unavailable || preconditionFailed || alreadyFailed !== null);
+  return {
+    alreadyFailed: target === "browser" ? alreadyFailed : null,
+    disabled,
+    target,
+    unavailable,
+  };
 }
 
 function isPreconditionFailure(error: unknown): boolean {
   return error instanceof ORPCError && error.code === "PRECONDITION_FAILED";
 }
 
+/**
+ * oRPC's own fallback messages, used when it could not parse an error response
+ * body. Seeing one means something between the browser and DropWatch replaced
+ * the response — a reverse proxy substituting its own error page for a 5xx is
+ * the usual cause — so the real reason is in the server's logs, not here.
+ */
+const ORPC_STATUS_FALLBACKS = new Set([
+  "Bad Gateway",
+  "Gateway Timeout",
+  "Internal Server Error",
+  "Service Unavailable",
+]);
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unable to reload the page preview.";
+  if (!(error instanceof Error)) {
+    return "Unable to reload the page preview.";
+  }
+  if (ORPC_STATUS_FALLBACKS.has(error.message)) {
+    return `the server returned "${error.message}" with no detail. If DropWatch is behind a proxy, the reason is in its logs.`;
+  }
+  return error.message;
 }
 
 /**
@@ -195,6 +240,7 @@ export function usePreviewFlow({
   );
   const reloadControl = preview
     ? transportReloadControl({
+        alreadyFailed: failedBrowserAttempt(preview),
         browserRender: capabilities.data?.browserRender,
         currentRender: preview.render,
         preconditionFailed: browserReloadPreconditionFailed,

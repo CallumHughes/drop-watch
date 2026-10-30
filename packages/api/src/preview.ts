@@ -17,6 +17,7 @@ import type {
   ExtractorStrategy,
 } from "@drop-watch/core/extract";
 import { extract } from "@drop-watch/core/extract";
+import { challengeReason } from "@drop-watch/core/extract/challenge";
 import type { UrlVerdict } from "@drop-watch/core/net/guard";
 import type { RetrieveResult } from "@drop-watch/core/render";
 import type { RenderMode } from "./schemas/products";
@@ -84,6 +85,13 @@ export function previewTransports(
 }
 
 export interface PreviewAttempt {
+  /**
+   * Why this attempt was refused, when it was — a bot-protection interstitial
+   * answers 200 with no product on it, so without this the chain reports
+   * "no price found" and sends the reader off to write a selector against a
+   * page that has none.
+   */
+  challenge: string | null;
   extraction: ExtractionResult | null;
   result: RetrieveResult;
   transport: RenderMode;
@@ -124,6 +132,8 @@ export interface PreviewOrchestrationOptions {
   render: PreviewRequestMode;
   renderUrl: string | undefined;
   retrieve: (transport: RenderMode) => Promise<RetrieveResult>;
+  /** The requested URL, named in a refusal that produced no response to read. */
+  url: string;
 }
 
 /**
@@ -136,6 +146,7 @@ export async function orchestratePreview({
   render,
   renderUrl,
   retrieve,
+  url,
 }: PreviewOrchestrationOptions): Promise<PreviewOrchestration> {
   const transports = previewTransports(render, renderUrl);
   const [firstTransport, secondTransport] = transports;
@@ -143,7 +154,7 @@ export async function orchestratePreview({
     return { attempts: [], fallbackReason: null, kind: "failed" };
   }
 
-  const firstAttempt = await runPreviewAttempt(firstTransport, retrieve, extractPage);
+  const firstAttempt = await runPreviewAttempt(firstTransport, retrieve, extractPage, url);
   if (!secondTransport) {
     return singleAttemptOutcome(firstAttempt);
   }
@@ -157,7 +168,7 @@ export async function orchestratePreview({
   }
 
   const fallbackReason = httpFallbackReason(firstAttempt);
-  const secondAttempt = await runPreviewAttempt(secondTransport, retrieve, extractPage);
+  const secondAttempt = await runPreviewAttempt(secondTransport, retrieve, extractPage, url);
   const attempts = [firstAttempt, secondAttempt];
 
   if (isExtractedAttempt(secondAttempt)) {
@@ -191,11 +202,20 @@ export async function orchestratePreview({
 async function runPreviewAttempt(
   transport: RenderMode,
   retrieve: PreviewOrchestrationOptions["retrieve"],
-  extractPage: PreviewOrchestrationOptions["extractPage"]
+  extractPage: PreviewOrchestrationOptions["extractPage"],
+  url: string
 ): Promise<PreviewAttempt> {
   const result = await retrieve(transport);
   const extraction = result.status === "ok" ? extractPage(result.body, result.url) : null;
-  return { extraction, result, transport };
+  // A 403 carries no body to match markers against, which is why the status is
+  // a signal in its own right. The post-redirect URL is the better host to
+  // name when there was a response at all.
+  const challenge = challengeReason(result.status === "ok" ? result.body : "", {
+    httpStatus: "httpStatus" in result ? result.httpStatus : undefined,
+    transport,
+    url: result.status === "ok" ? result.url : url,
+  });
+  return { challenge, extraction, result, transport };
 }
 
 function singleAttemptOutcome(attempt: PreviewAttempt): PreviewOrchestration {
@@ -289,8 +309,20 @@ function materiallyChangesTrackedObservation(
   return browserAddsOrChangesValue;
 }
 
+/**
+ * Always a 4xx, and that is the point.
+ *
+ * These are verdicts about the *target* page, not about our own health, and
+ * oRPC turns the code straight into the HTTP status. The 5xx codes this used to
+ * return (`BAD_GATEWAY` → 502, `GATEWAY_TIMEOUT` → 504, `SERVICE_UNAVAILABLE` →
+ * 503) are exactly the ones a reverse proxy treats as "my upstream is broken":
+ * it replaces the body with its own error page, oRPC's client can no longer
+ * parse it, and the real message — the one naming the 403 — is replaced by the
+ * generic status text from its own table. Anyone running DropWatch behind a
+ * proxy saw "Bad Gateway" and nothing else. A 422 is passed through untouched.
+ */
 export interface PreviewFailure {
-  code: "BAD_GATEWAY" | "GATEWAY_TIMEOUT" | "SERVICE_UNAVAILABLE";
+  code: "UNPROCESSABLE_CONTENT";
   message: string;
 }
 
@@ -303,21 +335,19 @@ export function previewFailure(attempts: readonly PreviewAttempt[]): PreviewFail
   if (failures.length === 0) {
     // No transport ran at all, so no transport is at fault; `every` over an
     // empty list would otherwise blame the renderer.
-    return { code: "BAD_GATEWAY", message: "Unable to retrieve the page (no transport ran)." };
-  }
-  const allRendererFaults = failures.every((attempt) => attempt.result.status === "renderer_error");
-  const allTimeouts = failures.every((attempt) => attempt.result.status === "timeout");
-  let code: PreviewFailure["code"] = "BAD_GATEWAY";
-  if (allRendererFaults) {
-    code = "SERVICE_UNAVAILABLE";
-  } else if (allTimeouts) {
-    code = "GATEWAY_TIMEOUT";
+    return {
+      code: "UNPROCESSABLE_CONTENT",
+      message: "Unable to retrieve the page (no transport ran).",
+    };
   }
   const details = failures
-    .map((attempt) => `${attempt.transport}: ${failureDescription(attempt.result)}`)
+    .map(
+      (attempt) =>
+        `${attempt.transport}: ${attempt.challenge ?? failureDescription(attempt.result)}`
+    )
     .join("; ");
 
-  return { code, message: `Unable to retrieve the page (${details}).` };
+  return { code: "UNPROCESSABLE_CONTENT", message: `Unable to retrieve the page (${details}).` };
 }
 
 function failureDescription(result: Exclude<RetrieveResult, { status: "ok" }>): string {
@@ -438,8 +468,35 @@ export interface PreviewExtraction {
   title: string | null;
 }
 
+/**
+ * One transport's outcome, as the preview panel needs to read it.
+ *
+ * Automatic mode may run the browser and have it fail, then still show a usable
+ * HTTP body. Without this the UI knows only about the winner, so it offers
+ * "Reload in browser" for an attempt that failed seconds earlier in the same
+ * request — and the reader pays another render to see the same refusal.
+ */
+export interface PreviewAttemptSummary {
+  /** Already a sentence; `null` when nothing suggested a block. */
+  challenge: string | null;
+  error: string | null;
+  status: RetrieveResult["status"];
+  transport: RenderMode;
+}
+
+export function toPreviewAttemptSummary(attempt: PreviewAttempt): PreviewAttemptSummary {
+  return {
+    challenge: attempt.challenge,
+    error: "error" in attempt.result ? attempt.result.error : null,
+    status: attempt.result.status,
+    transport: attempt.transport,
+  };
+}
+
 /** What one previewed page comes back as. */
 export interface PagePreview {
+  /** Every transport this preview ran, in the order it ran them. */
+  attempts: readonly PreviewAttemptSummary[];
   /** What was found, or `null` when the chain came up empty. */
   extraction: PreviewExtraction | null;
   /** Why it came up empty; `null` when it did not. */

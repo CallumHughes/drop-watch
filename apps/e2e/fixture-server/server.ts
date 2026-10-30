@@ -2,6 +2,10 @@
  * The stand-in for everything outside the app: the retailer pages the app
  * scrapes and the Home Assistant instance it alerts.
  *
+ * Product pages are rendered from the request as well as the stored state, so a
+ * template can behave like a CDN with bot protection — refusing a caller that
+ * announces a headless build, or serving a challenge interstitial with a 200.
+ *
  * The app's outbound HTTP happens server-side (undici in the web and worker
  * processes), where Playwright's request interception cannot reach — so tests
  * point the app at this server instead. Plain node:http, no dependencies;
@@ -35,7 +39,7 @@ import { lookup } from "node:dns/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 import { FIXTURE_HOSTS, FIXTURE_PORT } from "../constants";
-import { type FixtureProductState, renderProductPage } from "./templates";
+import { type FixtureProductState, type FixtureRequest, renderProductPage } from "./templates";
 
 const products = new Map<string, FixtureProductState>();
 const webhooks = new Map<string, unknown[]>();
@@ -88,7 +92,19 @@ function getProduct(request: IncomingMessage, response: ServerResponse, slug: st
     return;
   }
   const url = `http://${request.headers.host ?? `localhost:${FIXTURE_PORT}`}/products/${slug}`;
-  sendText(response, OK, renderProductPage(state, url), "text/html; charset=utf-8");
+  // The bot-protection templates answer on what the caller claims to be, the
+  // way a real CDN does, so they need the request and the right to refuse it.
+  const identity: FixtureRequest = {
+    secChUa: header(request, "sec-ch-ua"),
+    userAgent: header(request, "user-agent"),
+  };
+  const page = renderProductPage(state, url, identity);
+  sendText(response, page.status, page.body, "text/html; charset=utf-8");
+}
+
+function header(request: IncomingMessage, name: string): string | undefined {
+  const value = request.headers[name];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 async function recordWebhook(

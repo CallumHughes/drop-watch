@@ -22,6 +22,53 @@ const okExtraction: ExtractionResult = {
 };
 
 describe("toCheckOutcome", () => {
+  // An interstitial answers 200 with no product on it, so the chain's verdict
+  // ("no price found") is true and sends the reader off to write a selector
+  // against a page that has none.
+  it("names the protection vendor rather than reporting a page with no price", () => {
+    const interstitial: FetchPageResult = {
+      body: '<html><head><title>Pardon Our Interruption</title><script src="/_Incapsula_Resource"></script></head></html>',
+      durationMs: 90,
+      httpStatus: 200,
+      status: "ok",
+      url: "https://www.boots.com/p/10332063",
+    };
+    const outcome = toCheckOutcome(interstitial, extract(interstitial.body), null);
+
+    expect(outcome.status).toBe("extract_failed");
+    expect(outcome.error).toBe(
+      "boots.com blocked this request (Imperva bot protection). A saved selector will not help: it would match the interstitial, not the product."
+    );
+  });
+
+  it('explains a bodiless 403 instead of recording "HTTP 403"', () => {
+    const forbidden: FetchPageResult = {
+      durationMs: 40,
+      error: "HTTP 403",
+      httpStatus: 403,
+      status: "http_error",
+    };
+    const outcome = toCheckOutcome(forbidden, null, null, {
+      render: "http",
+      url: "https://www.superdrug.com/p/814543",
+    });
+
+    expect(outcome.status).toBe("http_error");
+    expect(outcome.error).toContain("superdrug.com blocked this request");
+  });
+
+  it("leaves an ordinary HTTP error's own message alone", () => {
+    const notFound: FetchPageResult = {
+      durationMs: 40,
+      error: "HTTP 404 Not Found",
+      httpStatus: 404,
+      status: "http_error",
+    };
+    expect(
+      toCheckOutcome(notFound, null, null, { render: "http", url: "https://store.test/p/1" }).error
+    ).toBe("HTTP 404 Not Found");
+  });
+
   it("records a price point when a price and currency were found", () => {
     expect(toCheckOutcome(okFetch, okExtraction, "GBP")).toEqual({
       extractorUsed: "jsonld",

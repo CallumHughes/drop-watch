@@ -25,6 +25,24 @@
  * first structured-data offer as the selected variant.
  */
 
+/**
+ * What a template is allowed to know about the request.
+ *
+ * Only the bot-protection templates read it, and only to tell the two
+ * transports apart the way a real CDN does: by what the caller says it is.
+ */
+export interface FixtureRequest {
+  /** `Sec-CH-UA`. Sent by a real Chromium, never by the undici fetch path. */
+  secChUa: string | undefined;
+  userAgent: string | undefined;
+}
+
+/** A served response, so a template can refuse a request rather than answer it. */
+export interface FixtureResponse {
+  body: string;
+  status: number;
+}
+
 export interface FixtureProductState {
   /** schema.org availability, e.g. "InStock" or "OutOfStock". */
   availability: "InStock" | "OutOfStock";
@@ -36,6 +54,10 @@ export interface FixtureProductState {
   /** Decimal string, e.g. "100.00" — prices are never floats on this wire. */
   price: string;
   template:
+    | "bot-protection"
+    | "bot-protection-browser"
+    | "bot-protection-interstitial"
+    | "bot-protection-total"
     | "browser-no-match"
     | "js"
     | "json-blob"
@@ -376,7 +398,107 @@ function jsonBlobPage(state: FixtureProductState): string {
 `;
 }
 
-export function renderProductPage(state: FixtureProductState, url: string): string {
+const HTTP_OK = 200;
+const HTTP_FORBIDDEN = 403;
+
+/** The marker Chromium's headless builds put in their UA and their brand list. */
+const HEADLESS_MARKER = "HeadlessChrome";
+
+/**
+ * Trimmed from the body boots.com actually serves a plain fetch: the challenge
+ * script and the `Pardon Our Interruption` title, with no product anywhere on
+ * it. Served with a 200, which is what makes it indistinguishable from a real
+ * page to anything that only looks at the status.
+ */
+function impervaInterstitial(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <noscript><title>Pardon Our Interruption</title></noscript>
+  <script>window.reeseSkipExpirationCheck = true;</script>
+  <script src="/_Incapsula_Resource?SWJIYLWA=719d34d31c8e3a6e6fffd425f7e032f3"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Pardon Our Interruption</h1>
+    <p>As you were browsing something about your browser made us think you were a bot.</p>
+  </div>
+</body>
+</html>
+`;
+}
+
+/** Whether the caller is announcing a headless build, in either place it shows. */
+function looksHeadless(request: FixtureRequest): boolean {
+  return (
+    (request.userAgent?.includes(HEADLESS_MARKER) ?? false) ||
+    (request.secChUa?.includes(HEADLESS_MARKER) ?? false)
+  );
+}
+
+/**
+ * Models the shops this app could not read at all: refuse anything announcing
+ * a headless build, on the first request, before any page JavaScript runs —
+ * which is exactly what Imperva does — and otherwise behave like a normal
+ * JavaScript-composed storefront, so the price exists only in the rendered DOM.
+ *
+ * Checking `Sec-CH-UA` as well as the user agent is the point. Overriding only
+ * the user agent leaves Chromium advertising `HeadlessChrome` in that header,
+ * so a test that read the user agent alone would pass while the real Boots
+ * still refused us.
+ */
+function botProtectionPage(
+  state: FixtureProductState,
+  url: string,
+  request: FixtureRequest
+): FixtureResponse {
+  if (looksHeadless(request)) {
+    return { body: "", status: HTTP_FORBIDDEN };
+  }
+  return { body: javascriptPage(state, url), status: HTTP_OK };
+}
+
+/**
+ * A shop that refuses every real browser but serves the plain-HTTP path. The
+ * HTTP body carries no price, so the preview exists, shows nothing automatic,
+ * and offers a browser reload that cannot possibly work — which is the state
+ * the UI has to recognise instead of charging another render for it.
+ */
+function browserForbiddenPage(
+  state: FixtureProductState,
+  url: string,
+  request: FixtureRequest
+): FixtureResponse {
+  // `Sec-CH-UA` is sent by a real Chromium and never by the undici path, which
+  // makes it the one header that tells the two transports apart.
+  if (request.secChUa !== undefined) {
+    return { body: "", status: HTTP_FORBIDDEN };
+  }
+  return { body: javascriptPage(state, url), status: HTTP_OK };
+}
+
+export function renderProductPage(
+  state: FixtureProductState,
+  url: string,
+  request: FixtureRequest
+): FixtureResponse {
+  if (state.template === "bot-protection") {
+    return botProtectionPage(state, url, request);
+  }
+  if (state.template === "bot-protection-browser") {
+    return browserForbiddenPage(state, url, request);
+  }
+  if (state.template === "bot-protection-interstitial") {
+    return { body: impervaInterstitial(), status: HTTP_OK };
+  }
+  if (state.template === "bot-protection-total") {
+    return { body: "", status: HTTP_FORBIDDEN };
+  }
+  return { body: htmlFor(state, url), status: HTTP_OK };
+}
+
+function htmlFor(state: FixtureProductState, url: string): string {
   if (state.template === "jsonld") {
     return jsonLdPage(state, url);
   }

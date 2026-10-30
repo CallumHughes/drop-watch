@@ -38,6 +38,7 @@ import {
   previewTransports,
   previewUrlRejection,
   toExpressionPreview,
+  toPreviewAttemptSummary,
   toPreviewExtraction,
 } from "../preview";
 import { MAX_EXPRESSION_LENGTH, type RenderMode } from "../schemas/products";
@@ -49,7 +50,12 @@ const MAX_LOCALE_LENGTH = 35;
  * `@drop-watch/core` — the UI reads the API, not the extraction engine.
  */
 export type { ExpressionMatch, ExpressionMode } from "@drop-watch/core/extract";
-export type { ExpressionPreview, PagePreview, PreviewExtraction } from "../preview";
+export type {
+  ExpressionPreview,
+  PagePreview,
+  PreviewAttemptSummary,
+  PreviewExtraction,
+} from "../preview";
 
 /**
  * Long enough to read a page's markup and work out a selector, short enough
@@ -187,8 +193,12 @@ export const previewRouter = {
         renderUrl: env.RENDER_URL,
         retrieve: async (transport) =>
           await retrievePreview(input.url, transport, env.RENDER_URL, httpRetries),
+        url: input.url,
       });
       const attemptLog = outcome.attempts.map((attempt) => ({
+        // Worth a field of its own: a blocked attempt and one that simply found
+        // no price are the same `extraction: false` otherwise.
+        challenge: attempt.challenge,
         confidence: attempt.extraction?.ok ? attempt.extraction.confidence : null,
         durationMs: attempt.result.durationMs,
         evidence: attempt.extraction?.ok ? attempt.extraction.evidence : null,
@@ -242,8 +252,9 @@ export const previewRouter = {
       log.emit();
 
       return {
+        attempts: outcome.attempts.map(toPreviewAttemptSummary),
         extraction: toPreviewExtraction(result),
-        extractionError: result.ok ? null : result.error,
+        extractionError: result.ok ? null : (outcome.attempt.challenge ?? result.error),
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,
         previewId,
