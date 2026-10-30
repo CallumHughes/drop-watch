@@ -35,6 +35,22 @@ export const DEFAULT_LOCALE = "en-GB";
  */
 export const DEFAULT_TIMEZONE = "Europe/London";
 
+/**
+ * Choose a stable representative of the locale's region, not the host's zone.
+ * A locale cannot identify a city in a region with multiple timezones.
+ */
+export function timezoneForLocale(locale: string = DEFAULT_LOCALE): string {
+  try {
+    // Node 24 supports Locale info; TypeScript's Intl lib does not yet declare it.
+    const regional = new Intl.Locale(locale).maximize() as Intl.Locale & {
+      getTimeZones: () => string[] | undefined;
+    };
+    return regional.getTimeZones()?.[0] ?? DEFAULT_TIMEZONE;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
 /** The token Chromium's headless builds put in their UA and their brand list. */
 const HEADLESS_BRAND = "HeadlessChrome";
 

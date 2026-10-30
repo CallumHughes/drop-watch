@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_USER_AGENT, headedBrands, headedUserAgent } from "./identity";
+import { DEFAULT_USER_AGENT, headedBrands, headedUserAgent, timezoneForLocale } from "./identity";
 
 const PLAIN_CHROME_SUFFIX = / Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/;
+
+describe("timezoneForLocale", () => {
+  it.each([
+    [undefined, "Europe/London"],
+    ["en-GB", "Europe/London"],
+    ["de-DE", "Europe/Berlin"],
+    ["de", "Europe/Berlin"],
+    ["fr-FR", "Europe/Paris"],
+    ["ja-JP", "Asia/Tokyo"],
+    ["en-DE", "Europe/Berlin"],
+    ["invalid_locale", "Europe/London"],
+    ["zz-ZZ", "Europe/London"],
+  ])("chooses a regional timezone for %s", (locale, expected) => {
+    expect(timezoneForLocale(locale)).toBe(expected);
+  });
+});
 
 describe("headedUserAgent", () => {
   // This exact string is what Imperva refuses on the first request, before any

@@ -15,6 +15,7 @@ import {
   previewUrlRejection,
   toExpressionPreview,
   toPreviewExtraction,
+  toPreviewExtractionError,
 } from "./preview";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
@@ -59,6 +60,24 @@ function extracted(
 }
 
 const NO_EXTRACTION: ExtractionResult = { error: "no price found", ok: false };
+
+describe("toPreviewExtractionError", () => {
+  it("keeps challenge context before the original extraction diagnostics", () => {
+    const result = extractPreviewPage(
+      "<title>Pardon Our Interruption</title>",
+      "https://store.test",
+      undefined
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(toPreviewExtractionError(result, "Store blocked this request.")).toBe(
+        `Store blocked this request. ${result.error}`
+      );
+      expect(toPreviewExtractionError(result, null)).toBe(result.error);
+    }
+    expect(toPreviewExtractionError(extracted("high"), null)).toBeNull();
+  });
+});
 
 interface OrchestrationScenario {
   browserExtraction?: ExtractionResult;

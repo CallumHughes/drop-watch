@@ -1,3 +1,9 @@
+import {
+  extractPreviewPage,
+  orchestratePreview,
+  toPreviewAttemptSummary,
+  toPreviewExtraction,
+} from "@drop-watch/api/preview";
 import type { PagePreview } from "@drop-watch/api/routers/preview";
 import { describe, expect, it } from "vitest";
 
@@ -99,7 +105,11 @@ describe("failedBrowserAttempt", () => {
         },
       ])
     );
-    expect(reason).toBe("boots.com blocked this request (Imperva bot protection).");
+    expect(reason).toMatchObject({
+      challenge: "boots.com blocked this request (Imperva bot protection).",
+      message: "boots.com blocked this request (Imperva bot protection).",
+      status: "http_error",
+    });
   });
 
   it("falls back to the transport error, then to the status", () => {
@@ -114,12 +124,16 @@ describe("failedBrowserAttempt", () => {
           },
         ])
       )
-    ).toBe("renderer unreachable");
+    ).toMatchObject({ challenge: null, message: "renderer unreachable", status: "renderer_error" });
     expect(
       failedBrowserAttempt(
         preview([{ challenge: null, error: null, status: "timeout", transport: "browser" }])
       )
-    ).toBe("the browser attempt reported timeout");
+    ).toMatchObject({
+      challenge: null,
+      message: "the browser attempt reported timeout",
+      status: "timeout",
+    });
   });
 
   it("stays silent when no browser attempt failed", () => {
@@ -135,13 +149,62 @@ describe("failedBrowserAttempt", () => {
       )
     ).toBeNull();
   });
+
+  it("reports a 200 browser challenge when the low-confidence HTTP price wins", async () => {
+    const outcome = await orchestratePreview({
+      extractPage: (html, url) => extractPreviewPage(html, url, undefined),
+      render: "auto",
+      renderUrl: "http://renderer:3002",
+      retrieve: async (transport) => ({
+        body:
+          transport === "http"
+            ? '<meta property="product:price:amount" content="21.50"><meta property="product:price:currency" content="GBP">'
+            : '<title>Pardon Our Interruption</title><script src="/_Incapsula_Resource"></script>',
+        durationMs: 10,
+        httpStatus: 200,
+        status: "ok",
+        url: "https://www.boots.com/p/10332063",
+      }),
+      url: "https://www.boots.com/p/10332063",
+    });
+    expect(outcome.kind).toBe("extracted");
+    if (outcome.kind !== "extracted") {
+      throw new Error("Expected the HTTP price to win");
+    }
+    expect(outcome.attempt.transport).toBe("http");
+    const result = {
+      ...preview(outcome.attempts.map(toPreviewAttemptSummary)),
+      extraction: toPreviewExtraction(outcome.attempt.extraction),
+      extractionError: null,
+    };
+    const failure = failedBrowserAttempt(result);
+    expect(failure?.status).toBe("ok");
+    expect(failure?.message).toContain("Imperva bot protection");
+    expect(
+      transportReloadControl({
+        alreadyFailed: failure,
+        browserRender: true,
+        currentRender: result.render,
+        preconditionFailed: false,
+      })
+    ).toMatchObject({ alreadyFailed: failure?.message, disabled: true });
+  });
 });
 
 describe("transportReloadControl with a failed escalation", () => {
   it("disables the browser reload and carries the reason", () => {
     expect(
       transportReloadControl({
-        alreadyFailed: "boots.com blocked this request.",
+        alreadyFailed: failedBrowserAttempt(
+          preview([
+            {
+              challenge: "boots.com blocked this request.",
+              error: "HTTP 403",
+              status: "http_error",
+              transport: "browser",
+            },
+          ])
+        ),
         browserRender: true,
         currentRender: "http",
         preconditionFailed: false,
@@ -159,11 +222,49 @@ describe("transportReloadControl with a failed escalation", () => {
   it("ignores it when the target is HTTP", () => {
     expect(
       transportReloadControl({
-        alreadyFailed: "boots.com blocked this request.",
+        alreadyFailed: failedBrowserAttempt(
+          preview([
+            {
+              challenge: "boots.com blocked this request.",
+              error: "HTTP 403",
+              status: "http_error",
+              transport: "browser",
+            },
+          ])
+        ),
         browserRender: true,
         currentRender: "browser",
         preconditionFailed: false,
       })
     ).toEqual({ alreadyFailed: null, disabled: false, target: "http", unavailable: false });
   });
+
+  it.each(["timeout", "renderer_error", "network_error", "http_error"] as const)(
+    "keeps the %s failure visible while allowing a deliberate retry",
+    (status) => {
+      const failure = failedBrowserAttempt(
+        preview([
+          {
+            challenge: null,
+            error: "temporary failure",
+            status,
+            transport: "browser",
+          },
+        ])
+      );
+      expect(
+        transportReloadControl({
+          alreadyFailed: failure,
+          browserRender: true,
+          currentRender: "http",
+          preconditionFailed: false,
+        })
+      ).toEqual({
+        alreadyFailed: "temporary failure",
+        disabled: false,
+        target: "browser",
+        unavailable: false,
+      });
+    }
+  );
 });

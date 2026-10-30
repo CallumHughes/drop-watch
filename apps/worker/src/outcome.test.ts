@@ -1,5 +1,5 @@
 import type { ExtractionResult } from "@drop-watch/core/extract";
-import { extract } from "@drop-watch/core/extract";
+import { extract, testExpression } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { describe, expect, it } from "vitest";
 import { toCheckOutcome } from "./outcome";
@@ -25,7 +25,7 @@ describe("toCheckOutcome", () => {
   // An interstitial answers 200 with no product on it, so the chain's verdict
   // ("no price found") is true and sends the reader off to write a selector
   // against a page that has none.
-  it("names the protection vendor rather than reporting a page with no price", () => {
+  it("names the protection vendor and preserves extraction diagnostics", () => {
     const interstitial: FetchPageResult = {
       body: '<html><head><title>Pardon Our Interruption</title><script src="/_Incapsula_Resource"></script></head></html>',
       durationMs: 90,
@@ -33,12 +33,38 @@ describe("toCheckOutcome", () => {
       status: "ok",
       url: "https://www.boots.com/p/10332063",
     };
-    const outcome = toCheckOutcome(interstitial, extract(interstitial.body), null);
+    const extraction = extract(interstitial.body);
+    const outcome = toCheckOutcome(interstitial, extraction, null);
 
     expect(outcome.status).toBe("extract_failed");
-    expect(outcome.error).toBe(
+    expect(outcome.error).toContain(
       "boots.com blocked this request (Imperva bot protection). A saved selector will not help: it would match the interstitial, not the product."
     );
+    expect(extraction.ok).toBe(false);
+    if (!extraction.ok) {
+      expect(outcome.error).toBe(
+        `boots.com blocked this request (Imperva bot protection). A saved selector will not help: it would match the interstitial, not the product. ${extraction.error}`
+      );
+    }
+  });
+
+  it("preserves a normal extraction failure when a vendor script accompanies a usable price", () => {
+    const body =
+      '<script src="https://js.datadome.co/tags.js"></script><span class="custom-cost">£21.50</span>';
+    const extraction = extract(body);
+    const outcome = toCheckOutcome({ ...okFetch, body }, extraction, null);
+
+    expect(extraction.ok).toBe(false);
+    if (!extraction.ok) {
+      expect(outcome.error).toBe(extraction.error);
+    }
+    expect(outcome.error).not.toContain("blocked");
+    expect(
+      testExpression(body, { expression: ".custom-cost", mode: "selector" }).result
+    ).toMatchObject({
+      ok: true,
+      price: "21.50",
+    });
   });
 
   it('explains a bodiless 403 instead of recording "HTTP 403"', () => {

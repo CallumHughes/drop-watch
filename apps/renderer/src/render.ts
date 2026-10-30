@@ -17,10 +17,10 @@ import { checkUrlScheme } from "@drop-watch/core/net/guard";
 import type { UserAgentBrand } from "@drop-watch/core/net/identity";
 import {
   DEFAULT_LOCALE,
-  DEFAULT_TIMEZONE,
   DEFAULT_USER_AGENT,
   headedBrands,
   headedUserAgent,
+  timezoneForLocale,
 } from "@drop-watch/core/net/identity";
 import type { RenderRequest, RenderResponse } from "@drop-watch/core/render/contract";
 import {
@@ -68,6 +68,8 @@ const BROWSER_SERVER_LAUNCH_TIMEOUT_MS = 10_000;
 const BROWSER_CLOSE_TIMEOUT_MS = 2000;
 const BROWSER_KILL_TIMEOUT_MS = 2000;
 const BROWSER_CONNECT_TIMEOUT_MS = 3000;
+// Leave a second of slack inside the 15s launch budget after server + connect.
+const IDENTITY_PROBE_TIMEOUT_MS = 1000;
 const CONTEXT_SETUP_TIMEOUT_MS = 5000;
 
 /**
@@ -239,7 +241,7 @@ async function launchBrowser(): Promise<ManagedBrowser> {
     });
     const identity = await withDeadline(
       detectIdentity(browser),
-      CONTEXT_SETUP_TIMEOUT_MS,
+      IDENTITY_PROBE_TIMEOUT_MS,
       "browser identity detection"
     ).catch(() => ({ metadata: null, userAgent: DEFAULT_USER_AGENT }));
     return { browser, identity, server };
@@ -420,7 +422,7 @@ async function preparePage(
     locale: request.locale ?? DEFAULT_LOCALE,
     proxy: { bypass: "<-loopback>", server: proxy.server },
     serviceWorkers: "block",
-    timezoneId: DEFAULT_TIMEZONE,
+    timezoneId: timezoneForLocale(request.locale),
     userAgent: request.userAgent ?? acquired.handle.identity.userAgent,
   });
 

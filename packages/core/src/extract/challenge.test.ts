@@ -32,12 +32,14 @@ describe("challengeVendor", () => {
   });
 
   it.each([
-    ["Akamai", '<script>window._abck="0~-1~-1";</script>'],
+    ["Akamai", '<div id="bm-verify">Verify you are human</div>'],
     [
       "Cloudflare",
       '<title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/h/b"></script>',
     ],
-    ["DataDome", '<script src="https://js.datadome.co/tags.js"></script>'],
+    ["Cloudflare", "<script>window._cf_chl_opt = {};</script>"],
+    ["Cloudflare", '<script src="/cdn-cgi/challenge-platform/h/g/flow/ov1"></script>'],
+    ["DataDome", '<iframe src="https://geo.captcha-delivery.com/captcha/"></iframe>'],
     ["PerimeterX", '<div id="px-captcha"></div>'],
   ])("names %s", (vendor, html) => {
     expect(challengeVendor(html)).toBe(vendor);
@@ -45,6 +47,22 @@ describe("challengeVendor", () => {
 
   it("leaves a real product page alone", () => {
     expect(challengeVendor(PRODUCT_PAGE)).toBeNull();
+  });
+
+  it.each([
+    '<script src="https://js.datadome.co/tags.js"></script>',
+    '<script src="/cdn-cgi/challenge-platform/h/g/scripts/jsd/main.js"></script>',
+    '<script src="/akam/13/5f7a1b2"></script><script src="akam-sw.js"></script>',
+    '<script>window._abck="0~-1~-1";</script>',
+    '<script src="/reese84"></script>',
+    '<script src="https://client.perimeterx.net/px.js"></script><!-- PerimeterX -->',
+    '<img data-size_px="640">',
+    "<p>Just a moment while we check stock near you.</p>",
+    "<p>Pardon Our Interruption is the name of this product.</p>",
+  ])("does not mistake passive vendor code or ordinary text for a challenge: %s", (markup) => {
+    const html = `<html><head><title>Product</title>${markup}</head><body><span class="custom-cost">£21.50</span></body></html>`;
+    expect(challengeVendor(html)).toBeNull();
+    expect(challengeReason(html, { httpStatus: 200 })).toBeNull();
   });
 
   // Markers live in the head; scanning a whole 5MB body on every check would be

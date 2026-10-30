@@ -132,6 +132,8 @@ describe("real Chromium identity", () => {
 
       expect(observed.userAgent).toBe("DropWatch/1.0 (test)");
       expect(html).toContain('data-language="de-DE"');
+      expect(html).toContain('data-timezone="Europe/Berlin"');
+      expect(observed.acceptLanguage).toContain("de-DE");
     } finally {
       await server.close();
       if (previousAllowlist === undefined) {

@@ -12,7 +12,7 @@
  * scripts, so a false positive would need a product page to ship one.
  */
 
-/** Bytes of markup worth scanning. A challenge page is small; a product page's protection markers sit in its head. */
+/** Characters worth scanning; challenge pages are usually small. */
 const SCAN_CHARS = 20_000;
 
 const HTTP_FORBIDDEN = 403;
@@ -27,16 +27,24 @@ interface ChallengeSignature {
 
 const SIGNATURES: readonly ChallengeSignature[] = [
   {
-    markers: ["_Incapsula_Resource", "Pardon Our Interruption", "reese84", "reeseSkipAutoLoad"],
+    markers: [
+      "_Incapsula_Resource",
+      /<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/i,
+      "reeseSkipAutoLoad",
+    ],
     vendor: "Imperva",
   },
-  { markers: ["_abck", "bm-verify", "akam-sw.js", "/akam/"], vendor: "Akamai" },
+  { markers: ["bm-verify"], vendor: "Akamai" },
   {
-    markers: ["cf-chl", "Just a moment", "__cf_chl", "cdn-cgi/challenge-platform"],
+    markers: [
+      "cf_chl_opt",
+      /\/cdn-cgi\/challenge-platform\/h\/[^/\s"']+\/flow\//,
+      /<title\b[^>]*>\s*Just a moment(?:\.{3}|…)?\s*<\/title>/i,
+    ],
     vendor: "Cloudflare",
   },
-  { markers: ["datadome", "DataDome", "dd_cookie"], vendor: "DataDome" },
-  { markers: ["PerimeterX", "_px", "px-captcha"], vendor: "PerimeterX" },
+  { markers: ["geo.captcha-delivery.com"], vendor: "DataDome" },
+  { markers: ["px-captcha"], vendor: "PerimeterX" },
 ];
 
 function matches(haystack: string, marker: RegExp | string): boolean {

@@ -99,15 +99,14 @@ export function toCheckOutcome(
   }
 
   if (!extraction.ok) {
-    // An interstitial answers 200 with no product on it, so the chain's "no
-    // price found" is true and useless. Name the block instead.
+    // Keep the extraction details even when the body looks like a challenge.
+    const challenge = challengeReason(fetched.body, {
+      httpStatus: fetched.httpStatus,
+      transport: listing.render,
+      url: fetched.url,
+    });
     return {
-      error:
-        challengeReason(fetched.body, {
-          httpStatus: fetched.httpStatus,
-          transport: listing.render,
-          url: fetched.url,
-        }) ?? extraction.error,
+      error: challenge ? `${challenge} ${extraction.error}` : extraction.error,
       httpStatus: fetched.httpStatus,
       recordPricePoint: false,
       status: "extract_failed",

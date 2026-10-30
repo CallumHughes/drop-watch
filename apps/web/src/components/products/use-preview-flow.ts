@@ -1,6 +1,10 @@
 "use client";
 
-import type { ExpressionMode, PagePreview } from "@drop-watch/api/routers/preview";
+import type {
+  ExpressionMode,
+  PagePreview,
+  PreviewAttemptSummary,
+} from "@drop-watch/api/routers/preview";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ChangeEvent, FormEvent } from "react";
@@ -43,14 +47,21 @@ export function isCurrentPreviewRequest(
  * panel would offer "Reload in browser" for an attempt that failed seconds ago
  * and charge another render to reach the same refusal.
  */
-export function failedBrowserAttempt(preview: PagePreview | null): string | null {
+export function failedBrowserAttempt(
+  preview: PagePreview | null
+): (PreviewAttemptSummary & { message: string }) | null {
   const attempt = preview?.attempts.find(
-    (candidate) => candidate.transport === "browser" && candidate.status !== "ok"
+    (candidate) =>
+      candidate.transport === "browser" &&
+      (candidate.status !== "ok" || candidate.challenge !== null)
   );
   if (!attempt) {
     return null;
   }
-  return attempt.challenge ?? attempt.error ?? `the browser attempt reported ${attempt.status}`;
+  return {
+    ...attempt,
+    message: attempt.challenge ?? attempt.error ?? `the browser attempt reported ${attempt.status}`,
+  };
 }
 
 /**
@@ -63,7 +74,7 @@ export function transportReloadControl({
   currentRender,
   preconditionFailed,
 }: {
-  alreadyFailed: string | null;
+  alreadyFailed: ReturnType<typeof failedBrowserAttempt>;
   browserRender: boolean | undefined;
   currentRender: PagePreview["render"];
   preconditionFailed: boolean;
@@ -71,9 +82,12 @@ export function transportReloadControl({
   const target = currentRender === "http" ? "browser" : "http";
   const unavailable = target === "browser" && browserRender === false;
   const disabled =
-    target === "browser" && (unavailable || preconditionFailed || alreadyFailed !== null);
+    target === "browser" &&
+    (unavailable ||
+      preconditionFailed ||
+      (alreadyFailed !== null && alreadyFailed.challenge !== null));
   return {
-    alreadyFailed: target === "browser" ? alreadyFailed : null,
+    alreadyFailed: target === "browser" ? (alreadyFailed?.message ?? null) : null,
     disabled,
     target,
     unavailable,

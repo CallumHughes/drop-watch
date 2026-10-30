@@ -40,6 +40,7 @@ import {
   toExpressionPreview,
   toPreviewAttemptSummary,
   toPreviewExtraction,
+  toPreviewExtractionError,
 } from "../preview";
 import { MAX_EXPRESSION_LENGTH, type RenderMode } from "../schemas/products";
 
@@ -254,7 +255,7 @@ export const previewRouter = {
       return {
         attempts: outcome.attempts.map(toPreviewAttemptSummary),
         extraction: toPreviewExtraction(result),
-        extractionError: result.ok ? null : (outcome.attempt.challenge ?? result.error),
+        extractionError: toPreviewExtractionError(result, outcome.attempt.challenge),
         htmlBytes: fetched.body.length,
         httpStatus: fetched.httpStatus,
         previewId,

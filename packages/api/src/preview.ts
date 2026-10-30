@@ -529,6 +529,16 @@ export function toPreviewExtraction(result: ExtractionResult): PreviewExtraction
   };
 }
 
+export function toPreviewExtractionError(
+  result: ExtractionResult,
+  challenge: string | null
+): string | null {
+  if (result.ok) {
+    return null;
+  }
+  return challenge ? `${challenge} ${result.error}` : result.error;
+}
+
 /**
  * What one candidate expression comes back as.
  *
