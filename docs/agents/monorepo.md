@@ -16,6 +16,7 @@ since the CLI differs between versions.
 | `packages/core` | Pure logic: extraction, alert rules, notification shaping, fetching. No database, no clock, no network of its own |
 | `packages/db` | Drizzle schema, migrations, queue wiring. Owns every row |
 | `packages/auth` | Better Auth config — see the `better-auth-best-practices` skill |
+| `packages/brand` | The product name and the logo artwork, plus the Canva import/generate script. Every other brand asset is derived from `assets/*.svg` |
 | `packages/email`, `env`, `ui`, `config` | Templates, validated env, shadcn components, shared tsconfig/biome |
 
 `docs/architecture/primitives.yaml` maps path globs to these primitives and is

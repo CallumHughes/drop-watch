@@ -7,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "brand:generate": "pnpm --filter @drop-watch/brand brand:generate",
+    "brand:import": "pnpm --filter @drop-watch/brand brand:import",
     "build": "turbo run build",
     "check": "ultracite check",
     "check-types": "turbo run check-types",

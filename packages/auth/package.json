@@ -11,6 +11,7 @@
   },
   "scripts": {},
   "dependencies": {
+    "@drop-watch/brand": "workspace:*",
     "@drop-watch/db": "workspace:*",
     "@drop-watch/email": "workspace:*",
     "@drop-watch/env": "workspace:*",

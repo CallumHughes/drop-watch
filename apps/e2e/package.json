@@ -9,6 +9,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@drop-watch/brand": "workspace:*",
     "@playwright/test": "^1.64.0",
     "pg": "catalog:",
     "tsx": "catalog:"

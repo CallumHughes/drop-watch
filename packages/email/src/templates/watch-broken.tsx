@@ -14,20 +14,14 @@
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
 /** @jsxImportSource react */
 
+import { APP_NAME } from "@drop-watch/brand";
 import type { NotificationPayload } from "@drop-watch/core/notify";
 import { productHost } from "@drop-watch/core/notify/message";
 import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
 
 import { productLabel } from "../format";
-import {
-  APP_NAME,
-  buttonStyle,
-  EmailLayout,
-  linkStyle,
-  mutedStyle,
-  paragraphStyle,
-} from "./layout";
+import { buttonStyle, EmailLayout, linkStyle, mutedStyle, paragraphStyle } from "./layout";
 
 const errorStyle: CSSProperties = {
   backgroundColor: "#f9fafb",
@@ -83,7 +77,7 @@ export function WatchBroken({ payload, watchUrl }: WatchBrokenProps) {
       </Text>
       <Text style={actionStyle}>
         <Link href={watchUrl ?? payload.url} style={buttonStyle}>
-          {watchUrl === null ? "Open the product page" : "Open in DropWatch"}
+          {watchUrl === null ? "Open the product page" : `Open in ${APP_NAME}`}
         </Link>
       </Text>
       <Text style={mutedStyle}>

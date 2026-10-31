@@ -12,6 +12,7 @@
  * Prices stay decimal strings throughout — never `Number`.
  */
 
+import { APP_NAME } from "@drop-watch/brand";
 import type { NotificationKind, NotificationPayload } from "./index";
 
 const WWW_PREFIX = /^www\./;
@@ -67,7 +68,7 @@ const TITLES: Record<NotificationKind, (label: string) => string> = {
   drop_percent: (label) => `Price drop: ${label}`,
   restock: (label) => `Back in stock: ${label}`,
   target: (label) => `Target hit: ${label}`,
-  test: () => "Test alert from DropWatch",
+  test: () => `Test alert from ${APP_NAME}`,
   watch_broken: (label) => `Watch broken: ${label}`,
 };
 

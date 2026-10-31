@@ -17,9 +17,10 @@
 /** @jsxRuntime automatic — see ./layout.tsx for why every template declares it. */
 /** @jsxImportSource react */
 
+import { APP_NAME } from "@drop-watch/brand";
 import { Text } from "@react-email/components";
 
-import { APP_NAME, CallToAction, EmailLayout, mutedStyle, paragraphStyle } from "./layout";
+import { CallToAction, EmailLayout, mutedStyle, paragraphStyle } from "./layout";
 
 export const CHANGE_EMAIL_SUBJECT = `Confirm the new email address on your ${APP_NAME} account`;
 

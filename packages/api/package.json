@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@drop-watch/auth": "workspace:*",
+    "@drop-watch/brand": "workspace:*",
     "@drop-watch/core": "workspace:*",
     "@drop-watch/db": "workspace:*",
     "@drop-watch/email": "workspace:*",
