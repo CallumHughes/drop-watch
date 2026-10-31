@@ -206,24 +206,6 @@ function icoFrom(pngs) {
   return Buffer.concat([header, ...entries, ...pngs.map(({ data }) => data)]);
 }
 
-// --- badges --------------------------------------------------------------
-
-/**
- * The mark is 1:2.8, so bare at 16px its shaft falls under a pixel and reads as
- * a smudge. Every app icon therefore sits in a filled square, which also gives
- * maskable icons the safe zone they need.
- */
-function badge({ art, box, fraction, radius, scheme }) {
-  const side = 100;
-  const scale = (side * fraction) / box.h;
-  const x = side / 2 - (box.x + box.w / 2) * scale;
-  const y = side / 2 - (box.y + box.h / 2) * scale;
-  const flip = scheme
-    ? `@media(prefers-color-scheme:dark){.bg{fill:${PAPER}}.fg{fill:${INK}}}`
-    : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}"><style>.bg{fill:${INK}}.fg{fill:${PAPER}}${flip}</style><rect class="bg" width="${side}" height="${side}"${radius ? ` rx="${radius}"` : ""}/><g class="fg" transform="translate(${round(x)} ${round(y)}) scale(${scale.toFixed(6)})">${art.replaceAll(ANY_FILL, "")}</g></svg>\n`;
-}
-
 // --- import --------------------------------------------------------------
 
 async function clean(dir, files, { pad, slug, token }) {
@@ -257,12 +239,7 @@ async function clean(dir, files, { pad, slug, token }) {
     .replace("<svg ", '<svg fill="currentColor" ');
 
   await writeFile(join(ASSETS, `${slug}.svg`), `${cropped}\n`);
-  return {
-    art: inner(flat),
-    box,
-    line: `${slug}.svg  ${raw.length} -> ${cropped.length} bytes (-${((1 - cropped.length / raw.length) * 100).toFixed(1)}%)  drift ${(moved * 100).toFixed(4)}%`,
-    slug,
-  };
+  return `${slug}.svg  ${raw.length} -> ${cropped.length} bytes (-${((1 - cropped.length / raw.length) * 100).toFixed(1)}%)  drift ${(moved * 100).toFixed(4)}%`;
 }
 
 async function runImport(dir) {
@@ -272,29 +249,10 @@ async function runImport(dir) {
   const files = (await readdir(dir)).filter((f) => f.toLowerCase().endsWith(".svg"));
   await mkdir(ASSETS, { recursive: true });
 
-  const done = await Promise.all(MARKS.map((target) => clean(dir, files, target)));
-  for (const { line } of done) {
+  for (const line of await Promise.all(MARKS.map((target) => clean(dir, files, target)))) {
     console.log(line);
   }
-
-  const mark = done.find((d) => d.slug === "mark");
-  await Promise.all([
-    writeFile(
-      join(ASSETS, "badge.svg"),
-      badge({ art: mark.art, box: mark.box, fraction: 0.58, radius: 22, scheme: false })
-    ),
-    writeFile(
-      join(ASSETS, "icon-scheme.svg"),
-      badge({ art: mark.art, box: mark.box, fraction: 0.58, radius: 22, scheme: true })
-    ),
-    // Maskable icons are cropped to the launcher's own shape, so this one runs
-    // full bleed and keeps the mark well inside the safe zone.
-    writeFile(
-      join(ASSETS, "badge-maskable.svg"),
-      badge({ art: mark.art, box: mark.box, fraction: 0.42, radius: 0, scheme: false })
-    ),
-  ]);
-  console.log("badge.svg, icon-scheme.svg, badge-maskable.svg");
+  console.log("run `pnpm brand:generate` to rebuild everything derived from these");
 }
 
 // --- generate ------------------------------------------------------------
@@ -320,19 +278,44 @@ function module_(name, lines) {
   );
 }
 
+/**
+ * The mark is 1:2.8, so bare at 16px its shaft falls under a pixel and reads as
+ * a smudge. Every app icon therefore sits in a filled square, which also gives
+ * maskable icons the safe zone they need.
+ */
+function badge({ art, box, fraction, radius, scheme }) {
+  const side = 100;
+  const scale = (side * fraction) / box.h;
+  const x = side / 2 - (box.x + box.w / 2) * scale;
+  const y = side / 2 - (box.y + box.h / 2) * scale;
+  const flip = scheme
+    ? `@media(prefers-color-scheme:dark){.bg{fill:${PAPER}}.fg{fill:${INK}}}`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}"><style>.bg{fill:${INK}}.fg{fill:${PAPER}}${flip}</style><rect class="bg" width="${side}" height="${side}"${radius ? ` rx="${radius}"` : ""}/><g class="fg" transform="translate(${round(x)} ${round(y)}) scale(${scale.toFixed(6)})">${art.replaceAll(ANY_FILL, "")}</g></svg>\n`;
+}
+
+/**
+ * The three app-icon treatments, measured off the mark every run. They are
+ * built here rather than in `import` so that an edit to `assets/mark.svg`
+ * reaches the favicon and the app icons, not just the components.
+ */
+async function badges(markSvg) {
+  const art = inner(markSvg);
+  const box = await inkBox(markSvg);
+  return {
+    badge: badge({ art, box, fraction: 0.58, radius: 22, scheme: false }),
+    // Maskable icons are cropped to the launcher's own shape, so this one runs
+    // full bleed and keeps the mark well inside the safe zone.
+    maskable: badge({ art, box, fraction: 0.42, radius: 0, scheme: false }),
+    scheme: badge({ art, box, fraction: 0.58, radius: 22, scheme: true }),
+  };
+}
+
 async function runGenerate() {
   const read = (slug) => readFile(join(ASSETS, `${slug}.svg`), "utf8");
-  const slugs = [
-    "mark",
-    "wordmark-horizontal",
-    "wordmark-stacked",
-    "badge",
-    "badge-maskable",
-    "icon-scheme",
-  ];
-  const [markSvg, horizontal, stacked, badgeSvg, maskable, scheme] = await Promise.all(
-    slugs.map(read)
-  );
+  const slugs = ["mark", "wordmark-horizontal", "wordmark-stacked"];
+  const [markSvg, horizontal, stacked] = await Promise.all(slugs.map(read));
+  const { badge: badgeSvg, maskable, scheme } = await badges(markSvg);
   const square = (svg, size) => png(svg, size, size).toBuffer();
 
   // favicon.ico carries the legacy sizes; icon.svg covers everything modern and
@@ -362,14 +345,15 @@ async function runGenerate() {
     .png()
     .toBuffer();
 
-  // An <img> cannot inherit currentColor, so Markdown and anything else that
-  // embeds the file rather than inlining it needs the ink baked in.
-  const baked = [
-    ["wordmark-on-light.svg", INK],
-    ["wordmark-on-dark.svg", PAPER],
-  ].map(([name, fill]) =>
-    writeFile(join(ASSETS, name), horizontal.replaceAll("currentColor", fill))
-  );
+  // The badges, and — because an <img> cannot inherit currentColor — a pair of
+  // wordmarks for Markdown and anything else that embeds rather than inlines.
+  const derived = {
+    "badge-maskable.svg": maskable,
+    "badge.svg": badgeSvg,
+    "icon-scheme.svg": scheme,
+    "wordmark-on-dark.svg": horizontal.replaceAll("currentColor", PAPER),
+    "wordmark-on-light.svg": horizontal.replaceAll("currentColor", INK),
+  };
 
   const written = await Promise.all([
     emit("apps/web/src/app/favicon.ico", ico),
@@ -380,11 +364,17 @@ async function runGenerate() {
     emit("apps/web/public/icon-512.png", i512),
     emit("apps/web/public/icon-maskable-512.png", maskablePng),
   ]);
-  await Promise.all(baked);
+  await Promise.all(
+    Object.entries(derived).map(([name, body]) => writeFile(join(ASSETS, name), body))
+  );
   for (const line of written) {
     console.log(line);
   }
-  console.log("assets/wordmark-on-light.svg, assets/wordmark-on-dark.svg");
+  console.log(
+    Object.keys(derived)
+      .map((name) => `assets/${name}`)
+      .join(", ")
+  );
 
   const art = (svg) => ({
     paths: [...inner(svg).matchAll(PATH_DATA)].map((m) => m[1]),

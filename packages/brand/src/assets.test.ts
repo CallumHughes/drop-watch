@@ -38,6 +38,20 @@ describe("the generated paths match the assets they came from", () => {
   });
 });
 
+/**
+ * The app icons are a badge — the mark inside a filled square — so each one
+ * carries a copy of its path data. `brand:generate` rebuilds them from the same
+ * asset the components read, and this is what holds the two together.
+ */
+describe("the badges carry the mark", () => {
+  it.each(["badge", "badge-maskable", "icon-scheme"])("%s", (name) => {
+    const svg = read(name);
+    for (const d of MARK.paths) {
+      expect(svg).toContain(d);
+    }
+  });
+});
+
 describe("every asset is clean vector", () => {
   const files = readdirSync(ASSETS).filter((f) => f.endsWith(".svg"));
 

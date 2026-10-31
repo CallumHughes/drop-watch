@@ -3,9 +3,10 @@
 The product name, the logo artwork, and the script that turns a Canva export
 into both.
 
-`assets/*.svg` is canonical. Every PNG, ICO and `*.generated.ts` in the repo is
-derived from it — nothing downstream is hand-edited, so a tweak is always a
-re-export plus two commands.
+The three marks in `assets/` — `mark`, `wordmark-horizontal`, `wordmark-stacked`
+— are canonical, and `import` is the only thing that writes them. Everything
+else, the badges beside them included, is produced by `generate`: edit a mark,
+re-run that one command, and every derived file follows.
 
 ## The vocabulary
 
@@ -72,6 +73,9 @@ that could not scale.
 
 | Output | From |
 | --- | --- |
+| `assets/badge.svg`, `assets/icon-scheme.svg` | `mark.svg`, centred in a rounded square |
+| `assets/badge-maskable.svg` | `mark.svg`, smaller and full bleed |
+| `assets/wordmark-on-{light,dark}.svg` | `wordmark-horizontal.svg`, ink baked in |
 | `apps/web/src/app/favicon.ico` | `badge.svg` at 16, 32 and 48 |
 | `apps/web/src/app/icon.svg` | `icon-scheme.svg` |
 | `apps/web/src/app/apple-icon.png` | `badge.svg`, flattened — Apple composites transparency on black |
