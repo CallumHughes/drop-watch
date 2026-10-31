@@ -24,6 +24,7 @@ primitives:
       - apps/web/src/components/**
       - apps/web/src/lib/**
       - apps/web/src/utils/**
+      - apps/web/public/**
     depends_on: [api-router, auth, ui-kit, brand, env-config]
 
   - id: api-router
