@@ -19,8 +19,9 @@ fix(core): fall back to microdata when JSON-LD has no offer
 chore(deps): bump next from 16.4.0 to 16.4.3
 ```
 
-Scope is the workspace or primitive the change lands in. Don't add a
-`Co-Authored-By` trailer for Claude.
+Scope is the workspace or primitive the change lands in. A commit an agent
+wrote carries a `Co-Authored-By` trailer naming the exact model that wrote it,
+so the log says who is responsible for the work.
 
 Commit or push only when asked. Branch first if on `main`.
 
