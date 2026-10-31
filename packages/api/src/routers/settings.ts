@@ -11,6 +11,7 @@
  * immediately with nothing to restart — Postgres is the interface.
  */
 
+import { APP_NAME } from "@drop-watch/brand";
 import type { ChannelResult } from "@drop-watch/core/notify/channels";
 import { deliverAlert } from "@drop-watch/core/notify/channels";
 import { alertChannels } from "@drop-watch/core/notify/targets";
@@ -142,7 +143,7 @@ export const settingsRouter = {
         price: "55.44",
         productId: sample?.id ?? "00000000-0000-0000-0000-000000000000",
         rule: "test",
-        title: sample?.title ?? "DropWatch test",
+        title: sample?.title ?? `${APP_NAME} test`,
         url: sample?.url ?? "https://example.com/",
       },
     });

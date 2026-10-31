@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@drop-watch/brand": "workspace:*",
     "@drop-watch/core": "workspace:*",
     "@drop-watch/env": "workspace:*",
     "@react-email/components": "catalog:",

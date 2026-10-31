@@ -33,7 +33,10 @@
       "!**/wrangler.jsonc",
       "!**/.source",
       "!**/convex/_generated",
-      "!packages/ui/src/components"
+      "!packages/ui/src/components",
+      "!packages/brand/assets",
+      "!apps/web/src/app/icon.svg",
+      "!**/*.generated.ts"
     ]
   },
   "formatter": {

@@ -1,4 +1,6 @@
-# DropWatch
+<img src="packages/brand/assets/wordmark-horizontal.svg#gh-light-mode-only" alt="DropWatch" height="40">
+<img src="packages/brand/assets/wordmark-horizontal.svg#gh-dark-mode-only" alt="DropWatch" height="40">
+
 
 DropWatch keeps an eye on product pages and tells you if the price drops. You
 give it a URL, it checks the page on a schedule and records what it finds.

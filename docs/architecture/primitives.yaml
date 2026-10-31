@@ -24,7 +24,7 @@ primitives:
       - apps/web/src/components/**
       - apps/web/src/lib/**
       - apps/web/src/utils/**
-    depends_on: [api-router, auth, ui-kit, env-config]
+    depends_on: [api-router, auth, ui-kit, brand, env-config]
 
   - id: api-router
     group: surfaces
@@ -34,7 +34,7 @@ primitives:
       user-owned data.
     code:
       - packages/api/**
-    depends_on: [app-db, job-queue, auth, extractor, email, alert-rules]
+    depends_on: [app-db, job-queue, auth, extractor, email, alert-rules, brand]
 
   - id: worker-process
     group: surfaces
@@ -127,6 +127,7 @@ primitives:
       fail a check.
     code:
       - packages/core/src/notify/**
+    depends_on: [brand]
 
   - id: money
     group: domain
@@ -173,7 +174,7 @@ primitives:
     code:
       - packages/auth/**
       - packages/db/src/schema/auth.ts
-    depends_on: [app-db, email, env-config]
+    depends_on: [app-db, email, env-config, brand]
 
   - id: email
     group: platform
@@ -182,7 +183,7 @@ primitives:
       reset, change-email, watch-broken.
     code:
       - packages/email/**
-    depends_on: [env-config, money]
+    depends_on: [env-config, money, brand]
 
   - id: env-config
     group: platform
@@ -197,6 +198,12 @@ primitives:
     summary: shadcn/ui components and Tailwind theme shared by the dashboard.
     code:
       - packages/ui/**
+
+  - id: brand
+    group: platform
+    summary: The product name and the logo artwork, plus the script that cleans and renders them.
+    code:
+      - packages/brand/**
 
   - id: build-config
     group: platform
@@ -222,6 +229,7 @@ primitives:
       build (NEXT_DIST_DIR=.next-e2e) and its own database.
     code:
       - apps/e2e/**
+    depends_on: [brand]
 
 invariants:
   - id: per-user-isolation
