@@ -14,7 +14,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import pngToIco from "png-to-ico";
 import sharp from "sharp";
 import { optimize } from "svgo";
 
@@ -178,6 +177,35 @@ function crop(svg, box, pad) {
   return svg.replace(VIEW_BOX, `viewBox="${next.join(" ")}"`);
 }
 
+/**
+ * An .ico wrapping PNGs: a 6-byte header, one 16-byte directory entry each,
+ * then the images. Hand-rolled because the obvious package declares
+ * `@types/node` as a runtime dependency, which drags a second major of the
+ * Node types through every peer context in the lockfile.
+ */
+function icoFrom(pngs) {
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(pngs.length, 4);
+
+  let offset = header.length + pngs.length * 16;
+  const entries = pngs.map(({ data, size }) => {
+    const entry = Buffer.alloc(16);
+    // 0 means 256 in this field; nothing here is that large, but the encoding
+    // is the format's, not ours.
+    entry.writeUInt8(size % 256, 0);
+    entry.writeUInt8(size % 256, 1);
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
+    entry.writeUInt32LE(data.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    offset += data.length;
+    return entry;
+  });
+
+  return Buffer.concat([header, ...entries, ...pngs.map(({ data }) => data)]);
+}
+
 // --- badges --------------------------------------------------------------
 
 /**
@@ -310,7 +338,9 @@ async function runGenerate() {
   // favicon.ico carries the legacy sizes; icon.svg covers everything modern and
   // flips its own colours with prefers-color-scheme.
   const [ico, apple, i192, i512, maskablePng] = await Promise.all([
-    Promise.all([16, 32, 48].map((s) => square(badgeSvg, s))).then(pngToIco),
+    Promise.all(
+      [16, 32, 48].map(async (size) => ({ data: await square(badgeSvg, size), size }))
+    ).then(icoFrom),
     // Apple refuses transparency and composites on black, so flatten first.
     square(badgeSvg, 180).then((b) => sharp(b).flatten({ background: INK }).png().toBuffer()),
     square(badgeSvg, 192),
@@ -332,6 +362,15 @@ async function runGenerate() {
     .png()
     .toBuffer();
 
+  // An <img> cannot inherit currentColor, so Markdown and anything else that
+  // embeds the file rather than inlining it needs the ink baked in.
+  const baked = [
+    ["wordmark-on-light.svg", INK],
+    ["wordmark-on-dark.svg", PAPER],
+  ].map(([name, fill]) =>
+    writeFile(join(ASSETS, name), horizontal.replaceAll("currentColor", fill))
+  );
+
   const written = await Promise.all([
     emit("apps/web/src/app/favicon.ico", ico),
     emit("apps/web/src/app/icon.svg", Buffer.from(scheme)),
@@ -341,9 +380,11 @@ async function runGenerate() {
     emit("apps/web/public/icon-512.png", i512),
     emit("apps/web/public/icon-maskable-512.png", maskablePng),
   ]);
+  await Promise.all(baked);
   for (const line of written) {
     console.log(line);
   }
+  console.log("assets/wordmark-on-light.svg, assets/wordmark-on-dark.svg");
 
   const art = (svg) => ({
     paths: [...inner(svg).matchAll(PATH_DATA)].map((m) => m[1]),

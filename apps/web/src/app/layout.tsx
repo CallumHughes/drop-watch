@@ -20,9 +20,11 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "default", title: APP_NAME },
   applicationName: APP_NAME,
   description: APP_DESCRIPTION,
-  // Every install answers to a different address, so the one URL the app is
-  // already required to know is what makes the social-card URLs absolute.
-  metadataBase: new URL(env.BETTER_AUTH_URL),
+  // Optional because the build runs with SKIP_ENV_VALIDATION and no URL at
+  // all: `new URL(undefined)` there throws while Next collects page data.
+  // Read at module load, so the standalone server picks up the self-hoster's
+  // real address on boot; only prerendered HTML keeps a build-time value.
+  metadataBase: env.BETTER_AUTH_URL ? new URL(env.BETTER_AUTH_URL) : undefined,
   openGraph: {
     description: APP_DESCRIPTION,
     siteName: APP_NAME,

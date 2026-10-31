@@ -12,17 +12,18 @@
   "scripts": {
     "brand:generate": "node scripts/brand.mjs generate",
     "brand:import": "node scripts/brand.mjs import",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "png-to-ico": "^3.0.1",
     "react": "catalog:",
     "sharp": "^0.35.5",
     "svgo": "^4.0.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:"

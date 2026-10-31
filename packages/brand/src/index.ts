@@ -1,7 +1,7 @@
 /**
  * The product's identity, in one place.
  *
- * The name was previously typed out in seven files across five workspaces, so
+ * The name was previously typed out in nine files across five workspaces, so
  * every package that renders it — the dashboard, auth, the mailer, the webhook
  * payloads — reads it from here instead. The artwork beside it in `assets/` is
  * the other half: both are canonical, and nothing downstream redefines either.
