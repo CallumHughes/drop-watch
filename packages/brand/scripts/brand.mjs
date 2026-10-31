@@ -332,15 +332,6 @@ async function runGenerate() {
     .png()
     .toBuffer();
 
-  // Email clients block SVG and data URIs, so the templates get a raster sent
-  // as an inline CID attachment. 2x for retina; displayed at 180px.
-  const emailLogo = await sharp(Buffer.from(horizontal.replaceAll("currentColor", INK)), {
-    density: 384,
-  })
-    .resize(360, Math.round((vh / vw) * 360), { fit: "fill" })
-    .png()
-    .toBuffer();
-
   const written = await Promise.all([
     emit("apps/web/src/app/favicon.ico", ico),
     emit("apps/web/src/app/icon.svg", Buffer.from(scheme)),
@@ -349,7 +340,6 @@ async function runGenerate() {
     emit("apps/web/public/icon-192.png", i192),
     emit("apps/web/public/icon-512.png", i512),
     emit("apps/web/public/icon-maskable-512.png", maskablePng),
-    emit("packages/brand/assets/email-logo.png", emailLogo),
   ]);
   for (const line of written) {
     console.log(line);
@@ -362,30 +352,14 @@ async function runGenerate() {
   const entry = (name, value) =>
     `export const ${name} = {\n  paths: [\n${value.paths.map((d) => `    "${d}",`).join("\n")}\n  ],\n  viewBox: "${value.viewBox}",\n} as const;`;
 
-  await Promise.all([
-    module_("paths.generated.ts", [
-      entry("MARK", art(markSvg)),
-      "",
-      entry("WORDMARK_HORIZONTAL", art(horizontal)),
-      "",
-      entry("WORDMARK_STACKED", art(stacked)),
-    ]),
-    module_("email-logo.generated.ts", [
-      "/** The wordmark as a PNG, inlined so no runtime file read can miss it. */",
-      `export const EMAIL_LOGO_BASE64 = "${emailLogo.toString("base64")}";`,
-      "",
-      "/** Display width in CSS pixels — the image itself is twice this, for retina. */",
-      "export const EMAIL_LOGO_WIDTH = 180;",
-      "",
-      "/**",
-      " * The `cid:` the layout's image points at, and the id of the attachment that",
-      " * answers it. It lives here so a template can name it without importing the",
-      " * mailer, which would pull the Resend client into every render.",
-      " */",
-      'export const EMAIL_LOGO_CID = "dropwatch-logo";',
-    ]),
+  await module_("paths.generated.ts", [
+    entry("MARK", art(markSvg)),
+    "",
+    entry("WORDMARK_HORIZONTAL", art(horizontal)),
+    "",
+    entry("WORDMARK_STACKED", art(stacked)),
   ]);
-  console.log("src/paths.generated.ts, src/email-logo.generated.ts");
+  console.log("src/paths.generated.ts");
 }
 
 const [command, argument] = process.argv.slice(2);

@@ -21,7 +21,6 @@
  * "tried and failed".
  */
 
-import { EMAIL_LOGO_BASE64, EMAIL_LOGO_CID } from "@drop-watch/brand/email-logo";
 import { env } from "@drop-watch/env/email";
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
@@ -128,9 +127,6 @@ export async function sendEmail({ react, subject, to }: SendEmailInput): Promise
   try {
     const [html, text] = await Promise.all([render(react), render(react, { plainText: true })]);
     const { data, error } = await resendClient(key).emails.send({
-      attachments: [
-        { content: EMAIL_LOGO_BASE64, contentId: EMAIL_LOGO_CID, filename: "logo.png" },
-      ],
       from: emailFrom(),
       html,
       subject,

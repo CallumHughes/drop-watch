@@ -78,7 +78,6 @@ that could not scale.
 | `apps/web/src/app/opengraph-image.png` | `wordmark-horizontal.svg` on the dark ground |
 | `apps/web/public/icon-{192,512}.png` | `badge.svg` |
 | `apps/web/public/icon-maskable-512.png` | `badge-maskable.svg` |
-| `assets/email-logo.png` + `src/email-logo.generated.ts` | `wordmark-horizontal.svg` |
 | `src/paths.generated.ts` | all three marks, for the React components |
 
 ### Why the app icons are a badge
@@ -92,18 +91,6 @@ already draws around it.
 `icon.svg` carries a `prefers-color-scheme` rule and inverts itself, so the
 badge stays visible against both light and dark browser chrome. The raster icons
 cannot do that and are always dark-on-transparent.
-
-### Why the email logo is base64
-
-Email clients block SVG and `data:` URIs, so the templates need a PNG — and
-`APP_URL` is optional and usually a LAN address, so an `<img src>` pointing at
-the install would be a broken icon in any client outside the house. The mailer
-instead sends the PNG as an inline CID attachment, which works offline and in
-Gmail and Outlook alike.
-
-It ships as base64 in a generated module rather than as a file read at runtime,
-because neither Next's output tracing nor the worker's bundle would carry a path
-opened through `import.meta.url`.
 
 ## Using it
 

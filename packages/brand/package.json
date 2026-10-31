@@ -7,7 +7,6 @@
     ".": "./src/index.ts",
     "./assets/*": "./assets/*",
     "./components/*": "./src/components/*.tsx",
-    "./email-logo": "./src/email-logo.generated.ts",
     "./paths": "./src/paths.generated.ts"
   },
   "scripts": {

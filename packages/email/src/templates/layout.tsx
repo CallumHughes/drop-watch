@@ -27,7 +27,6 @@
 /** @jsxImportSource react */
 
 import { APP_NAME } from "@drop-watch/brand";
-import { EMAIL_LOGO_CID, EMAIL_LOGO_WIDTH } from "@drop-watch/brand/email-logo";
 import {
   Body,
   Container,
@@ -35,7 +34,6 @@ import {
   Heading,
   Hr,
   Html,
-  Img,
   Link,
   Preview,
   Section,
@@ -45,11 +43,6 @@ import type { CSSProperties, ReactNode } from "react";
 
 const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-
-const logoStyle: CSSProperties = {
-  display: "block",
-  marginBottom: "24px",
-};
 
 const bodyStyle: CSSProperties = {
   backgroundColor: "#f6f7f9",
@@ -175,12 +168,6 @@ export function EmailLayout({ children, heading, preview }: EmailLayoutProps) {
       <Preview>{preview}</Preview>
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
-          <Img
-            alt={APP_NAME}
-            src={`cid:${EMAIL_LOGO_CID}`}
-            style={logoStyle}
-            width={EMAIL_LOGO_WIDTH}
-          />
           <Heading style={headingStyle}>{heading}</Heading>
           <Section>{children}</Section>
           <Hr style={hrStyle} />
