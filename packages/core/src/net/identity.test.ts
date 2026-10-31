@@ -18,6 +18,34 @@ describe("timezoneForLocale", () => {
   ])("chooses a regional timezone for %s", (locale, expected) => {
     expect(timezoneForLocale(locale)).toBe(expected);
   });
+
+  // A region's zone list arrives alphabetically, so reading the first one picks
+  // `America/Adak` for the United States and an Antarctic research station for
+  // Australia — a browser claiming either is rarer than one claiming nothing.
+  it.each([
+    ["en-US", "America/New_York"],
+    ["es-US", "America/New_York"],
+    ["en-CA", "America/Toronto"],
+    ["en-AU", "Australia/Sydney"],
+    ["pt-BR", "America/Sao_Paulo"],
+    ["es-MX", "America/Mexico_City"],
+    ["es-ES", "Europe/Madrid"],
+    ["pt-PT", "Europe/Lisbon"],
+    ["ru-RU", "Europe/Moscow"],
+    ["zh-CN", "Asia/Shanghai"],
+  ])("picks where the shoppers are, not the alphabet, for %s", (locale, expected) => {
+    expect(timezoneForLocale(locale)).toBe(expected);
+  });
+
+  // Single-zone regions are unambiguous, so they are deliberately not listed.
+  it.each([
+    ["it-IT", "Europe/Rome"],
+    ["nl-NL", "Europe/Amsterdam"],
+    ["sv-SE", "Europe/Stockholm"],
+    ["ko-KR", "Asia/Seoul"],
+  ])("needs no entry for the single zone of %s", (locale, expected) => {
+    expect(timezoneForLocale(locale)).toBe(expected);
+  });
 });
 
 describe("headedUserAgent", () => {

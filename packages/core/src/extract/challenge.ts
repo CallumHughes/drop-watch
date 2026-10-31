@@ -27,11 +27,10 @@ interface ChallengeSignature {
 
 const SIGNATURES: readonly ChallengeSignature[] = [
   {
-    markers: [
-      "_Incapsula_Resource",
-      /<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/i,
-      "reeseSkipAutoLoad",
-    ],
+    // Deliberately not `_Incapsula_Resource`: that script is Imperva's sensor,
+    // which a protected site also serves on the pages it delivers normally, so
+    // matching it would name a block on a page that arrived intact.
+    markers: [/<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/i, "reeseSkipAutoLoad"],
     vendor: "Imperva",
   },
   { markers: ["bm-verify"], vendor: "Akamai" },

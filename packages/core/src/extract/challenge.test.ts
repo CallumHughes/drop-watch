@@ -55,6 +55,7 @@ describe("challengeVendor", () => {
     '<script src="/akam/13/5f7a1b2"></script><script src="akam-sw.js"></script>',
     '<script>window._abck="0~-1~-1";</script>',
     '<script src="/reese84"></script>',
+    '<script src="/_Incapsula_Resource?SWJIYLWA=719d34d31c8e3a6e6fffd425f7e032f3"></script>',
     '<script src="https://client.perimeterx.net/px.js"></script><!-- PerimeterX -->',
     '<img data-size_px="640">',
     "<p>Just a moment while we check stock near you.</p>",

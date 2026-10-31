@@ -10,6 +10,10 @@ const PREVIEW_RPC = "**/api/rpc/preview/page";
  */
 const CHECK_TIMEOUT_MS = 45_000;
 
+/** The named block first, the chain's own verdict kept behind it. */
+const BLOCK_BEFORE_NO_PRICE = /blocked this request[\s\S]*no price found \(tried:/;
+const BLOCK_BEFORE_STRATEGIES = /blocked this request[\s\S]*tried: jsonld/;
+
 /**
  * The journey this suite exists for: a shop that refuses a headless browser.
  *
@@ -62,10 +66,11 @@ test("a challenge interstitial is named, not reported as a page with no price", 
     await expect(addProduct.page.getByText("Imperva bot protection")).toBeVisible();
   });
 
-  // The whole point: the chain's own verdict is true and useless, and acting on
-  // it means writing a selector against markup that holds no product.
-  await test.step("it does not claim the page simply had no price", async () => {
-    await expect(addProduct.page.getByText("no price found")).not.toBeVisible();
+  // The chain's own verdict is true but useless on its own — acting on it means
+  // writing a selector against markup that holds no product — so it is kept as
+  // a diagnostic and the named block is what the reader meets first.
+  await test.step("the block is named ahead of the chain's own verdict", async () => {
+    await expect(addProduct.noAutoMatchNote).toContainText(BLOCK_BEFORE_NO_PRICE);
   });
 
   await test.step("the page cannot be tracked on a block", async () => {
@@ -153,11 +158,13 @@ test("a scheduled check names the block in the check log", async ({
   /**
    * The run's status stays `extract_failed` — "no price found" is its label,
    * and it is accurate, since a 200 carrying no product is exactly that. What
-   * had to change is the detail beside it: the extraction chain's own list of
-   * strategies it tried says nothing a reader can act on.
+   * had to change is the order of the detail beside it: the chain's own list of
+   * strategies says nothing a reader can act on, so it follows the named block
+   * rather than standing in for it. It is still recorded, because on a page
+   * mistaken for a challenge it is the only thing left to diagnose from.
    */
-  await test.step("it does not fall back to listing the strategies it tried", async () => {
-    await expect(productDetail.checkRunLog).not.toContainText("tried: jsonld");
+  await test.step("the strategies it tried follow the block rather than replacing it", async () => {
+    await expect(productDetail.checkRunLog).toContainText(BLOCK_BEFORE_STRATEGIES);
   });
 
   // This listing is in HTTP mode, so suggesting a browser is the useful advice;

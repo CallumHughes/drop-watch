@@ -36,8 +36,40 @@ export const DEFAULT_LOCALE = "en-GB";
 export const DEFAULT_TIMEZONE = "Europe/London";
 
 /**
+ * Where a region's shoppers actually are, for the regions a locale cannot
+ * narrow on its own. `getTimeZones()` lists a region's zones alphabetically,
+ * which for a multi-zone country picks somewhere nobody lives: `en-US` would
+ * claim `America/Adak` and `en-AU` an Antarctic research station — a louder
+ * tell than the single default this exists to replace. Only regions with
+ * several zones need an entry, plus the two whose first zone is a legacy alias.
+ */
+const REGION_TIMEZONES: Readonly<Record<string, string>> = {
+  AR: "America/Argentina/Buenos_Aires",
+  AU: "Australia/Sydney",
+  BR: "America/Sao_Paulo",
+  CA: "America/Toronto",
+  CL: "America/Santiago",
+  CN: "Asia/Shanghai",
+  DE: "Europe/Berlin",
+  ES: "Europe/Madrid",
+  ID: "Asia/Jakarta",
+  IN: "Asia/Kolkata",
+  MX: "America/Mexico_City",
+  MY: "Asia/Kuala_Lumpur",
+  NZ: "Pacific/Auckland",
+  PT: "Europe/Lisbon",
+  RU: "Europe/Moscow",
+  UA: "Europe/Kyiv",
+  US: "America/New_York",
+  VN: "Asia/Ho_Chi_Minh",
+};
+
+/**
  * Choose a stable representative of the locale's region, not the host's zone.
- * A locale cannot identify a city in a region with multiple timezones.
+ * A locale cannot identify a city, so a region holding several zones is read
+ * from {@link REGION_TIMEZONES}; one holding exactly a single zone needs no
+ * entry, and anything we cannot place keeps {@link DEFAULT_TIMEZONE} rather
+ * than guessing.
  */
 export function timezoneForLocale(locale: string = DEFAULT_LOCALE): string {
   try {
@@ -45,7 +77,12 @@ export function timezoneForLocale(locale: string = DEFAULT_LOCALE): string {
     const regional = new Intl.Locale(locale).maximize() as Intl.Locale & {
       getTimeZones: () => string[] | undefined;
     };
-    return regional.getTimeZones()?.[0] ?? DEFAULT_TIMEZONE;
+    const mapped = regional.region ? REGION_TIMEZONES[regional.region] : undefined;
+    if (mapped) {
+      return mapped;
+    }
+    const zones = regional.getTimeZones();
+    return zones?.length === 1 ? (zones[0] ?? DEFAULT_TIMEZONE) : DEFAULT_TIMEZONE;
   } catch {
     return DEFAULT_TIMEZONE;
   }

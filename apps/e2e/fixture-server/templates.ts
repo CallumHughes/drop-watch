@@ -416,7 +416,7 @@ function impervaInterstitial(): string {
 <head>
   <meta charset="utf-8" />
   <noscript><title>Pardon Our Interruption</title></noscript>
-  <script>window.reeseSkipExpirationCheck = true;</script>
+  <script>window.reeseSkipAutoLoad = true;</script>
   <script src="/_Incapsula_Resource?SWJIYLWA=719d34d31c8e3a6e6fffd425f7e032f3"></script>
 </head>
 <body>
