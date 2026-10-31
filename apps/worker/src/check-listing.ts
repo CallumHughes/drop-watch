@@ -320,7 +320,7 @@ async function runCheck(listingId: string, source: CheckSource): Promise<void> {
   const extraction = extractFrom(listing, fetched);
   const extractedCurrency = extraction?.ok ? extraction.currency : undefined;
   const currency = extractedCurrency ?? listing.currency ?? null;
-  const outcome = toCheckOutcome(fetched, extraction, currency);
+  const outcome = toCheckOutcome(fetched, extraction, currency, listing);
 
   const scheduledFor = nextCheckAt(new Date(), listing.intervalMinutes, listing.jitterPercent);
   const write =

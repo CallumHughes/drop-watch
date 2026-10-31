@@ -1,5 +1,5 @@
 import type { ExtractionResult } from "@drop-watch/core/extract";
-import { extract } from "@drop-watch/core/extract";
+import { extract, testExpression } from "@drop-watch/core/extract";
 import type { FetchPageResult } from "@drop-watch/core/fetch";
 import { describe, expect, it } from "vitest";
 import { toCheckOutcome } from "./outcome";
@@ -22,6 +22,79 @@ const okExtraction: ExtractionResult = {
 };
 
 describe("toCheckOutcome", () => {
+  // An interstitial answers 200 with no product on it, so the chain's verdict
+  // ("no price found") is true and sends the reader off to write a selector
+  // against a page that has none.
+  it("names the protection vendor and preserves extraction diagnostics", () => {
+    const interstitial: FetchPageResult = {
+      body: '<html><head><title>Pardon Our Interruption</title><script src="/_Incapsula_Resource"></script></head></html>',
+      durationMs: 90,
+      httpStatus: 200,
+      status: "ok",
+      url: "https://www.boots.com/p/10332063",
+    };
+    const extraction = extract(interstitial.body);
+    const outcome = toCheckOutcome(interstitial, extraction, null);
+
+    expect(outcome.status).toBe("extract_failed");
+    expect(outcome.error).toContain(
+      "boots.com blocked this request (Imperva bot protection). A saved selector will not help: it would match the interstitial, not the product."
+    );
+    expect(extraction.ok).toBe(false);
+    if (!extraction.ok) {
+      expect(outcome.error).toBe(
+        `boots.com blocked this request (Imperva bot protection). A saved selector will not help: it would match the interstitial, not the product. ${extraction.error}`
+      );
+    }
+  });
+
+  it("preserves a normal extraction failure when a vendor script accompanies a usable price", () => {
+    const body =
+      '<script src="https://js.datadome.co/tags.js"></script><span class="custom-cost">£21.50</span>';
+    const extraction = extract(body);
+    const outcome = toCheckOutcome({ ...okFetch, body }, extraction, null);
+
+    expect(extraction.ok).toBe(false);
+    if (!extraction.ok) {
+      expect(outcome.error).toBe(extraction.error);
+    }
+    expect(outcome.error).not.toContain("blocked");
+    expect(
+      testExpression(body, { expression: ".custom-cost", mode: "selector" }).result
+    ).toMatchObject({
+      ok: true,
+      price: "21.50",
+    });
+  });
+
+  it('explains a bodiless 403 instead of recording "HTTP 403"', () => {
+    const forbidden: FetchPageResult = {
+      durationMs: 40,
+      error: "HTTP 403",
+      httpStatus: 403,
+      status: "http_error",
+    };
+    const outcome = toCheckOutcome(forbidden, null, null, {
+      render: "http",
+      url: "https://www.superdrug.com/p/814543",
+    });
+
+    expect(outcome.status).toBe("http_error");
+    expect(outcome.error).toContain("superdrug.com blocked this request");
+  });
+
+  it("leaves an ordinary HTTP error's own message alone", () => {
+    const notFound: FetchPageResult = {
+      durationMs: 40,
+      error: "HTTP 404 Not Found",
+      httpStatus: 404,
+      status: "http_error",
+    };
+    expect(
+      toCheckOutcome(notFound, null, null, { render: "http", url: "https://store.test/p/1" }).error
+    ).toBe("HTTP 404 Not Found");
+  });
+
   it("records a price point when a price and currency were found", () => {
     expect(toCheckOutcome(okFetch, okExtraction, "GBP")).toEqual({
       extractorUsed: "jsonld",

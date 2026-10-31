@@ -68,6 +68,11 @@ function TransportReload({ reload }: { reload: NonNullable<PreviewFlowState["tra
           restart to enable it.
         </p>
       ) : null}
+      {reload.alreadyFailed ? (
+        <p className="text-muted-foreground text-xs" role="status">
+          This preview already tried a browser and it failed: {reload.alreadyFailed}
+        </p>
+      ) : null}
       {reload.isPending ? (
         <p className="text-muted-foreground text-xs" role="status">
           {targetsBrowser
