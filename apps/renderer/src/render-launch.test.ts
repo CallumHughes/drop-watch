@@ -36,8 +36,10 @@ it("keeps a slow cold launch usable when identity detection needs its fallback",
     }),
     route: async () => undefined,
   };
+  const send = vi.fn(async () => undefined);
   const renderContext = {
     close: vi.fn(async () => undefined),
+    newCDPSession: async () => ({ send }),
     newPage: async () => ({
       content: async () => "<p>Product</p>",
       goto: async () => ({ ok: () => true, status: () => 200 }),
@@ -51,6 +53,7 @@ it("keeps a slow cold launch usable when identity detection needs its fallback",
   const browser = {
     isConnected: () => true,
     newContext: vi.fn().mockResolvedValueOnce(probeContext).mockResolvedValue(renderContext),
+    version: () => "156.0.8078.4",
   };
   mocks.launchServer.mockImplementation(async () => {
     await new Promise((resolve) => setTimeout(resolve, 9990));
@@ -69,6 +72,21 @@ it("keeps a slow cold launch usable when identity detection needs its fallback",
 
   expect(await pending).toMatchObject({ result: { status: "ok" } });
   expect(browserStatus()).toBe("connected");
+  // The probe never answered, so the brand list is composed rather than read —
+  // but it is still sent. Skipping it would leave Chromium announcing
+  // `HeadlessChrome` in `Sec-CH-UA` behind a user agent claiming otherwise.
+  expect(send).toHaveBeenCalledWith(
+    "Emulation.setUserAgentOverride",
+    expect.objectContaining({
+      userAgentMetadata: expect.objectContaining({
+        brands: [
+          { brand: "Chromium", version: "156" },
+          { brand: "Google Chrome", version: "156" },
+        ],
+        platform: "macOS",
+      }),
+    })
+  );
   expect(server.close).not.toHaveBeenCalled();
   expect(server.kill).not.toHaveBeenCalled();
   expect(renderContext.close).toHaveBeenCalledOnce();

@@ -18,11 +18,15 @@
  * Imperva refuses on the first request, before any page JavaScript runs.
  *
  * Keep this roughly current. A UA several major versions behind the Chromium
- * actually making the request is itself a signal, so it is worth bumping
- * whenever the pinned Playwright version moves.
+ * actually making the request is itself a signal, and the plain-HTTP path sends
+ * this string on every fetch, so it is worth bumping whenever the pinned
+ * Playwright version moves. `apps/renderer/src/identity-freshness.test.ts`
+ * fails once it falls more than a major behind the Chromium Playwright ships —
+ * the renderer owns that check, because this package must not import
+ * Playwright.
  */
 export const DEFAULT_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36";
 
 export const DEFAULT_ACCEPT_LANGUAGE = "en-GB,en;q=0.9";
 
@@ -95,7 +99,10 @@ const HEADLESS_BRAND = "HeadlessChrome";
  * What a headless build's `HeadlessChrome` entry becomes. Real Chrome brands
  * itself this way; our UA already claims `Chrome`, so the two agree.
  */
-const HEADED_BRAND = "Google Chrome";
+export const HEADED_BRAND = "Google Chrome";
+
+/** The other brand real Chrome lists, and the one the headless build keeps. */
+export const CHROMIUM_BRAND = "Chromium";
 
 /**
  * Playwright's headless Chromium reports `HeadlessChrome/<version>`. Swapping
@@ -132,4 +139,45 @@ export function headedBrands(brands: readonly UserAgentBrand[]): UserAgentBrand[
     brand: brand === HEADLESS_BRAND ? HEADED_BRAND : brand,
     version,
   }));
+}
+
+/**
+ * The brands real Chrome advertises at `version`, for when the browser could
+ * not be asked for its own list.
+ *
+ * Second best to {@link headedBrands}, and only because the alternative is
+ * worse: sending no brand list at all leaves Chromium announcing
+ * `"HeadlessChrome"` in `Sec-CH-UA` behind a user agent that claims otherwise,
+ * which is a plainer contradiction than a brand list missing its GREASE entry.
+ * That entry is deliberately absent — Chromium varies it per build, so there is
+ * nothing to copy and inventing one would be a guess about a value a real
+ * browser never repeats.
+ */
+export function headedBrandsFromVersion(version: string): UserAgentBrand[] {
+  const major = version.split(".")[0] ?? version;
+  return [
+    { brand: CHROMIUM_BRAND, version: major },
+    { brand: HEADED_BRAND, version: major },
+  ];
+}
+
+/**
+ * What `Sec-CH-UA-Platform` has to say for a given user agent, read from the UA
+ * itself so the pair cannot disagree. Chromium's own spelling of each name.
+ */
+const UA_PLATFORMS: readonly (readonly [RegExp, string])[] = [
+  [/Windows/, "Windows"],
+  [/Macintosh|Mac OS X/, "macOS"],
+  [/CrOS/, "Chrome OS"],
+  [/Android/, "Android"],
+];
+
+/** Chromium's platform name for `userAgent`; Linux is its own fallback too. */
+export function platformForUserAgent(userAgent: string): string {
+  for (const [pattern, platform] of UA_PLATFORMS) {
+    if (pattern.test(userAgent)) {
+      return platform;
+    }
+  }
+  return "Linux";
 }

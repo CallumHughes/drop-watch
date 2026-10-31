@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_USER_AGENT, headedBrands, headedUserAgent, timezoneForLocale } from "./identity";
+import {
+  DEFAULT_USER_AGENT,
+  headedBrands,
+  headedBrandsFromVersion,
+  headedUserAgent,
+  platformForUserAgent,
+  timezoneForLocale,
+} from "./identity";
 
 const PLAIN_CHROME_SUFFIX = / Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/;
 
@@ -117,5 +124,54 @@ describe("headedBrands", () => {
 
   it("copes with an empty list", () => {
     expect(headedBrands([])).toEqual([]);
+  });
+});
+
+describe("headedBrandsFromVersion", () => {
+  // Only reached when the browser could not be asked, and the alternative is
+  // sending no brand list at all — which leaves `Sec-CH-UA` announcing
+  // `HeadlessChrome` behind a user agent that claims otherwise.
+  it("brands a full build string as real Chrome does, by major", () => {
+    expect(headedBrandsFromVersion("156.0.8078.4")).toEqual([
+      { brand: "Chromium", version: "156" },
+      { brand: "Google Chrome", version: "156" },
+    ]);
+  });
+
+  it("never claims a headless build", () => {
+    for (const { brand } of headedBrandsFromVersion("156.0.8078.4")) {
+      expect(brand).not.toContain("Headless");
+    }
+  });
+
+  // No GREASE entry on purpose: Chromium varies it per build, so there is
+  // nothing to copy and a guess is a value no real browser repeats.
+  it("omits the GREASE brand rather than inventing one", () => {
+    expect(headedBrandsFromVersion("156.0.8078.4")).toHaveLength(2);
+  });
+
+  it("falls back to the whole string when there is no dot to split on", () => {
+    expect(headedBrandsFromVersion("156")).toEqual([
+      { brand: "Chromium", version: "156" },
+      { brand: "Google Chrome", version: "156" },
+    ]);
+  });
+});
+
+describe("platformForUserAgent", () => {
+  // Read from the user agent rather than from the host, so the pair cannot
+  // disagree: a macOS UA beside `Sec-CH-UA-Platform: Linux` is its own tell.
+  it.each([
+    [DEFAULT_USER_AGENT, "macOS"],
+    ["Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/156.0.0.0", "Linux"],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/156.0.0.0", "Windows"],
+    ["Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 Chrome/156.0.0.0", "Chrome OS"],
+    ["Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/156.0.0.0", "Android"],
+  ])("reads the platform out of %s", (userAgent, expected) => {
+    expect(platformForUserAgent(userAgent)).toBe(expected);
+  });
+
+  it("answers Linux for a user agent that names no platform at all", () => {
+    expect(platformForUserAgent("DropWatch/1.0 (test)")).toBe("Linux");
   });
 });

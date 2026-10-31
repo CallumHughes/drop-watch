@@ -33,6 +33,10 @@ const SIGNATURES: readonly ChallengeSignature[] = [
     markers: [/<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/i, "reeseSkipAutoLoad"],
     vendor: "Imperva",
   },
+  // The broadest marker left, and a bare substring. It names the field Bot
+  // Manager's challenge form posts back, which a delivered product page has no
+  // reason to carry — but if one ever does, narrow this toward the challenge
+  // path the way Cloudflare's was, rather than widening the scan.
   { markers: ["bm-verify"], vendor: "Akamai" },
   {
     markers: [

@@ -16,10 +16,14 @@
 import { checkUrlScheme } from "@drop-watch/core/net/guard";
 import type { UserAgentBrand } from "@drop-watch/core/net/identity";
 import {
+  CHROMIUM_BRAND,
   DEFAULT_LOCALE,
   DEFAULT_USER_AGENT,
+  HEADED_BRAND,
   headedBrands,
+  headedBrandsFromVersion,
   headedUserAgent,
+  platformForUserAgent,
   timezoneForLocale,
 } from "@drop-watch/core/net/identity";
 import type { RenderRequest, RenderResponse } from "@drop-watch/core/render/contract";
@@ -75,12 +79,14 @@ const CONTEXT_SETUP_TIMEOUT_MS = 5000;
 /**
  * What this browser should claim to be, read from the browser itself.
  *
- * `metadata` is `null` when the probe could not read the client hints, in which
- * case only the user agent is overridden — a partial identity is still a large
- * improvement on announcing `HeadlessChrome`.
+ * `metadata` is never absent, deliberately. Overriding the user agent alone
+ * leaves Chromium announcing `"HeadlessChrome"` in `Sec-CH-UA` — the header
+ * Superdrug gated on — behind a user agent claiming to be an ordinary Chrome,
+ * which is a worse pair than either half alone. When the probe cannot be read,
+ * {@link fallbackIdentity} composes a list rather than sending none.
  */
 interface BrowserIdentity {
-  metadata: UserAgentMetadata | null;
+  metadata: UserAgentMetadata;
   userAgent: string;
 }
 
@@ -142,6 +148,41 @@ interface ProbedIdentity {
  */
 const IDENTITY_PROBE_URL = "http://localhost/__identity-probe";
 
+/** The version of the Chrome-ish brand in a list, which carries the real build. */
+function chromeVersion(brands: readonly UserAgentBrand[]): string | null {
+  const chrome = brands.find(({ brand }) => brand === HEADED_BRAND || brand === CHROMIUM_BRAND);
+  return chrome?.version ?? null;
+}
+
+/**
+ * An identity for when the probe could not be read: this browser's real version
+ * behind the brands Chrome would advertise for it, and a platform taken from
+ * the user agent we are about to send so the two agree.
+ *
+ * The high-entropy fields stay empty rather than invented. A site only receives
+ * them after asking for them with `Accept-CH`, and a wrong architecture is
+ * worse than an absent one; `Sec-CH-UA` itself goes out on the first request,
+ * unasked, which is why the brand list is the part worth composing.
+ */
+function fallbackIdentity(userAgent: string, version: string): BrowserIdentity {
+  const brands = headedBrandsFromVersion(version);
+  return {
+    metadata: {
+      architecture: "",
+      bitness: "",
+      brands,
+      fullVersion: version,
+      fullVersionList: brands.map(({ brand }) => ({ brand, version })),
+      mobile: false,
+      model: "",
+      platform: platformForUserAgent(userAgent),
+      platformVersion: "",
+      wow64: false,
+    },
+    userAgent,
+  };
+}
+
 /**
  * Reads what this Chromium says about itself and removes the headless marker,
  * rather than sending hardcoded values: the versions then still match the
@@ -189,7 +230,7 @@ async function detectIdentity(browser: Browser): Promise<BrowserIdentity> {
 
     if (!probed) {
       const reported = await page.evaluate(() => navigator.userAgent);
-      return { metadata: null, userAgent: headedUserAgent(reported) ?? reported };
+      return fallbackIdentity(headedUserAgent(reported) ?? reported, browser.version());
     }
 
     const fullVersionList = headedBrands(probed.fullVersionList);
@@ -198,7 +239,10 @@ async function detectIdentity(browser: Browser): Promise<BrowserIdentity> {
         architecture: probed.architecture,
         bitness: probed.bitness,
         brands: headedBrands(probed.brands),
-        fullVersion: browser.version(),
+        // The browser's own Chrome entry rather than `browser.version()`: the
+        // two are normally the same build, and when they are not,
+        // `Sec-CH-UA-Full-Version` would contradict the list beside it.
+        fullVersion: chromeVersion(fullVersionList) ?? browser.version(),
         fullVersionList,
         mobile: false,
         model: probed.model,
@@ -243,7 +287,17 @@ async function launchBrowser(): Promise<ManagedBrowser> {
       detectIdentity(browser),
       IDENTITY_PROBE_TIMEOUT_MS,
       "browser identity detection"
-    ).catch(() => ({ metadata: null, userAgent: DEFAULT_USER_AGENT }));
+    ).catch((error: unknown) => {
+      // Worth a warning rather than a silent degrade: this browser now claims
+      // a version and platform it was never asked about, which is the one part
+      // of the identity nothing downstream can check.
+      const reason = error instanceof Error ? error.message : String(error);
+      log.warn(
+        "renderer",
+        `identity probe failed, composing an identity from the browser version: ${reason}`
+      );
+      return fallbackIdentity(DEFAULT_USER_AGENT, browser.version());
+    });
     return { browser, identity, server };
   } catch (error) {
     if (server) {
@@ -371,16 +425,15 @@ async function installAddressGuard(context: BrowserContext, state: GuardState): 
  * Chromium derives `Sec-CH-UA` from its own brand list, so overriding only the
  * user agent leaves a headless build announcing `"HeadlessChrome"` in a header
  * bot protection reads. CDP is the only way to replace it, and the metadata is
- * this browser's own with one entry renamed — see `detectIdentity`.
+ * this browser's own with one entry renamed — see `detectIdentity`, or
+ * `fallbackIdentity` for the composed list used when the probe said nothing.
+ * There is no path that skips this: the header is the whole point.
  */
 async function applyClientHints(
   context: BrowserContext,
   page: Page,
   identity: BrowserIdentity
 ): Promise<void> {
-  if (!identity.metadata) {
-    return;
-  }
   // Deliberately not detached: the override lives on the session, and
   // detaching reverts it, so the header would go back to announcing
   // `HeadlessChrome`. The session is torn down with its context in `finally`.
@@ -448,7 +501,7 @@ async function preparePage(
     // it. Skipped when the caller supplied its own user agent: our brand list
     // describes this Chromium, and pairing it with someone else's user agent
     // would be the contradiction it exists to avoid.
-    if (!request.userAgent && acquired.handle.identity.metadata) {
+    if (!request.userAgent) {
       await withDeadline(
         applyClientHints(context, page, acquired.handle.identity),
         CONTEXT_SETUP_TIMEOUT_MS,
