@@ -10,11 +10,13 @@
  */
 
 import type { ExtractionEvidence, ExtractionResult } from "@drop-watch/core/extract";
+import { challengeReason } from "@drop-watch/core/extract/challenge";
 import { isAmbiguousExtraction } from "@drop-watch/core/extract/evidence";
 import type { RetrieveResult } from "@drop-watch/core/render";
-import type { checkRunStatus, ExtractorUsed } from "@drop-watch/db/schema/products";
+import type { checkRunStatus, ExtractorUsed, renderMode } from "@drop-watch/db/schema/products";
 
 export type CheckRunStatus = (typeof checkRunStatus.enumValues)[number];
+type RenderMode = (typeof renderMode.enumValues)[number];
 
 export interface CheckOutcome {
   error?: string;
@@ -46,11 +48,15 @@ function ambiguousError(extraction: Extract<ExtractionResult, { ok: true }>): st
  *   the product's configured fallback. `null` when neither supplied one, which
  *   is an extraction failure rather than a reason to invent a currency: a bare
  *   number with no unit is not a price.
+ * @param listing - the transport and URL this check used, for naming the host
+ *   and giving the right advice in a bot-protection message. Only that message
+ *   reads it, so it is optional.
  */
 export function toCheckOutcome(
   fetched: RetrieveResult,
   extraction: ExtractionResult | null,
-  currency: string | null
+  currency: string | null,
+  listing: { render?: RenderMode; url?: string } = {}
 ): CheckOutcome {
   switch (fetched.status) {
     // A 304 means the page has not changed since our last successful fetch.
@@ -58,9 +64,16 @@ export function toCheckOutcome(
     // deliberately not its own status, or Epic 7 would alarm on a fine product.
     case "not_modified":
       return { httpStatus: fetched.httpStatus, recordPricePoint: false, status: "ok" };
+    // A 403 from a bot-protection vendor is still an `http_error`, but "HTTP
+    // 403" alone says nothing about what to do next.
     case "http_error":
       return {
-        error: fetched.error,
+        error:
+          challengeReason("", {
+            httpStatus: fetched.httpStatus,
+            transport: listing.render,
+            url: listing.url,
+          }) ?? fetched.error,
         httpStatus: fetched.httpStatus,
         recordPricePoint: false,
         status: "http_error",
@@ -86,8 +99,14 @@ export function toCheckOutcome(
   }
 
   if (!extraction.ok) {
+    // Keep the extraction details even when the body looks like a challenge.
+    const challenge = challengeReason(fetched.body, {
+      httpStatus: fetched.httpStatus,
+      transport: listing.render,
+      url: fetched.url,
+    });
     return {
-      error: extraction.error,
+      error: challenge ? `${challenge} ${extraction.error}` : extraction.error,
       httpStatus: fetched.httpStatus,
       recordPricePoint: false,
       status: "extract_failed",

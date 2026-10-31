@@ -73,6 +73,16 @@ primitives:
       - packages/core/src/render/**
     depends_on: [outbound-network-guard]
 
+  - id: browser-identity
+    group: domain
+    summary: >
+      What both transports claim to be — user agent, client-hint brands, locale
+      and timezone. Shared so plain HTTP and the browser cannot present two
+      different identities for one listing, and so the renderer stops
+      announcing itself as headless, which CDNs refuse outright.
+    code:
+      - packages/core/src/net/identity.ts
+
   - id: outbound-network-guard
     group: domain
     summary: >
@@ -86,7 +96,10 @@ primitives:
   - id: extractor
     group: domain
     summary: >
-      Price and availability extraction. The automatic chain runs JSON-LD,
+      Price and availability extraction, and recognising a page that holds no
+      product to extract from — a bot-protection interstitial answers 200 and
+      would otherwise read as a product page with no price. The automatic chain
+      runs JSON-LD,
       microdata and OpenGraph in precedence order; a listing may instead be
       pinned to one expression strategy — a CSS selector (optionally reading an
       attribute with `::attr(name)`) or a JSONPath over the page's embedded JSON.

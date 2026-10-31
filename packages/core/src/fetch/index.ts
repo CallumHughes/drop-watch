@@ -5,23 +5,23 @@
  * hostname), realistic browser headers, conditional requests via
  * ETag/If-Modified-Since, exponential backoff on 429 and 5xx, and a ~20s cap.
  *
- * At personal-tracking volume this is invisible to target sites. Sites with
- * active bot protection (Amazon in particular) are treated as unsupported —
- * we do not escalate against them.
+ * At personal-tracking volume this is invisible to target sites. We present as
+ * an ordinary Chrome (see `../net/identity`) rather than announcing automation,
+ * which is enough for most CDNs; we do not solve CAPTCHAs, rotate identities or
+ * route through proxy pools, so a site that still refuses us stays unsupported.
+ * Several do — `../extract/challenge` names them instead of reporting the
+ * challenge page as a product page with no price.
  */
 
 import PQueue from "p-queue";
 import { Agent, buildConnector, fetch as undiciFetch } from "undici";
 import { BlockedAddressError, checkLiteralHost, checkUrlScheme, guardedLookup } from "../net/guard";
+import { DEFAULT_ACCEPT_LANGUAGE, DEFAULT_USER_AGENT } from "../net/identity";
 
 const LEADING_WWW = /^www\./;
 
-/** Chrome on macOS. Sending a real UA is what keeps most CDNs from 403ing us. */
-const DEFAULT_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 const DEFAULT_ACCEPT =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
-const DEFAULT_ACCEPT_LANGUAGE = "en-GB,en;q=0.9";
 /**
  * Set explicitly so we never advertise an encoding we cannot decode. undici's
  * own default includes `zstd`, whose decompressor only exists on Node 23+ —

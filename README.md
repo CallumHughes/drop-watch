@@ -150,10 +150,14 @@ changed in the UI takes effect on the next check without restarting anything.
 
 ## Known limitations
 
-- **Sites with active bot protection are unsupported**, Amazon in particular. The
-  fetch layer is deliberately polite — a realistic user agent and conditional
-  requests, but no escalation beyond that. If a shop is determined to block
-  scripted access, DropWatch will not fight it.
+- **Some sites with active bot protection are unsupported**, Amazon in
+  particular. Both transports present as an ordinary Chrome and neither
+  announces automation, which is enough for most CDNs: Imperva-protected shops
+  such as Boots, Superdrug and Screwfix work in browser mode. Beyond that there
+  is no escalation — no CAPTCHA solving, no identity rotation, no proxy pools —
+  and a shop determined to block scripted access will still win. Where one
+  does, the preview and the check log name the protection vendor instead of
+  reporting a page with no price.
 - **One `web` replica.** The add-product preview caches its result in memory
   per process, so behind a load balancer the selector picker would test against
   a page a different replica holds.

@@ -6,6 +6,8 @@ const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
 const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/;
 const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/;
 const AUTOMATIC_REPAIR_PATTERN = /automatic price is ambiguous/;
+/** The panel's line when a browser attempt in this same preview already failed. */
+const BROWSER_ALREADY_FAILED_PATTERN = /already tried a browser and it failed/;
 
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {
@@ -24,6 +26,11 @@ export class AddProductPage {
   readonly automaticRepairWarning: Locator;
   /** Provenance displayed when the successful preview came from the renderer sidecar. */
   readonly browserRenderProvenance: Locator;
+  /**
+   * Shown instead of a pointless second render: automatic mode escalated to the
+   * browser itself, that attempt failed, and the reason is reported here.
+   */
+  readonly browserAlreadyFailedNote: Locator;
   readonly selectorInput: Locator;
   readonly jsonPathInput: Locator;
   readonly trackButton: Locator;
@@ -44,6 +51,7 @@ export class AddProductPage {
     this.noAutoMatchNote = page.getByText(NO_AUTO_MATCH_PATTERN);
     this.automaticRepairWarning = page.getByText(AUTOMATIC_REPAIR_PATTERN);
     this.browserRenderProvenance = page.getByText("rendered in a browser");
+    this.browserAlreadyFailedNote = page.getByText(BROWSER_ALREADY_FAILED_PATTERN);
     this.selectorInput = page.getByLabel("CSS selector for the price");
     this.jsonPathInput = page.getByLabel("JSONPath for the price");
     this.trackButton = page.getByRole("button", { name: "Track this product" });

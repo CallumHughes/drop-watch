@@ -1,14 +1,31 @@
 /**
  * The one file in this package allowed to import Playwright.
  *
- * Scope, matching `packages/core/src/fetch/index.ts`: sites with active bot
- * protection are unsupported and we do not escalate against them. This exists
- * for pages that build their own DOM in JavaScript, not for pages that don't
- * want us — no `playwright-extra`, no stealth plugins, no fingerprint
- * spoofing, no UA games beyond Chromium's default, no CAPTCHA anything.
+ * Scope, matching `packages/core/src/fetch/index.ts`: this exists for pages
+ * that build their own DOM in JavaScript. It presents as an ordinary Chrome and
+ * does not advertise automation — Chromium's own `HeadlessChrome` user agent is
+ * refused outright by Imperva on the first request, before any page JavaScript
+ * runs, and the `--enable-automation` tells stop a challenge script issuing its
+ * cookie even once the user agent passes. Beyond that there is no escalation:
+ * no `playwright-extra`, no stealth plugins, no canvas or WebGL spoofing, no
+ * identity rotation, no proxy pools, no CAPTCHA anything. Sites that still
+ * refuse us stay unsupported, and `@drop-watch/core/extract/challenge` names
+ * them rather than letting a challenge page pass for a product page.
  */
 
 import { checkUrlScheme } from "@drop-watch/core/net/guard";
+import type { UserAgentBrand } from "@drop-watch/core/net/identity";
+import {
+  CHROMIUM_BRAND,
+  DEFAULT_LOCALE,
+  DEFAULT_USER_AGENT,
+  HEADED_BRAND,
+  headedBrands,
+  headedBrandsFromVersion,
+  headedUserAgent,
+  platformForUserAgent,
+  timezoneForLocale,
+} from "@drop-watch/core/net/identity";
 import type { RenderRequest, RenderResponse } from "@drop-watch/core/render/contract";
 import {
   DEFAULT_RENDER_MAX_BYTES,
@@ -55,11 +72,189 @@ const BROWSER_SERVER_LAUNCH_TIMEOUT_MS = 10_000;
 const BROWSER_CLOSE_TIMEOUT_MS = 2000;
 const BROWSER_KILL_TIMEOUT_MS = 2000;
 const BROWSER_CONNECT_TIMEOUT_MS = 3000;
+// Leave a second of slack inside the 15s launch budget after server + connect.
+const IDENTITY_PROBE_TIMEOUT_MS = 1000;
 const CONTEXT_SETUP_TIMEOUT_MS = 5000;
+
+/**
+ * What this browser should claim to be, read from the browser itself.
+ *
+ * `metadata` is never absent, deliberately. Overriding the user agent alone
+ * leaves Chromium announcing `"HeadlessChrome"` in `Sec-CH-UA` — the header
+ * Superdrug gated on — behind a user agent claiming to be an ordinary Chrome,
+ * which is a worse pair than either half alone. When the probe cannot be read,
+ * {@link fallbackIdentity} composes a list rather than sending none.
+ */
+interface BrowserIdentity {
+  metadata: UserAgentMetadata;
+  userAgent: string;
+}
+
+/** The subset of CDP's `Emulation.setUserAgentOverride` metadata we send. */
+interface UserAgentMetadata {
+  architecture: string;
+  bitness: string;
+  brands: UserAgentBrand[];
+  fullVersion: string;
+  fullVersionList: UserAgentBrand[];
+  mobile: boolean;
+  model: string;
+  platform: string;
+  platformVersion: string;
+  wow64: boolean;
+}
 
 interface ManagedBrowser {
   browser: Browser;
+  identity: BrowserIdentity;
   server: BrowserServer;
+}
+
+/**
+ * `navigator.userAgentData` is not in this project's DOM lib. Declared here
+ * rather than widened globally: only the probe below touches it, and only
+ * inside the page.
+ */
+interface NavigatorUAData {
+  brands: UserAgentBrand[];
+  getHighEntropyValues: (hints: string[]) => Promise<{
+    architecture?: string;
+    bitness?: string;
+    fullVersionList?: UserAgentBrand[];
+    model?: string;
+    platformVersion?: string;
+  }>;
+  platform: string;
+}
+
+interface ProbedIdentity {
+  architecture: string;
+  bitness: string;
+  brands: UserAgentBrand[];
+  fullVersionList: UserAgentBrand[];
+  model: string;
+  platform: string;
+  platformVersion: string;
+  userAgent: string;
+}
+
+/**
+ * A page on a potentially-trustworthy origin, served from memory.
+ *
+ * `navigator.userAgentData` is undefined on `about:blank` — an opaque origin is
+ * not a secure context — so the brand list cannot be read there. Fulfilling the
+ * route locally gives the page a `http://localhost` origin without opening a
+ * socket, which is why this needs no address-guard exemption.
+ */
+const IDENTITY_PROBE_URL = "http://localhost/__identity-probe";
+
+/** The version of the Chrome-ish brand in a list, which carries the real build. */
+function chromeVersion(brands: readonly UserAgentBrand[]): string | null {
+  const chrome = brands.find(({ brand }) => brand === HEADED_BRAND || brand === CHROMIUM_BRAND);
+  return chrome?.version ?? null;
+}
+
+/**
+ * An identity for when the probe could not be read: this browser's real version
+ * behind the brands Chrome would advertise for it, and a platform taken from
+ * the user agent we are about to send so the two agree.
+ *
+ * The high-entropy fields stay empty rather than invented. A site only receives
+ * them after asking for them with `Accept-CH`, and a wrong architecture is
+ * worse than an absent one; `Sec-CH-UA` itself goes out on the first request,
+ * unasked, which is why the brand list is the part worth composing.
+ */
+function fallbackIdentity(userAgent: string, version: string): BrowserIdentity {
+  const brands = headedBrandsFromVersion(version);
+  return {
+    metadata: {
+      architecture: "",
+      bitness: "",
+      brands,
+      fullVersion: version,
+      fullVersionList: brands.map(({ brand }) => ({ brand, version })),
+      mobile: false,
+      model: "",
+      platform: platformForUserAgent(userAgent),
+      platformVersion: "",
+      wow64: false,
+    },
+    userAgent,
+  };
+}
+
+/**
+ * Reads what this Chromium says about itself and removes the headless marker,
+ * rather than sending hardcoded values: the versions then still match the
+ * browser making the request, so the identity cannot contradict the TLS and
+ * JavaScript fingerprints that accompany it. Chromium's own GREASE brand is
+ * kept for the same reason — inventing one would drift from whatever the
+ * pinned Playwright build actually uses.
+ *
+ * Costs one in-memory page per browser launch, not per render.
+ */
+async function detectIdentity(browser: Browser): Promise<BrowserIdentity> {
+  const context = await browser.newContext();
+  try {
+    await context.route("**/*", (route) =>
+      route.fulfill({ body: "<html></html>", contentType: "text/html" })
+    );
+    const page = await context.newPage();
+    await page.goto(IDENTITY_PROBE_URL, { waitUntil: "domcontentloaded" });
+    const probed = await page.evaluate(async (): Promise<ProbedIdentity | null> => {
+      const data = (navigator as Navigator & { userAgentData?: NavigatorUAData }).userAgentData;
+      if (!data) {
+        return null;
+      }
+      const high = await data.getHighEntropyValues([
+        "architecture",
+        "bitness",
+        "fullVersionList",
+        "model",
+        "platformVersion",
+      ]);
+      return {
+        architecture: high.architecture ?? "",
+        bitness: high.bitness ?? "",
+        brands: data.brands.map(({ brand, version }) => ({ brand, version })),
+        fullVersionList: (high.fullVersionList ?? []).map(({ brand, version }) => ({
+          brand,
+          version,
+        })),
+        model: high.model ?? "",
+        platform: data.platform,
+        platformVersion: high.platformVersion ?? "",
+        userAgent: navigator.userAgent,
+      };
+    });
+
+    if (!probed) {
+      const reported = await page.evaluate(() => navigator.userAgent);
+      return fallbackIdentity(headedUserAgent(reported) ?? reported, browser.version());
+    }
+
+    const fullVersionList = headedBrands(probed.fullVersionList);
+    return {
+      metadata: {
+        architecture: probed.architecture,
+        bitness: probed.bitness,
+        brands: headedBrands(probed.brands),
+        // The browser's own Chrome entry rather than `browser.version()`: the
+        // two are normally the same build, and when they are not,
+        // `Sec-CH-UA-Full-Version` would contradict the list beside it.
+        fullVersion: chromeVersion(fullVersionList) ?? browser.version(),
+        fullVersionList,
+        mobile: false,
+        model: probed.model,
+        platform: probed.platform,
+        platformVersion: probed.platformVersion,
+        wow64: false,
+      },
+      userAgent: headedUserAgent(probed.userAgent) ?? probed.userAgent,
+    };
+  } finally {
+    await context.close().catch(() => undefined);
+  }
 }
 
 async function launchBrowser(): Promise<ManagedBrowser> {
@@ -70,17 +265,40 @@ async function launchBrowser(): Promise<ManagedBrowser> {
         "--disable-quic",
         "--dns-prefetch-disable",
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        // Without this, `navigator.webdriver` is true and the automation
+        // surface stays visible to page JavaScript, which is enough for a
+        // challenge script to withhold its cookie and leave us on a near-empty
+        // interstitial instead of the product page.
+        "--disable-blink-features=AutomationControlled",
       ],
       // Playwright defaults this to false even for a non-root process. Pages
       // are hostile input, so keep Chromium's renderer processes behind their
       // own sandbox as well as the surrounding container boundary.
       chromiumSandbox: true,
+      // Playwright adds `--enable-automation` by default. It changes nothing we
+      // rely on and is read directly by bot-protection scripts.
+      ignoreDefaultArgs: ["--enable-automation"],
       timeout: BROWSER_SERVER_LAUNCH_TIMEOUT_MS,
     });
     const browser = await chromium.connect(server.wsEndpoint(), {
       timeout: BROWSER_CONNECT_TIMEOUT_MS,
     });
-    return { browser, server };
+    const identity = await withDeadline(
+      detectIdentity(browser),
+      IDENTITY_PROBE_TIMEOUT_MS,
+      "browser identity detection"
+    ).catch((error: unknown) => {
+      // Worth a warning rather than a silent degrade: this browser now claims
+      // a version and platform it was never asked about, which is the one part
+      // of the identity nothing downstream can check.
+      const reason = error instanceof Error ? error.message : String(error);
+      log.warn(
+        "renderer",
+        `identity probe failed, composing an identity from the browser version: ${reason}`
+      );
+      return fallbackIdentity(DEFAULT_USER_AGENT, browser.version());
+    });
+    return { browser, identity, server };
   } catch (error) {
     if (server) {
       await withDeadline(
@@ -201,6 +419,102 @@ async function installAddressGuard(context: BrowserContext, state: GuardState): 
   });
 }
 
+/**
+ * Rewrites the client-hint headers, which a context `userAgent` does not touch.
+ *
+ * Chromium derives `Sec-CH-UA` from its own brand list, so overriding only the
+ * user agent leaves a headless build announcing `"HeadlessChrome"` in a header
+ * bot protection reads. CDP is the only way to replace it, and the metadata is
+ * this browser's own with one entry renamed — see `detectIdentity`, or
+ * `fallbackIdentity` for the composed list used when the probe said nothing.
+ * There is no path that skips this: the header is the whole point.
+ */
+async function applyClientHints(
+  context: BrowserContext,
+  page: Page,
+  identity: BrowserIdentity
+): Promise<void> {
+  // Deliberately not detached: the override lives on the session, and
+  // detaching reverts it, so the header would go back to announcing
+  // `HeadlessChrome`. The session is torn down with its context in `finally`.
+  const session = await context.newCDPSession(page);
+  // No `acceptLanguage` here: the context's `locale` already sets it, and
+  // passing both appends a second q-value to the header.
+  await session.send("Emulation.setUserAgentOverride", {
+    userAgent: identity.userAgent,
+    userAgentMetadata: identity.metadata,
+  });
+}
+
+interface PreparedPage {
+  context: BrowserContext;
+  page: Page;
+}
+
+/**
+ * A context and a page ready to navigate: address guard installed, identity
+ * applied, nothing fetched yet.
+ *
+ * Separate from `renderPage` because every failure here is evidence about the
+ * browser rather than about the page, so each one retires the generation and
+ * escapes — which is what lets the sidecar answer 5xx and the worker record
+ * `renderer_error` instead of blaming the retailer.
+ */
+async function preparePage(
+  acquired: { generation: BrowserGeneration<ManagedBrowser>; handle: ManagedBrowser },
+  request: RenderRequest,
+  proxy: GuardedSocksProxy,
+  guard: GuardState
+): Promise<PreparedPage> {
+  // The identity defaults are deliberate, not cosmetic: Chromium's own
+  // `HeadlessChrome` UA is refused on the first request by Imperva, and a
+  // browser whose timezone disagrees with its language is a cheap tell. A
+  // caller's own `locale`/`userAgent` still wins.
+  const contextPromise = acquired.handle.browser.newContext({
+    acceptDownloads: false,
+    locale: request.locale ?? DEFAULT_LOCALE,
+    proxy: { bypass: "<-loopback>", server: proxy.server },
+    serviceWorkers: "block",
+    timezoneId: timezoneForLocale(request.locale),
+    userAgent: request.userAgent ?? acquired.handle.identity.userAgent,
+  });
+
+  let context: BrowserContext;
+  try {
+    context = await withDeadline(contextPromise, CONTEXT_SETUP_TIMEOUT_MS, "browser context setup");
+  } catch (error) {
+    // A timed-out protocol call can still resolve later. Close that late
+    // context explicitly while retiring its browser generation below.
+    contextPromise.then((lateContext) => lateContext.close()).catch(() => undefined);
+    browserManager.retire(acquired.generation);
+    throw error;
+  }
+
+  try {
+    await withDeadline(
+      installAddressGuard(context, guard),
+      CONTEXT_SETUP_TIMEOUT_MS,
+      "browser route setup"
+    );
+    const page = await withDeadline(context.newPage(), CONTEXT_SETUP_TIMEOUT_MS, "page setup");
+    // Before the first navigation, because the header this fixes is sent with
+    // it. Skipped when the caller supplied its own user agent: our brand list
+    // describes this Chromium, and pairing it with someone else's user agent
+    // would be the contradiction it exists to avoid.
+    if (!request.userAgent) {
+      await withDeadline(
+        applyClientHints(context, page, acquired.handle.identity),
+        CONTEXT_SETUP_TIMEOUT_MS,
+        "client hint override"
+      );
+    }
+    return { context, page };
+  } catch (error) {
+    browserManager.retire(acquired.generation);
+    throw error;
+  }
+}
+
 interface Navigated {
   html: string;
   response: PlaywrightResponse | null;
@@ -266,39 +580,9 @@ export async function renderPage(request: RenderRequest): Promise<RenderResponse
     proxy = await startGuardedSocksProxy();
     const acquired = await browserManager.acquire();
     ({ generation } = acquired);
-    const contextPromise = acquired.handle.browser.newContext({
-      acceptDownloads: false,
-      proxy: { bypass: "<-loopback>", server: proxy.server },
-      serviceWorkers: "block",
-      ...(request.locale ? { locale: request.locale } : {}),
-      ...(request.userAgent ? { userAgent: request.userAgent } : {}),
-    });
-    try {
-      context = await withDeadline(
-        contextPromise,
-        CONTEXT_SETUP_TIMEOUT_MS,
-        "browser context setup"
-      );
-    } catch (error) {
-      // A timed-out protocol call can still resolve later. Close that late
-      // context explicitly while retiring its browser generation below.
-      contextPromise.then((lateContext) => lateContext.close()).catch(() => undefined);
-      browserManager.retire(generation);
-      throw error;
-    }
-
-    let page: Page;
-    try {
-      await withDeadline(
-        installAddressGuard(context, guard),
-        CONTEXT_SETUP_TIMEOUT_MS,
-        "browser route setup"
-      );
-      page = await withDeadline(context.newPage(), CONTEXT_SETUP_TIMEOUT_MS, "page setup");
-    } catch (error) {
-      browserManager.retire(generation);
-      throw error;
-    }
+    const prepared = await preparePage(acquired, request, proxy, guard);
+    ({ context } = prepared);
+    const { page } = prepared;
 
     try {
       const { html, response } = await withDeadline(
