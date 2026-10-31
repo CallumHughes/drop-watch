@@ -1,3 +1,4 @@
+import { APP_NAME } from "@drop-watch/brand";
 import { createDb } from "@drop-watch/db";
 import { findPendingInvite, markInviteAccepted } from "@drop-watch/db/invites";
 // biome-ignore lint/performance/noNamespaceImport: drizzle adapter requires the full schema object.
@@ -179,7 +180,7 @@ export function createAuth() {
   const mailer = emailEnabled();
 
   return betterAuth({
-    appName: "DropWatch",
+    appName: APP_NAME,
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(db, {
       provider: "pg",

@@ -1,5 +1,7 @@
 "use client";
 
+import { APP_NAME } from "@drop-watch/brand";
+import { Mark, Wordmark } from "@drop-watch/brand/components/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -10,7 +12,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@drop-watch/ui/components/sidebar";
-import { ChartLineIcon } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps } from "react";
 
@@ -36,9 +37,14 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link href="/" />} size="lg">
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <ChartLineIcon className="size-4" />
+                <Mark className="h-5! w-auto!" />
               </div>
-              <span className="truncate font-medium">DropWatch</span>
+              {/* The menu button sizes every descendant svg to 16 square, which
+                  letterboxes a 5.4:1 wordmark down to a smudge. */}
+              <Wordmark className="h-4! w-auto!" />
+              {/* The wordmark is artwork, and the label is hidden with it when
+                  the rail collapses, so the link keeps a name of its own. */}
+              <span className="sr-only">{APP_NAME}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

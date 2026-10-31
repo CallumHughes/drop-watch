@@ -13,6 +13,7 @@
   "dependencies": {
     "@drop-watch/api": "workspace:*",
     "@drop-watch/auth": "workspace:*",
+    "@drop-watch/brand": "workspace:*",
     "@drop-watch/core": "workspace:*",
     "@drop-watch/email": "workspace:*",
     "@drop-watch/env": "workspace:*",

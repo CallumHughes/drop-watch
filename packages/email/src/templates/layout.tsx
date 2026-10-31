@@ -26,6 +26,7 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource react */
 
+import { APP_NAME } from "@drop-watch/brand";
 import {
   Body,
   Container,
@@ -39,9 +40,6 @@ import {
   Text,
 } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
-
-/** The product's name as it appears in headings, subjects and footers. */
-export const APP_NAME = "DropWatch";
 
 const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
