@@ -63,6 +63,9 @@ catalogs:
     lucide-react:
       specifier: ^1.55.0
       version: 1.55.0
+    minimatch:
+      specifier: 10.2.6
+      version: 10.2.6
     next:
       specifier: ^16.4.3
       version: 16.4.3
@@ -125,6 +128,9 @@ importers:
       husky:
         specifier: latest
         version: 9.1.7
+      minimatch:
+        specifier: 'catalog:'
+        version: 10.2.6
       turbo:
         specifier: ^2.11.7
         version: 2.11.7
