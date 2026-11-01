@@ -53,11 +53,15 @@ node .agents/skills/visual-recap/scripts/check-primitives-map.mjs
 ```
 
 The shared loader resolves `docs/architecture/primitives.yaml` relative to the
-scripts. Classification follows the map's ordered code globs and exclusions.
-After changing these scripts, run their regression checks:
+scripts. Classification follows the map's ordered code globs and exclusions,
+including hidden files. Summaries and invariant statements accept scalar or
+folded (`>`) text; literal (`|`) blocks are rejected. Exclusions must match an
+existing path covered by the same primitive's code globs.
+
+`pnpm test` and CI include these regression checks. To run them alone:
 
 ```bash
-node --test .agents/skills/visual-recap/scripts/primitives-map.test.mjs
+pnpm test:skills
 ```
 
 The upsert script checks mermaid, then replaces the marker block or appends it.

@@ -147,6 +147,7 @@ primitives:
     excludes:
       - packages/db/src/queue.ts
       - packages/db/src/migrate.ts
+      - packages/db/src/schema/auth.ts
     depends_on: [env-config]
 
   - id: job-queue

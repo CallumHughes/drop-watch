@@ -4,8 +4,9 @@
  * Constrained YAML subset used by the repository map: group mappings, primitive
  * and invariant records, folded text, and path lists. Not a general YAML parser.
  */
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
-import { matchesGlob, resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { minimatch } from 'minimatch'
 
 export const defaultMapPath = resolve(
 	import.meta.dirname,
@@ -147,6 +148,9 @@ export function parsePrimitivesMap(text) {
 			if (key === 'group') current.group = value
 			else if (key === 'name') current.name = value
 			else {
+				if (/^\|[1-9+-]*$/.test(fieldMatch[2])) {
+					throw new Error(`Literal block scalars are unsupported for ${key}; use folded > text instead`)
+				}
 				foldedSummary = value === '>' || value === '>-' || value === '>+'
 				current.summary = foldedSummary ? '' : value
 			}
@@ -178,7 +182,7 @@ export function pathMatchesRoot(filePath, root) {
 	const normalizedFile = filePath.replaceAll('\\', '/')
 	const normalizedRoot = root.replaceAll('\\', '/')
 	if (!normalizedRoot) return false
-	return matchesGlob(normalizedFile, normalizedRoot)
+	return minimatch(normalizedFile, normalizedRoot, { dot: true })
 }
 
 /**
@@ -233,8 +237,9 @@ export function loadPrimitivesMap(mapPath = defaultMapPath) {
 }
 
 /**
- * Validate that every `code` and `docs` path resolves on disk.
+ * Validate that every `code`, `docs`, and `excludes` path resolves on disk.
  * Code globs must match at least one existing path under the repo root.
+ * Exclusions must overlap an entry's code globs.
  *
  * @param {PrimitivesMap} map
  * @param {string} [repoRoot]
@@ -245,6 +250,7 @@ export function checkPrimitivesMapPaths(
 ) {
 	/** @type {Array<{ kind: string, id: string, path: string, reason: string }>} */
 	const errors = []
+	const paths = listPaths(repoRoot)
 
 	/**
 	 * @param {Primitive} entry
@@ -264,13 +270,7 @@ export function checkPrimitivesMapPaths(
 		}
 
 		for (const codePath of entry.code) {
-			const absolute = resolve(repoRoot, codePath)
-			if (existsSync(absolute)) continue
-			const matches = globSync(codePath, {
-				cwd: repoRoot,
-				exclude: ['**/node_modules/**', '**/.git/**', '**/.next/**'],
-			})
-			if (matches.length > 0) continue
+			if (paths.some((path) => pathMatchesRoot(path, codePath))) continue
 
 			errors.push({
 				kind,
@@ -279,9 +279,37 @@ export function checkPrimitivesMapPaths(
 				reason: 'code root missing on disk',
 			})
 		}
+
+		for (const excludedPath of entry.excludes) {
+			if (paths.some((path) =>
+				pathMatchesRoot(path, excludedPath) &&
+				entry.code.some((codePath) => pathMatchesRoot(path, codePath)),
+			)) continue
+			errors.push({
+				kind,
+				id: entry.id,
+				path: excludedPath,
+				reason: 'exclusion matches no existing path within code globs',
+			})
+		}
 	}
 
 	for (const primitive of map.primitives) checkEntry(primitive, 'primitive')
 	for (const invariant of map.invariants) checkEntry(invariant, 'invariant')
 	return errors
+}
+
+/** @param {string} repoRoot */
+function listPaths(repoRoot) {
+	const paths = []
+	function visit(directory) {
+		for (const entry of readdirSync(resolve(repoRoot, directory), { withFileTypes: true })) {
+			if (['node_modules', '.git', '.next', '.turbo'].includes(entry.name)) continue
+			const path = directory ? `${directory}/${entry.name}` : entry.name
+			paths.push(path)
+			if (entry.isDirectory()) visit(path)
+		}
+	}
+	visit('')
+	return paths
 }
