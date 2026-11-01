@@ -1,6 +1,6 @@
 # Notifications
 
-DropWatch has two alert channels: a Home Assistant webhook and email. They are
+DropWATCH has two alert channels: a Home Assistant webhook and email. They are
 independent, both optional, and an unconfigured channel is not a failed one —
 with no mailer, nothing about the logs or the webhook path differs from an
 instance that never had one. Delivery failures on either channel are logged and

@@ -1,4 +1,4 @@
-# The system primitives of DropWatch, as used by the `visual-recap` skill to
+# The system primitives of DropWATCH, as used by the `visual-recap` skill to
 # classify a change. `id` values are stable and quoted verbatim in recap
 # blocks. `code` globs map changed paths to a primitive; first match wins,
 # most specific glob first.

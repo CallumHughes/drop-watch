@@ -1,5 +1,5 @@
 /**
- * An admin's invitation to join DropWatch.
+ * An admin's invitation to join DropWATCH.
  *
  * Signup is invite-only, so this link is the recipient's only way to an
  * account — hence the raw URL {@link CallToAction} prints under the button for

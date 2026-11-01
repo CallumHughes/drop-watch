@@ -76,7 +76,7 @@ describe("alertMessage", () => {
 
   it("says a test alert is a test", () => {
     const message = alertMessage({ ...base, rule: "test" });
-    expect(message.title).toBe("Test alert from DropWatch");
+    expect(message.title).toBe("Test alert from DropWATCH");
     expect(message.body).toContain("This is a test notification.");
   });
 

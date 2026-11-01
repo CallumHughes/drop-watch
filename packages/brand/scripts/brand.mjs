@@ -28,6 +28,9 @@ const PAPER = "#ffffff";
 /** A rendering difference above this fraction of subpixels fails the import. */
 const DIFF_BUDGET = 0.0005;
 
+/** A row thinner than this share of the widest one is descender, not body. */
+const DESCENDER_SHARE = 0.25;
+
 const MARKS = [
   { pad: 0.04, slug: "mark", token: "icon" },
   { pad: 0.02, slug: "wordmark-horizontal", token: "row" },
@@ -163,6 +166,52 @@ async function inkBox(svg) {
     x: minX + Math.abs(info.trimOffsetLeft) / scale,
     y: minY + Math.abs(info.trimOffsetTop) / scale,
   };
+}
+
+/**
+ * The wordmark re-centred on its letterforms rather than its bounding box.
+ *
+ * The box stops at the "p" descender, so centring it hangs the lettering high
+ * — the reason type is centred on its cap band and not on its em box. Mirror
+ * the space below the baseline above the caps and the two agree again.
+ */
+async function balanced(svg) {
+  const [minX, minY, w, h] = viewBox(svg);
+  const scale = 2;
+  const width = Math.round(w * scale);
+  const height = Math.round(h * scale);
+  const pixels = await raster(svg, width, height);
+  const channels = pixels.length / (width * height);
+
+  const ink = [];
+  for (let y = 0; y < height; y += 1) {
+    let row = 0;
+    for (let x = 0; x < width; x += 1) {
+      if (pixels[(y * width + x) * channels + channels - 1] > 127) {
+        row += 1;
+      }
+    }
+    ink.push(row);
+  }
+
+  // Descenders are a few strokes wide where the x-height band runs the whole
+  // word, so the fall at the baseline is an order of magnitude, not a nudge.
+  const floor = Math.max(...ink) * DESCENDER_SHARE;
+  const first = ink.findIndex((row) => row > 0);
+  const last = ink.findLastIndex((row) => row > floor);
+  // A blank or unreadable raster would otherwise land both at -1 and write a
+  // plausible-looking box from nothing, the way an unchecked diff would.
+  if (first === -1 || last <= first) {
+    throw new Error(`no letterforms found to centre on (caps ${first}, baseline ${last})`);
+  }
+
+  const unit = (row) => minY + row / scale;
+  const caps = unit(first);
+  const baseline = unit(last);
+  const bottom = minY + h;
+  const top = Math.min(caps - (bottom - baseline), minY);
+
+  return [minX, round(top), w, round(bottom - top)].join(" ");
 }
 
 /** Reframes to the artwork's own bounds plus padding, so layout controls size. */
@@ -376,17 +425,19 @@ async function runGenerate() {
       .join(", ")
   );
 
-  const art = (svg) => ({
+  const art = (svg, box) => ({
     paths: [...inner(svg).matchAll(PATH_DATA)].map((m) => m[1]),
-    viewBox: viewBox(svg).join(" "),
+    viewBox: box ?? viewBox(svg).join(" "),
   });
   const entry = (name, value) =>
     `export const ${name} = {\n  paths: [\n${value.paths.map((d) => `    "${d}",`).join("\n")}\n  ],\n  viewBox: "${value.viewBox}",\n} as const;`;
 
+  // Only the components get the re-centred box: the rasters above place the
+  // artwork themselves, and the slack would read there as a lopsided margin.
   await module_("paths.generated.ts", [
     entry("MARK", art(markSvg)),
     "",
-    entry("WORDMARK_HORIZONTAL", art(horizontal)),
+    entry("WORDMARK_HORIZONTAL", art(horizontal, await balanced(horizontal))),
     "",
     entry("WORDMARK_STACKED", art(stacked)),
   ]);

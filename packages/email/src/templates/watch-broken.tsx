@@ -40,14 +40,14 @@ const actionStyle: CSSProperties = {
   margin: "20px 0 12px",
 };
 
-/** The subject. Names the product, because DropWatch watches several. */
+/** The subject. Names the product, because DropWATCH watches several. */
 export function watchBrokenSubject(payload: NotificationPayload): string {
   return `Watch broken: ${productLabel(payload)}`;
 }
 
 export interface WatchBrokenProps {
   payload: NotificationPayload;
-  /** Absolute link to the product in DropWatch, or `null` without `APP_URL`. */
+  /** Absolute link to the product in DropWATCH, or `null` without `APP_URL`. */
   watchUrl: string | null;
 }
 
@@ -65,7 +65,7 @@ export function WatchBroken({ payload, watchUrl }: WatchBrokenProps) {
           ? "Checks for this product keep failing"
           : `The last ${failures} checks for this product failed in a row`}
         , so its price is no longer being tracked. The usual causes are a page that has moved, a
-        selector that no longer matches, or a shop that has started blocking DropWatch.
+        selector that no longer matches, or a shop that has started blocking {APP_NAME}.
       </Text>
       {payload.error === null ? null : <Text style={errorStyle}>{payload.error}</Text>}
       <Text style={paragraphStyle}>

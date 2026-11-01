@@ -7,8 +7,12 @@
  * the other half: both are canonical, and nothing downstream redefines either.
  */
 
-/** The product's name as it appears in headings, titles, subjects and footers. */
-export const APP_NAME = "DropWatch";
+/**
+ * The product's name as it appears in headings, titles, subjects and footers.
+ * Cased to match the wordmark, which sets "WATCH" in caps beside the script
+ * "Drop" — so the text beside the artwork reads the same as the artwork.
+ */
+export const APP_NAME = "DropWATCH";
 
 /** One line, for a tagline or a sidebar subtitle. */
 export const APP_TAGLINE = "Self-hosted price tracking";

@@ -1,4 +1,4 @@
-# DropWatch, from prebuilt images — no clone, no build. Download this file
+# DropWATCH, from prebuilt images — no clone, no build. Download this file
 # (and, for browser mode, seccomp_profile.json — see the `renderer` service
 # below) alongside an `.env` copied from `.env.example`, then:
 #

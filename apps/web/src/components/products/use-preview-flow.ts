@@ -5,6 +5,7 @@ import type {
   PagePreview,
   PreviewAttemptSummary,
 } from "@drop-watch/api/routers/preview";
+import { APP_NAME } from "@drop-watch/brand";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ChangeEvent, FormEvent } from "react";
@@ -100,7 +101,7 @@ function isPreconditionFailure(error: unknown): boolean {
 
 /**
  * oRPC's own fallback messages, used when it could not parse an error response
- * body. Seeing one means something between the browser and DropWatch replaced
+ * body. Seeing one means something between the browser and DropWATCH replaced
  * the response — a reverse proxy substituting its own error page for a 5xx is
  * the usual cause — so the real reason is in the server's logs, not here.
  */
@@ -116,7 +117,7 @@ function errorMessage(error: unknown): string {
     return "Unable to reload the page preview.";
   }
   if (ORPC_STATUS_FALLBACKS.has(error.message)) {
-    return `the server returned "${error.message}" with no detail. If DropWatch is behind a proxy, the reason is in its logs.`;
+    return `the server returned "${error.message}" with no detail. If ${APP_NAME} is behind a proxy, the reason is in its logs.`;
   }
   return error.message;
 }

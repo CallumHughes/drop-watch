@@ -40,8 +40,10 @@ export function AppSidebar({
                 <Mark className="h-5! w-auto!" />
               </div>
               {/* The menu button sizes every descendant svg to 16 square, which
-                  letterboxes a 5.4:1 wordmark down to a smudge. */}
-              <Wordmark className="h-4! w-auto!" />
+                  letterboxes a 3.8:1 wordmark down to a smudge. Full height
+                  instead: the row has width to spare, so the cap band is what
+                  runs out first. */}
+              <Wordmark className="h-8! w-auto!" />
               {/* The wordmark is artwork, and the label is hidden with it when
                   the rail collapses, so the link keeps a name of its own. */}
               <span className="sr-only">{APP_NAME}</span>

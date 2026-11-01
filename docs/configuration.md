@@ -71,7 +71,7 @@ which returns the post-JavaScript HTML.
 
 New add-flow previews always start with HTTP. A confident price is used
 immediately; when that response has no price or an ambiguous one and
-`RENDER_URL` is configured, DropWatch also checks the rendered page. It keeps
+`RENDER_URL` is configured, DropWATCH also checks the rendered page. It keeps
 the most trustworthy usable result and saves its actual mode with the new
 listing, so scheduled checks stay pinned to that winning mode. Existing
 listings are unchanged; switch one manually in its settings if you want to

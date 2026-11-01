@@ -1,10 +1,10 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="packages/brand/assets/wordmark-on-dark.svg">
-  <img src="packages/brand/assets/wordmark-on-light.svg" alt="DropWatch" height="40">
+  <img src="packages/brand/assets/wordmark-on-light.svg" alt="DropWATCH" height="40">
 </picture>
 
 
-DropWatch keeps an eye on product pages and tells you if the price drops. You
+DropWATCH keeps an eye on product pages and tells you if the price drops. You
 give it a URL, it checks the page on a schedule and records what it finds.
 Self-hosted: your machine, your Postgres.
 
@@ -166,7 +166,7 @@ changed in the UI takes effect on the next check without restarting anything.
 - **Prices render in `en-GB` formatting.** The currency follows the shop; the
   number and date formatting does not yet follow you.
 
-There is no browsing for alternatives you have not added yourself — DropWatch
+There is no browsing for alternatives you have not added yourself — DropWATCH
 only ever compares the stores you are already tracking against each other,
 never against the wider market.
 
