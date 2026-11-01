@@ -1,15 +1,12 @@
 "use client";
 
-import type { ExpressionMode } from "@drop-watch/api/routers/preview";
-import type { Listing } from "@drop-watch/api/routers/products";
+import type { Listing, ListingSummary } from "@drop-watch/api/routers/products";
 import {
-  MAX_EXPRESSION_LENGTH,
   MAX_INTERVAL_MINUTES,
   MAX_JITTER_PERCENT,
   MIN_INTERVAL_MINUTES,
   PINNED_NEEDS_EXPRESSION,
 } from "@drop-watch/api/schemas/products";
-import { LISTING_EXTRACTORS, type ListingExtractor } from "@drop-watch/core/extract/strategies";
 import { Button } from "@drop-watch/ui/components/button";
 import { Checkbox } from "@drop-watch/ui/components/checkbox";
 import { Input } from "@drop-watch/ui/components/input";
@@ -20,27 +17,16 @@ import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
 import {
-  EXPRESSION_LABELS,
   type ListingExtractionSettings,
+  listingExtractionNote,
   listingExtractionSettings,
   repairActionLabel,
   repairSummary,
+  type TrackedPriceChange,
 } from "./listing-repair";
 import { PreviewFlow } from "./preview-flow";
 import { browserToggleState } from "./render-mode";
 import { type PreviewFlow as PreviewFlowState, usePreviewFlow } from "./use-preview-flow";
-
-/** How each mode reads in the settings editor. `auto` is not an expression. */
-const EXTRACTOR_LABELS: Record<ListingExtractor, string> = {
-  auto: "Automatically (recommended)",
-  jsonpath: "JSONPath into the page's JSON",
-  selector: "CSS selector",
-};
-
-const EXPRESSION_PLACEHOLDERS: Record<ExpressionMode, string> = {
-  jsonpath: "$..price",
-  selector: ".price, [data-price]::attr(data-price) …",
-};
 
 /**
  * A labelled control. The caller owns the id and hands the same one to its
@@ -73,6 +59,7 @@ function Field({
  * clears a pinned expression.
  */
 function RepairPanel({
+  currency,
   current,
   flow,
   isOpen,
@@ -81,7 +68,9 @@ function RepairPanel({
   onOpen,
   pending,
   plan,
+  tracked,
 }: {
+  currency: string | null;
   current: ListingExtractionSettings;
   flow: PreviewFlowState;
   isOpen: boolean;
@@ -90,6 +79,7 @@ function RepairPanel({
   onOpen: () => void;
   pending: boolean;
   plan: ListingExtractionSettings | null;
+  tracked: TrackedPriceChange | undefined;
 }) {
   const untestedPreview = Boolean(flow.preview) && !flow.chosen && !pending;
   return (
@@ -97,7 +87,7 @@ function RepairPanel({
       <div>
         <p className="font-medium text-xs">Repair this listing’s price extraction</p>
         <p className="text-muted-foreground text-xs">
-          Re-preview the current URL, test a CSS selector or JSONPath, and save the verified
+          Re-preview the current URL, tell us the price its page shows, and save the verified
           extraction without recreating this listing.
         </p>
       </div>
@@ -113,17 +103,19 @@ function RepairPanel({
       </div>
       {isOpen ? (
         <>
-          <PreviewFlow flow={flow} lockUrl />
+          <PreviewFlow currency={currency} flow={flow} lockUrl />
           <div className="flex flex-wrap items-center gap-2">
             <Button disabled={!plan} onClick={onApply} size="sm" type="button">
               {repairActionLabel(plan)}
             </Button>
             {plan ? (
-              <p className="text-muted-foreground text-xs">{repairSummary(plan, current)}</p>
+              <p className="text-muted-foreground text-xs">
+                {repairSummary(plan, current, tracked)}
+              </p>
             ) : null}
             {untestedPreview ? (
               <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
-                Test exactly one price match before applying this repair.
+                Enter the price this page shows before applying this repair.
               </p>
             ) : null}
           </div>
@@ -143,9 +135,12 @@ function RepairPanel({
  * before it ever sends the request.
  */
 export function ListingSettingsForm({
+  latest,
   listing,
   onSaved,
 }: {
+  /** This listing's most recent observation, so a repair can name what changes. */
+  latest?: ListingSummary["latest"];
   listing: Listing;
   onSaved?: () => void;
 }) {
@@ -153,8 +148,6 @@ export function ListingSettingsForm({
   const intervalId = useId();
   const jitterId = useId();
   const localeId = useId();
-  const expressionId = useId();
-  const extractorId = useId();
   const renderHintId = useId();
 
   const [intervalMinutes, setIntervalMinutes] = useState(String(listing.intervalMinutes));
@@ -193,14 +186,8 @@ export function ListingSettingsForm({
   const onJitterChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setJitterPercent(event.target.value);
   }, []);
-  const onExpressionChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setExpression(event.target.value);
-  }, []);
   const onLocaleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setLocale(event.target.value);
-  }, []);
-  const onExtractorChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
-    setExtractor(event.target.value as ListingExtractor);
   }, []);
   const toggleBrowserRender = useCallback((checked: boolean) => {
     setRenderMode(checked ? "browser" : "http");
@@ -209,6 +196,7 @@ export function ListingSettingsForm({
   const repairPending =
     repairOpen &&
     (repairFlow.fetchPreview.isPending ||
+      repairFlow.isLocating ||
       repairFlow.isTesting ||
       Boolean(repairFlow.transportReload?.isPending));
   const repairCanApply = Boolean(repairFlow.preview && repairFlow.chosen && !repairPending);
@@ -220,6 +208,13 @@ export function ListingSettingsForm({
     render: renderMode,
   };
   const repairPlan = repairCanApply ? listingExtractionSettings(repairFlow, currentSettings) : null;
+  const tracked: TrackedPriceChange | undefined = repairFlow.chosen
+    ? {
+        currency: repairFlow.chosen.currency ?? latest?.currency ?? listing.currency,
+        next: repairFlow.chosen.price,
+        previous: latest?.price ?? null,
+      }
+    : undefined;
   const openRepair = useCallback(() => {
     setRepairOpen(true);
     loadRepairPreview();
@@ -314,22 +309,15 @@ export function ListingSettingsForm({
         </Field>
       </div>
 
-      <Field htmlFor={extractorId} label="How the price is found">
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
-          id={extractorId}
-          onChange={onExtractorChange}
-          value={extractor}
-        >
-          {LISTING_EXTRACTORS.map((mode) => (
-            <option key={mode} value={mode}>
-              {EXTRACTOR_LABELS[mode]}
-            </option>
-          ))}
-        </select>
-      </Field>
+      {/* Read-only: the repair panel below is the only way to change this, and
+          it derives the expression from a price rather than asking for one. */}
+      <div className="flex flex-col gap-1 text-xs">
+        <span className="text-muted-foreground">How the price is found</span>
+        <p>{listingExtractionNote(currentSettings)}</p>
+      </div>
 
       <RepairPanel
+        currency={listing.currency}
         current={currentSettings}
         flow={repairFlow}
         isOpen={repairOpen}
@@ -338,31 +326,8 @@ export function ListingSettingsForm({
         onOpen={openRepair}
         pending={repairPending}
         plan={repairPlan}
+        tracked={tracked}
       />
-
-      {/* Hidden during a repair: the picker below owns the same label, and two
-          identically labelled selector inputs is one too many. */}
-      {extractor === "auto" || repairOpen ? null : (
-        <Field htmlFor={expressionId} label={`${EXPRESSION_LABELS[extractor]} for the price`}>
-          <div className="flex flex-col gap-1">
-            <Input
-              autoComplete="off"
-              id={expressionId}
-              maxLength={MAX_EXPRESSION_LENGTH}
-              onChange={onExpressionChange}
-              placeholder={EXPRESSION_PLACEHOLDERS[extractor]}
-              spellCheck={false}
-              value={expression}
-            />
-            {extractor === "selector" ? (
-              <p className="text-muted-foreground">
-                For an attribute value, use <code>[data-price]::attr(data-price)</code>. Include a
-                currency symbol or code if the page provides no currency elsewhere.
-              </p>
-            ) : null}
-          </div>
-        </Field>
-      )}
 
       <div className="flex flex-col gap-1">
         <Label className="items-start gap-2">

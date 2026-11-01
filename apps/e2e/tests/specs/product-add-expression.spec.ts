@@ -5,7 +5,11 @@ const CHECK_TIMEOUT_MS = 45_000;
 /**
  * Two pages that must fall through the automatic chain: one whose price only
  * exists in an attribute value, and one whose price only exists in an embedded
- * JSON payload. The picker rescues both.
+ * JSON payload.
+ *
+ * Both are driven through the "Advanced" disclosure on purpose. The dashboard's
+ * own path is the price locator, covered in `product-add.spec.ts`; this is the
+ * escape hatch, and it has to keep working for a page the locator cannot read.
  */
 
 test("tracks an attribute-only price with a selector attribute", async ({
@@ -22,6 +26,7 @@ test("tracks an attribute-only price with a selector attribute", async ({
   });
 
   await test.step("the selector attribute syntax reads the currency-bearing value", async () => {
+    await addProduct.openAdvanced();
     await addProduct.selectorInput.fill("[data-price]::attr(data-price)");
     await expect(addProduct.strategyNote).toContainText("CSS selector");
   });
@@ -50,6 +55,7 @@ test("tracks a price that only exists in embedded JSON with a JSONPath", async (
   });
 
   await test.step("a JSONPath resolves it out of the payload", async () => {
+    await addProduct.openAdvanced();
     await addProduct.mode("JSONPath").click();
     await addProduct.jsonPathInput.fill("$..price");
     await expect(addProduct.strategyNote).toContainText("JSONPath");

@@ -5,6 +5,7 @@ import type {
   PagePreview,
   PreviewAttemptSummary,
 } from "@drop-watch/api/routers/preview";
+import { PRICE_PATTERN } from "@drop-watch/api/schemas/products";
 import { APP_NAME } from "@drop-watch/brand";
 import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -24,8 +25,27 @@ import { automaticPreviewNeedsRepair, previewSelection } from "./preview-confide
  */
 const EXPRESSION_DEBOUNCE_MS = 300;
 
-/** Where the picker starts when the chain found nothing: the familiar one. */
+/** Where the advanced picker starts when the chain found nothing. */
 const DEFAULT_MODE: ExpressionMode = "selector";
+
+/** A price worth asking the server about — the same shape a target price takes. */
+export function expectedPriceIsUsable(value: string): boolean {
+  return PRICE_PATTERN.test(value.trim());
+}
+
+/**
+ * Whether a located candidate should be pinned at all.
+ *
+ * When the chain already reads the price the user typed *and* the worker's gate
+ * would accept it, pinning an expression adds a thing to rot for no gain. That
+ * only arises when the picker was opened by hand: a preview needing repair is
+ * one the gate refuses, so agreement there still needs a pin.
+ */
+export function automaticAlreadyReadsIt(
+  automatic: { agrees: boolean; ambiguous: boolean } | null | undefined
+): boolean {
+  return Boolean(automatic?.agrees) && !automatic?.ambiguous;
+}
 
 /** Blank locale drafts should omit the optional preview locale input. */
 export function normalizePreviewLocale(locale: string | null | undefined): string | undefined {
@@ -147,6 +167,8 @@ export function usePreviewFlow({
   const [mode, setMode] = useState<ExpressionMode | null>(null);
   const [expression, setExpression] = useState("");
   const [settledExpression, setSettledExpression] = useState("");
+  const [expectedPrice, setExpectedPrice] = useState("");
+  const [settledExpectedPrice, setSettledExpectedPrice] = useState("");
   const [transportReloadError, setTransportReloadError] = useState<string | null>(null);
   const [browserReloadPreconditionFailed, setBrowserReloadPreconditionFailed] = useState(false);
   const previewRequestGeneration = useRef(0);
@@ -164,6 +186,8 @@ export function usePreviewFlow({
     setMode(null);
     setExpression("");
     setSettledExpression("");
+    setExpectedPrice("");
+    setSettledExpectedPrice("");
     setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
   }, [localeInput]);
@@ -172,6 +196,11 @@ export function usePreviewFlow({
     const timer = setTimeout(() => setSettledExpression(expression), EXPRESSION_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [expression]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSettledExpectedPrice(expectedPrice), EXPRESSION_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [expectedPrice]);
 
   const fetchPreview = useMutation(
     orpc.preview.page.mutationOptions({
@@ -191,6 +220,8 @@ export function usePreviewFlow({
         // extraction finds a price, the picker stays closed below.
         setExpression("");
         setSettledExpression("");
+        setExpectedPrice("");
+        setSettledExpectedPrice("");
         // Nothing matched automatically, so the picker is the next step rather
         // than an option buried behind a toggle.
         setMode(
@@ -222,6 +253,8 @@ export function usePreviewFlow({
         setPreview(data);
         setExpression("");
         setSettledExpression("");
+        setExpectedPrice("");
+        setSettledExpectedPrice("");
         setMode(
           data.extraction === null || automaticPreviewNeedsRepair(data) ? DEFAULT_MODE : null
         );
@@ -247,6 +280,20 @@ export function usePreviewFlow({
       staleTime: Number.POSITIVE_INFINITY,
     })
   );
+  const trimmedExpectedPrice = settledExpectedPrice.trim();
+  const suggestion = useQuery(
+    orpc.preview.suggestExpressions.queryOptions({
+      enabled: previewId !== "" && expectedPriceIsUsable(trimmedExpectedPrice),
+      input: {
+        expectedPrice: trimmedExpectedPrice,
+        previewId,
+        ...(localeInput ? { locale: localeInput } : {}),
+      },
+      // Same reason as the expression test: the cached body cannot change, and
+      // none of this touches the network.
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
   const capabilities = useQuery(
     orpc.capabilities.queryOptions({
       enabled: preview?.render === "http",
@@ -262,6 +309,29 @@ export function usePreviewFlow({
       })
     : null;
 
+  // Applying the top candidate rather than offering the list is the point of
+  // the flow: choosing between two selectors that read the same number today
+  // is the judgement nobody should have to make. Keyed on the query result, so
+  // a hand-written expression in the advanced picker is never overwritten.
+  const suggested = suggestion.data;
+  useEffect(() => {
+    const candidate = suggested?.candidates[0];
+    if (!candidate || automaticAlreadyReadsIt(suggested?.automatic)) {
+      return;
+    }
+    setMode(candidate.mode);
+    setExpression(candidate.expression);
+    setSettledExpression(candidate.expression);
+  }, [suggested]);
+
+  const onExpectedPriceChange = useCallback((next: string) => {
+    setExpectedPrice(next);
+  }, []);
+  /** Picking one of the page's own prices re-asks with that value. */
+  const onPickPagePrice = useCallback((amount: string) => {
+    setExpectedPrice(amount);
+    setSettledExpectedPrice(amount);
+  }, []);
   const onUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     previewRequestGeneration.current += 1;
     setUrl(event.target.value);
@@ -344,26 +414,37 @@ export function usePreviewFlow({
     setMode(null);
     setExpression("");
     setSettledExpression("");
+    setExpectedPrice("");
+    setSettledExpectedPrice("");
     setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
   }, [initialUrl]);
 
+  const isLocating =
+    expectedPriceIsUsable(expectedPrice) &&
+    (expectedPrice.trim() !== trimmedExpectedPrice || suggestion.isFetching);
+
   return {
     automaticRepairRequired,
     chosen,
+    expectedPrice,
     expression,
     expressionTest,
     fetchPreview,
+    isLocating,
     isTesting,
     loadPreview,
     mode,
+    onExpectedPriceChange,
     onExpressionChange: setExpression,
     onFetch,
     onModeChange,
+    onPickPagePrice,
     onUrlChange,
     preview,
     reset,
     savingWithExpression,
+    suggestion,
     togglePicker,
     transportReload: reloadControl
       ? {

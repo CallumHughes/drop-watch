@@ -23,24 +23,26 @@ test("tracks a product found by the automatic JSON-LD extraction", async ({
   });
 });
 
-test("tracks a structured-data-free page with a hand-picked selector", async ({
+test("tracks a structured-data-free page from the price it shows", async ({
   addProduct,
   fixtureProduct,
 }) => {
   await fixtureProduct.publish({ price: "42.50", template: "selector" });
 
-  await test.step("the automatic chain finds nothing and offers the picker", async () => {
+  await test.step("the automatic chain finds nothing and asks for the price", async () => {
     await addProduct.goto();
     await addProduct.loadPreview(fixtureProduct.url);
     await expect(addProduct.noAutoMatchNote).toBeVisible();
+    await expect(addProduct.expectedPriceInput).toBeVisible();
+    await expect(addProduct.trackButton).toBeDisabled();
   });
 
-  await test.step("a CSS selector finds the price", async () => {
-    await addProduct.selectorInput.fill(".price");
-    await expect(addProduct.strategyNote).toContainText("CSS selector");
+  await test.step("the displayed price is enough to find where it comes from", async () => {
+    await addProduct.locatePrice("42.50");
+    await expect(addProduct.trackButton).toBeEnabled();
   });
 
-  await test.step("saving works from the selector path", async () => {
+  await test.step("saving works without anyone writing an expression", async () => {
     await addProduct.track();
   });
 });

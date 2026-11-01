@@ -5,6 +5,11 @@ import type { Locator } from "@playwright/test";
  * automatic extraction" — and reads "Apply repair" only while disabled.
  */
 const APPLY_REPAIR_PATTERN = /^Apply /;
+/** The read-only sentence that replaced the extractor select. */
+const EXTRACTION_NOTE_PATTERN = /^(Found automatically|Read from a spot)/;
+const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/;
+const ADVANCED_PATTERN = /^Advanced: point at the price/;
+const LOCATED_PATTERN = /^Found that price here/;
 
 /**
  * The inline per-listing settings editor a `ListingRow` opens via `edit()`.
@@ -12,10 +17,15 @@ const APPLY_REPAIR_PATTERN = /^Apply /;
  * edit mode at once and their forms would otherwise be indistinguishable.
  */
 export class ListingSettingsForm {
+  /** The disclosure hiding the hand-written picker. Closed by default. */
+  readonly advancedToggle: Locator;
   readonly applyRepairButton: Locator;
   readonly browserRenderCheckbox: Locator;
-  /** `auto` | `selector` | `jsonpath` — how the price is found. */
-  readonly extractorSelect: Locator;
+  /** The one question the repair asks. */
+  readonly expectedPriceInput: Locator;
+  /** How the price is found, now read-only — the repair panel is the only editor. */
+  readonly extractionNote: Locator;
+  readonly locatedNote: Locator;
   readonly repairButton: Locator;
   readonly saveButton: Locator;
   readonly singleMatchNote: Locator;
@@ -26,7 +36,10 @@ export class ListingSettingsForm {
     this.browserRenderCheckbox = row.getByRole("checkbox", {
       name: "Load the page in a headless browser",
     });
-    this.extractorSelect = row.getByLabel("How the price is found");
+    this.extractionNote = row.getByText(EXTRACTION_NOTE_PATTERN);
+    this.expectedPriceInput = row.getByLabel(EXPECTED_PRICE_PATTERN);
+    this.locatedNote = row.getByText(LOCATED_PATTERN);
+    this.advancedToggle = row.getByText(ADVANCED_PATTERN);
     this.repairButton = row.getByRole("button", { name: "Re-preview and repair" });
     this.applyRepairButton = row.getByRole("button", { name: APPLY_REPAIR_PATTERN });
     this.saveButton = row.getByRole("button", { name: "Save listing settings" });
@@ -36,5 +49,21 @@ export class ListingSettingsForm {
   /** The expression input, whose label follows the selected mode. */
   expressionInput(mode: "CSS selector" | "JSONPath"): Locator {
     return this.row.getByLabel(`${mode} for the price`);
+  }
+
+  /** Opens the hand-written picker. Idempotent — a second click would close it. */
+  async openAdvanced(): Promise<void> {
+    const input = this.expressionInput("CSS selector");
+    if (await input.isVisible()) {
+      return;
+    }
+    await this.advancedToggle.click();
+    await input.waitFor();
+  }
+
+  /** Tells the repair what the page shows and waits for it to find the spot. */
+  async locatePrice(price: string): Promise<void> {
+    await this.expectedPriceInput.fill(price);
+    await this.locatedNote.waitFor();
   }
 }

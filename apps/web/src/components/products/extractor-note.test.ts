@@ -17,19 +17,20 @@ describe("extractorNote", () => {
       render: "browser",
     },
     {
-      expected: "Will be tracked with the selector .price.",
+      expected: "Will be tracked from the price you confirmed on the page.",
       expression: ".price",
       mode: "selector",
       render: "http",
     },
     {
-      expected: "Will be tracked with the selector .price, loaded in a headless browser.",
+      expected:
+        "Will be tracked from the price you confirmed on the page, loaded in a headless browser.",
       expression: ".price",
       mode: "selector",
       render: "browser",
     },
     {
-      expected: "Will be tracked with the JSONPath $..price.",
+      expected: "Will be tracked from the price you confirmed on the page.",
       expression: "$..price",
       mode: "jsonpath",
       render: "http",
@@ -41,7 +42,7 @@ describe("extractorNote", () => {
     }
   );
 
-  it("does not describe a path until a price has been found", () => {
+  it("does not describe an extraction until a price has been found", () => {
     expect(
       extractorNote({
         expression: ".price",

@@ -24,10 +24,15 @@ first three, so usually there is nothing to configure. There are no per-site
 adapters, which means nothing to update when a shop redesigns — and also means a
 shop can quietly break a watch.
 
-**Picking a selector.** When none of that finds anything, the add-product page
-lets you type a CSS selector and shows the match count and a few matched
-elements as you type, with the page source to hand. It works off a single cached
-fetch, so trying selectors does not hammer the shop.
+**Telling it the price.** When none of that finds anything — or when the page
+quotes several prices and nothing says which one it is selling — it asks you one
+question: what price does this page show? It then works out for itself which
+spot on the page that number comes from, prefers the ones least likely to move
+when the shop redesigns, and shows you the markup it landed on so you can
+confirm it picked the right occurrence. All of it runs off a single cached fetch,
+so answering does not hammer the shop. Writing a CSS selector or JSONPath by
+hand is still there, behind an "Advanced" disclosure, for a page whose price the
+engine cannot read at all.
 
 **Multiple stores.** A product can track more than one retailer's URL for the
 same item. The detail page draws one line per store on the price chart, and the
@@ -48,10 +53,11 @@ Each fires once and then keeps quiet for a cooldown, on the theory that being
 told the same thing every three hours is how a notifier gets muted. A lower
 price reopens it.
 
-**Broken watches.** Selectors rot. A shop changes its markup, the tracker stops
+**Broken watches.** Markup rots. A shop changes its page, the tracker stops
 finding a price, and left alone it would sit there indefinitely saying nothing.
 After a few consecutive failures it sends a `watch_broken` alert, then shuts up
-until the product recovers.
+until the product recovers. Repairing one is the same question as setting it up:
+re-fetch the page and say what price it shows now.
 
 **Scheduling.** Interval is per store, five minutes to a week, with some jitter
 so a batch added in one sitting does not hit the same shop on the same minute.

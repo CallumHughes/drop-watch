@@ -4,7 +4,10 @@ import type {
   PreviewExtraction,
 } from "@drop-watch/api/routers/preview";
 import type { RenderMode } from "@drop-watch/api/schemas/products";
+import { toMinorUnits } from "@drop-watch/core/decimal";
 import type { ListingExtractor } from "@drop-watch/core/extract/strategies";
+
+import { formatPrice } from "@/lib/format";
 
 export interface ListingRepairState {
   chosen: PreviewExtraction | null;
@@ -51,6 +54,22 @@ export function listingExtractionSettings(
   return { expression: null, extractor: "auto", render: state.preview.render };
 }
 
+/**
+ * How this listing's price is found, without naming the expression.
+ *
+ * The editor no longer offers to change the expression by hand — the repair
+ * panel derives it from a price the reader confirms — so printing it here would
+ * only invite editing it somewhere that cannot.
+ */
+export function listingExtractionNote(settings: ListingExtractionSettings): string {
+  const extraction =
+    settings.extractor === "auto"
+      ? "Found automatically from the page's own product data"
+      : "Read from a spot on the page you confirmed";
+  const rendering = settings.render === "browser" ? ", loaded in a headless browser" : "";
+  return `${extraction}${rendering}.`;
+}
+
 /** How each pinned mode reads in the settings editor and its repair panel. */
 export const EXPRESSION_LABELS: Record<ExpressionMode, string> = {
   jsonpath: "JSONPath",
@@ -82,13 +101,48 @@ export function repairActionLabel(next: ListingExtractionSettings | null): strin
     : `Apply tested ${EXPRESSION_LABELS[next.extractor]}`;
 }
 
+/** The price this listing records now, and the price the repair would record. */
+export interface TrackedPriceChange {
+  currency: string | null;
+  next: string;
+  /** The last price recorded for this listing; `null` when there is none. */
+  previous: string | null;
+}
+
+/**
+ * Names the price the repair would start recording, when that differs from the
+ * one on record.
+ *
+ * Worth saying out loud: `drop_percent` fires against this listing's own
+ * previous observation, so moving the reading from a was-price to the real one
+ * is an artificial fall and the next check can alert on it.
+ */
+function trackedPriceSentence(tracked: TrackedPriceChange | undefined): string | null {
+  if (!tracked?.previous) {
+    return null;
+  }
+  let changed = false;
+  try {
+    changed = toMinorUnits(tracked.previous) !== toMinorUnits(tracked.next);
+  } catch {
+    return null;
+  }
+  if (!changed) {
+    return null;
+  }
+  const from = formatPrice(tracked.previous, tracked.currency);
+  const to = formatPrice(tracked.next, tracked.currency);
+  return ` It will record ${to} where ${from} is on record, so the next check will read as a price change and may alert.`;
+}
+
 /**
  * Spells out every change applying would make. An automatic result quietly
  * clearing a working expression is the case this exists for.
  */
 export function repairSummary(
   next: ListingExtractionSettings,
-  current: ListingExtractionSettings
+  current: ListingExtractionSettings,
+  tracked?: TrackedPriceChange
 ): string {
   const changes: string[] = [];
   if (next.extractor === "auto") {
@@ -102,5 +156,5 @@ export function repairSummary(
   if (next.render !== current.render) {
     changes.push(`check over ${RENDER_LABELS[next.render]}`);
   }
-  return `Applying will ${listPhrase(changes)}.`;
+  return `Applying will ${listPhrase(changes)}.${trackedPriceSentence(tracked) ?? ""}`;
 }

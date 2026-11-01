@@ -16,6 +16,7 @@ import {
   toExpressionPreview,
   toPreviewExtraction,
   toPreviewExtractionError,
+  toPriceSuggestion,
 } from "./preview";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
@@ -667,6 +668,66 @@ describe("toPreviewExtraction", () => {
     expect(result.extraction).toMatchObject({
       confidence: "high",
       evidence: { matchCount: 1, type: "selector:configured" },
+    });
+  });
+});
+
+describe("toPriceSuggestion", () => {
+  const sample = { context: '<span class="price">£24.99</span>', value: "£24.99" };
+
+  it("flattens absent currencies to null on the wire", () => {
+    expect(
+      toPriceSuggestion({
+        automatic: { agrees: true, ambiguous: false, price: "24.99" },
+        candidates: [
+          { expression: ".amount", mode: "selector", reason: "Reads the text.", sample },
+        ],
+        pricesOnPage: [{ amount: "19.99", context: "£19.99" }],
+      })
+    ).toEqual({
+      automatic: { agrees: true, ambiguous: false, currency: null, price: "24.99" },
+      candidates: [
+        {
+          currency: null,
+          expression: ".amount",
+          mode: "selector",
+          reason: "Reads the text.",
+          sample,
+        },
+      ],
+      pricesOnPage: [{ amount: "19.99", context: "£19.99", currency: null }],
+    });
+  });
+
+  it("keeps a currency the expression itself yields", () => {
+    const wire = toPriceSuggestion({
+      automatic: { agrees: false, ambiguous: true, currency: "GBP", price: "49.99" },
+      candidates: [
+        {
+          currency: "GBP",
+          expression: "$.offers[1]",
+          mode: "jsonpath",
+          reason: "Reads the page's structured data.",
+          sample: { context: '<script id="x">', value: '{"price":"24.99"}' },
+        },
+      ],
+      pricesOnPage: [],
+    });
+
+    expect(wire.automatic).toEqual({
+      agrees: false,
+      ambiguous: true,
+      currency: "GBP",
+      price: "49.99",
+    });
+    expect(wire.candidates[0]?.currency).toBe("GBP");
+  });
+
+  it("reports no automatic verdict when the chain read nothing", () => {
+    expect(toPriceSuggestion({ automatic: null, candidates: [], pricesOnPage: [] })).toEqual({
+      automatic: null,
+      candidates: [],
+      pricesOnPage: [],
     });
   });
 });

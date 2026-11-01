@@ -39,7 +39,7 @@ export function extractByJsonPath({
   }
 
   for (const value of resolved) {
-    const parsed = priceFrom(value, locale);
+    const parsed = jsonValuePrice(value, locale);
     if (parsed) {
       const candidate: PriceCandidate = {
         confidence: "high",
@@ -63,8 +63,13 @@ export function extractByJsonPath({
  * Availability is deliberately not read here: there is no convention for where
  * it sits relative to an arbitrary path, and guessing wrong would silently
  * mark things in stock.
+ *
+ * Exported for `./suggest`, which validates synthesised paths against JSON
+ * documents it has already collected. Reading a resolved value one way in the
+ * strategy and another in the suggester is exactly how a suggestion starts
+ * promising a price the strategy will not read.
  */
-function priceFrom(value: unknown, locale: string | undefined): ParsedPrice | null {
+export function jsonValuePrice(value: unknown, locale: string | undefined): ParsedPrice | null {
   if (typeof value === "number" || typeof value === "string") {
     return parsePrice(value, { ...(locale ? { locale } : {}) });
   }
