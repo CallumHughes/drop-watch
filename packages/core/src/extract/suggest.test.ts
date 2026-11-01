@@ -471,6 +471,27 @@ describe("suggestExpressions — JSON", () => {
     expect(candidates[0]?.currency).toBe("GBP");
   });
 
+  it("still validates stable markup when unpenalised paths fill the budget", () => {
+    // Worse than the variant array: these paths carry no index and no penalty
+    // at all, so nothing in the draft ordering holds them back. What makes
+    // them unpinnable is the currency they do not read, and that is known only
+    // once a candidate has been run — after the cutoff.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({
+        variants: Object.fromEntries(
+          Array.from({ length: 45 }, (_entry, index) => [`sku${index}`, { price: 24.99 }])
+        ),
+      })}</script>
+       <span class="product-price">£24.99</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.currency).toBe("GBP");
+  });
+
   it("ranks a list position below stable markup, because it fails silently", () => {
     const html = page(
       ldScript({

@@ -31,6 +31,11 @@ import type { CheerioElement, ExpressionMode, StrategyContext } from "./types";
 const MAX_ELEMENTS = 6000;
 /** Candidates actually run against the document. */
 const MAX_VALIDATIONS = 40;
+/**
+ * Validations held back for the other mode, so one payload cannot take them
+ * all. See {@link budgeted}.
+ */
+const RESERVED_VALIDATIONS = 12;
 /** Returned candidates. The surplus beyond the first is for an agent or the
  * advanced picker; the UI applies the top one. */
 const MAX_CANDIDATES = 5;
@@ -1399,6 +1404,53 @@ function currencyPenalty(
   return listingCurrency ? BARE_NUMBER_PENALTY : NO_CURRENCY_PENALTY;
 }
 
+interface ScoredDraft {
+  draft: Draft;
+  total: number;
+}
+
+/**
+ * The drafts the validation budget is spent on: best first, except that
+ * neither mode may starve the other.
+ *
+ * Ordering alone cannot do it, because the term deciding whether a candidate
+ * can be pinned at all — the currency it reads — is known only once it has
+ * been run. One payload can hand the JSON walker more unpenalised drafts than
+ * the whole budget: a 45-key map of `{ price }` objects is 45 tier-0 paths
+ * carrying no penalty and no currency, none of which a listing without one can
+ * record, and best-first ordering spent every slot inside it while the one
+ * markup selector on the page carrying `£` was never run.
+ *
+ * So each mode keeps a floor it cannot be pushed below while it still has
+ * drafts to offer. Within a mode the order is unchanged, and a page whose
+ * drafts fit in the budget is unaffected.
+ */
+function budgeted(sorted: readonly ScoredDraft[]): ScoredDraft[] {
+  const unseen: Record<ExpressionMode, number> = { jsonpath: 0, selector: 0 };
+  for (const { draft } of sorted) {
+    unseen[draft.mode] += 1;
+  }
+  const spent: Record<ExpressionMode, number> = { jsonpath: 0, selector: 0 };
+  const taken: ScoredDraft[] = [];
+  for (const entry of sorted) {
+    if (taken.length >= MAX_VALIDATIONS) {
+      break;
+    }
+    const { mode } = entry.draft;
+    const other = mode === "jsonpath" ? "selector" : "jsonpath";
+    unseen[mode] -= 1;
+    // Only what the other mode can still use is held for it, so a page with
+    // one selector on it does not cost the JSON walker twelve slots.
+    const held = Math.min(unseen[other], RESERVED_VALIDATIONS);
+    if (spent[mode] >= MAX_VALIDATIONS - held) {
+      continue;
+    }
+    spent[mode] += 1;
+    taken.push(entry);
+  }
+  return taken;
+}
+
 function listPhrase(parts: readonly string[]): string {
   if (parts.length <= 1) {
     return parts[0] ?? "";
@@ -1556,10 +1608,11 @@ export function suggestExpressions(html: string, options: SuggestOptions): Sugge
   // Best drafts first, so the validation budget is spent on the candidates
   // that could actually be pinned rather than on whichever shape the walkers
   // happened to produce most of.
-  const drafts = [...byExpression.values()]
-    .map((draft) => ({ draft, total: draftScore(draft) }))
-    .sort((a, b) => a.total - b.total)
-    .slice(0, MAX_VALIDATIONS);
+  const drafts = budgeted(
+    [...byExpression.values()]
+      .map((draft) => ({ draft, total: draftScore(draft) }))
+      .sort((a, b) => a.total - b.total)
+  );
 
   const ranked: { candidate: ExpressionCandidate; total: number }[] = [];
   for (const { draft, total } of drafts) {
