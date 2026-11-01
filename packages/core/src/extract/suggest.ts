@@ -1343,15 +1343,17 @@ function validateJsonPath(
   };
 }
 
-function score(
-  draft: Draft,
-  candidate: UnreasonedCandidate,
-  listingCurrency: string | undefined
-): number {
-  let total = draft.tier * TIER_WEIGHT + Math.floor(candidate.expression.length / LENGTH_DIVISOR);
-  if (!candidate.currency) {
-    total += listingCurrency ? BARE_NUMBER_PENALTY : NO_CURRENCY_PENALTY;
-  }
+/**
+ * Everything ranking can say about a draft before it is run.
+ *
+ * Only the currency a candidate reads needs the validation it is competing
+ * for, so this is also what decides which drafts get the budget. Ordering the
+ * drafts by tier alone spent all 40 validations on a 25-entry `variants`
+ * array — every draft in it positional — and never ran the `.product-price`
+ * selector that would have won.
+ */
+function draftScore(draft: Draft): number {
+  let total = draft.tier * TIER_WEIGHT + Math.floor(draft.expression.length / LENGTH_DIVISOR);
   if (draft.unnamed) {
     total += UNNAMED_FIELD_PENALTY;
   }
@@ -1377,6 +1379,23 @@ function score(
     total += STALE_PRICE_PENALTY;
   }
   return total;
+}
+
+/**
+ * The one term only validation can settle.
+ *
+ * A candidate reading no currency on a listing that has none recorded is an
+ * `extract_failed` next check whatever else is true of it, so it gives up its
+ * whole band rather than a penalty a tier gap can outweigh.
+ */
+function currencyPenalty(
+  candidate: UnreasonedCandidate,
+  listingCurrency: string | undefined
+): number {
+  if (candidate.currency) {
+    return 0;
+  }
+  return listingCurrency ? BARE_NUMBER_PENALTY : NO_CURRENCY_PENALTY;
 }
 
 function listPhrase(parts: readonly string[]): string {
@@ -1533,12 +1552,16 @@ export function suggestExpressions(html: string, options: SuggestOptions): Sugge
       byExpression.set(key, draft);
     }
   }
+  // Best drafts first, so the validation budget is spent on the candidates
+  // that could actually be pinned rather than on whichever shape the walkers
+  // happened to produce most of.
   const drafts = [...byExpression.values()]
-    .sort((a, b) => a.tier - b.tier)
+    .map((draft) => ({ draft, total: draftScore(draft) }))
+    .sort((a, b) => a.total - b.total)
     .slice(0, MAX_VALIDATIONS);
 
   const ranked: { candidate: ExpressionCandidate; total: number }[] = [];
-  for (const draft of drafts) {
+  for (const { draft, total } of drafts) {
     const validated =
       draft.mode === "jsonpath"
         ? validateJsonPath(documents, draft.expression, expected, options.locale)
@@ -1548,7 +1571,7 @@ export function suggestExpressions(html: string, options: SuggestOptions): Sugge
     }
     ranked.push({
       candidate: { ...validated, reason: reasonFor(draft, validated, options.listingCurrency) },
-      total: score(draft, validated, options.listingCurrency),
+      total: total + currencyPenalty(validated, options.listingCurrency),
     });
   }
   ranked.sort((a, b) => a.total - b.total);

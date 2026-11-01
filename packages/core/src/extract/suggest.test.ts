@@ -449,6 +449,28 @@ describe("suggestExpressions — JSON", () => {
     });
   });
 
+  it("still validates stable markup when a long variant list fills the budget", () => {
+    // Every draft the array yields is positional, and there are more of them
+    // than the validation budget allows. Ordering drafts by tier alone spent
+    // the lot on them, so the one selector worth pinning was never run — and
+    // reordering the array then moved the pin to a different variant's price.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({
+        variants: [
+          ...Array.from({ length: 25 }, () => ({ price: 24.99, priceCurrency: "GBP" })),
+          { price: 19.99, priceCurrency: "GBP" },
+        ],
+      })}</script>
+       <span class="product-price">£24.99</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.currency).toBe("GBP");
+  });
+
   it("ranks a list position below stable markup, because it fails silently", () => {
     const html = page(
       ldScript({
