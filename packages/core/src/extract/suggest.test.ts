@@ -639,6 +639,23 @@ describe("suggestExpressions — ranking against what the listing already knows"
     expect(candidates[0]?.currency).toBe("GBP");
   });
 
+  it("prefers currency-bearing markup even when nothing names its element", () => {
+    // The wrapper and the bare tag inside it are the only candidates reading a
+    // currency, and both carry a shape penalty. Neither may lose to the bare
+    // JSON number on that account: a listing with no currency cannot record a
+    // reading that has none either.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ price: 24.99 })}</script>
+       <main class="product-main"><span class="css-1x2y3z">£24.99</span></main>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.currency).toBe("GBP");
+    expect(candidates[0]?.mode).toBe("selector");
+  });
+
   it("prefers the durable path once the listing supplies the currency", () => {
     const { candidates } = suggestExpressions(bareJsonAndMarkup, {
       expectedPrice: "24.99",

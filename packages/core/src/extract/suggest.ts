@@ -1220,22 +1220,36 @@ function walkJson(
 /** Durability of a candidate's *shape*: structured data, attribute, then text. */
 const TIER_WEIGHT = 1000;
 /**
- * Every penalty below outweighs a tier, and most outweigh two.
+ * Three bands, spaced clear of each other so the arithmetic compares them in
+ * order instead of averaging them.
  *
  * A tier says how well a candidate's shape will survive the page being
- * rebuilt. A penalty says it reads the wrong number, or no number the worker
- * will accept — which no amount of durability redeems. A bare `price` in an
- * embedded blob is the most durable thing this engine can produce and must
- * still lose to the markup that carries a currency when the listing has none,
- * because that pin is an `extract_failed` on the very next check.
+ * rebuilt; a penalty says it reads the wrong number, or no number the worker
+ * will accept. Those are not commensurable, and while they shared one band a
+ * two-tier gap could swallow a penalty whole: a bare `price` in an embedded
+ * payload outranked the markup carrying a currency on a listing that had none
+ * stored, which is an `extract_failed` on the very next check.
+ *
+ * Lowest band, under {@link NO_CURRENCY_PENALTY}: the tier, and the penalties
+ * that only say a markup change could move the reading. Two tiers and all
+ * three of those come to 3500, so the band stays well inside its ceiling.
+ *
+ * Then feasibility, under {@link POSITIONAL_PENALTY}: it reads no currency and
+ * the listing has none, so it cannot run at all until one is configured.
+ *
+ * Then risk: it reads a number that is not the price, or will not be
+ * tomorrow. That loses even to a candidate which cannot run yet, because it
+ * fails silently and a failed check does not.
  */
-const STALE_PRICE_PENALTY = 2600;
-const UNNAMED_FIELD_PENALTY = 2600;
-const OTHER_PRODUCT_PENALTY = 2500;
-const STRUCK_PENALTY = 2400;
-const PROSE_PENALTY = 2300;
+const STALE_PRICE_PENALTY = 10_600;
+const UNNAMED_FIELD_PENALTY = 10_600;
+const OTHER_PRODUCT_PENALTY = 10_500;
+const STRUCK_PENALTY = 10_400;
+const PROSE_PENALTY = 10_300;
+/** Which of several prices this reads depends on their order in the markup. */
+const POSITIONAL_PENALTY = 10_100;
 /** No currency anywhere: on the candidate, and none on file for the listing. */
-const NO_CURRENCY_PENALTY = 2200;
+const NO_CURRENCY_PENALTY = 5000;
 /**
  * The listing already has one, so a bare number still checks out — but reading
  * the currency off the page beats trusting what was stored, because a page that
@@ -1245,8 +1259,6 @@ const NO_CURRENCY_PENALTY = 2200;
  * not displaced by markup over the currency alone.
  */
 const BARE_NUMBER_PENALTY = 600;
-/** Which of several prices this reads depends on their order in the markup. */
-const POSITIONAL_PENALTY = 1500;
 /** Identified only by its ancestors and tag, so a markup change can move it. */
 const WEAK_SELECTOR_PENALTY = 500;
 /**
