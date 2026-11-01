@@ -133,6 +133,50 @@ describe("suggestExpressions — markup", () => {
     expect(candidates[0]?.reason).toBe("Reads the price element's text.");
   });
 
+  it("reads a carousel name spelled across two classes", () => {
+    // `also bought` puts the phrase in two classes, and no class of a
+    // recommendation block says "price", so the was-price rule's corroboration
+    // could never fire here. Without it the carousel's wrapper outranked the
+    // real price element on expression length alone.
+    const html = page(
+      "",
+      `<main class="pdp"><span class="product-price">£24.99</span></main>
+       <aside class="also bought"><span class="tile-price">£24.99</span></aside>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    const order = candidates.map((candidate) => candidate.expression);
+    expect(order.indexOf(".product-price")).toBeLessThan(order.indexOf(".also"));
+    expect(candidates.find((candidate) => candidate.expression === ".also")?.reason).toContain(
+      "another product"
+    );
+    expect(
+      candidates.find((candidate) => candidate.expression === ".tile-price")?.reason
+    ).toContain("another product");
+  });
+
+  it("does not read an ordinary name as a carousel for want of a companion", () => {
+    // `other` is a companion away from naming a carousel, and `details` is not
+    // that companion.
+    const html = page(
+      "",
+      '<main class="pdp"><span class="other-details price">£24.99</span></main>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates.find((candidate) => candidate.expression === ".price")?.reason).toBe(
+      "Reads the price element's text."
+    );
+  });
+
   it("still reads a hyphenated was-price name as one", () => {
     const html = page(
       "",
@@ -163,6 +207,54 @@ describe("suggestExpressions — markup", () => {
     // reason are the honest ones — the sentence caveat does not apply.
     expect(candidates[0]?.expression).toBe(".product-price");
     expect(candidates[0]?.reason).toBe("Reads an attribute on the price element.");
+  });
+
+  it("never makes a monetary attribute value part of the selector", () => {
+    // `[data-price="£24.99"]` identifies the element today and matches nothing
+    // the moment the price moves, so the watch would break on precisely the
+    // change it exists to catch.
+    const html = page("", '<span class="price" data-price="£24.99">£24.99</span>');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates) {
+      expect(candidate.expression).not.toContain("24.99");
+    }
+    expect(candidates[0]?.expression).toBe(".price::attr(data-price)");
+  });
+
+  it("does the same for a price carrying a currency code", () => {
+    const html = page("", '<span class="price" data-price="24.99 GBP">£24.99</span>');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    for (const candidate of candidates) {
+      expect(candidate.expression).not.toContain("24.99");
+    }
+  });
+
+  it("does not take an attribute for a price just because the number matches", () => {
+    // A product id on a page selling something for £499 parses to 499 and goes
+    // on reading 499 after the price moves.
+    const html = page("", '<span class="price" data-product-id="499">£499</span>');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".price");
+    expect(
+      candidates.find((candidate) => candidate.expression === ".price::attr(data-product-id)")
+        ?.reason
+    ).toContain("says it holds a price");
   });
 
   it("suggests a price that only exists in a meta property", () => {
@@ -434,6 +526,24 @@ describe("suggestExpressions — ranking against what the listing already knows"
     });
 
     expect(candidates[0]?.expression).toBe("$..price");
+    expect(candidates[0]?.reason).toBe("Reads the page's structured data.");
+  });
+
+  it("reads a price field named anywhere along its path", () => {
+    // `current` says nothing on its own; `priceInfo` says it plainly. Reading
+    // only the leaf key called this some number that happened to match.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ priceInfo: { current: 24.99 } })}</script>
+       <span class="product-price">£24.99</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe("$..current");
     expect(candidates[0]?.reason).toBe("Reads the page's structured data.");
   });
 

@@ -307,27 +307,81 @@ const OTHER_PRODUCT_WORDS = new Set([
   "youmaylike",
 ]);
 const WEAK_OTHER_PRODUCT_WORDS = new Set(["also", "more", "other", "suggest"]);
-
 /**
- * Whether any of these names carries one of `words`.
+ * What a weak other-product word needs beside it.
  *
- * Each name is read word by word and also whole with its separators removed,
- * so `cross-sell` matches `crosssell`. A `weak` word only counts when the same
- * name also says "price": `old-price` is a was-price, `font-bold` is a weight.
- * One name means one class or one id, never a whole attribute — see
- * {@link elementNames} for why that distinction is the whole point.
+ * `price` cannot do that job here: the whole phrase is `also bought`, and the
+ * second half lands in a class of its own. These words are safe to read across
+ * an element's classes because none of them is price-element vocabulary.
  */
-function namesCarry(
-  names: readonly string[],
-  words: ReadonlySet<string>,
-  weak: ReadonlySet<string>
-): boolean {
-  for (const name of names) {
-    const found = nameWords(name);
-    if (words.has(found.join("")) || found.some((word) => words.has(word))) {
+const OTHER_PRODUCT_COMPANIONS = new Set([
+  "bought",
+  "items",
+  "like",
+  "liked",
+  "picks",
+  "products",
+  "sellers",
+  "viewed",
+]);
+
+/** A vocabulary, and what its half-words need beside them to count. */
+interface WordSignal {
+  /**
+   * Whether a corroborating word may come from another of the element's names.
+   *
+   * False for a was-price, whose corroborator is `price` and therefore sits on
+   * half the price elements on the web — `w-full product-price` is not an old
+   * price. True where the corroborators are a vocabulary that never turns up
+   * on a price element by itself, so `class="also bought"` can still be read.
+   */
+  acrossNames: boolean;
+  corroborators: ReadonlySet<string>;
+  /** Words that say it only alongside a corroborator. */
+  weak: ReadonlySet<string>;
+  /** Words that say it on their own. */
+  words: ReadonlySet<string>;
+}
+
+const STALE_PRICE_SIGNAL: WordSignal = {
+  acrossNames: false,
+  corroborators: PRICE_WORDS,
+  weak: WEAK_STALE_PRICE_WORDS,
+  words: STALE_PRICE_WORDS,
+};
+const OTHER_PRODUCT_SIGNAL: WordSignal = {
+  acrossNames: true,
+  corroborators: OTHER_PRODUCT_COMPANIONS,
+  weak: WEAK_OTHER_PRODUCT_WORDS,
+  words: OTHER_PRODUCT_WORDS,
+};
+
+function carriesAny(words: Iterable<string>, set: ReadonlySet<string>): boolean {
+  for (const word of words) {
+    if (set.has(word)) {
       return true;
     }
-    if (found.some((word) => weak.has(word)) && found.some((word) => PRICE_WORDS.has(word))) {
+  }
+  return false;
+}
+
+/**
+ * Whether any of these names carries one of `signal`'s words.
+ *
+ * Each name is read word by word and also whole with its separators removed,
+ * so `cross-sell` matches `crosssell`. One name means one class or one id,
+ * never a whole attribute — see {@link elementNames} for why that distinction
+ * is the whole point, and {@link WordSignal.acrossNames} for the one place it
+ * is deliberately relaxed.
+ */
+function namesCarry(names: readonly string[], signal: WordSignal): boolean {
+  const everyWord = signal.acrossNames ? names.flatMap((name) => nameWords(name)) : null;
+  for (const name of names) {
+    const found = nameWords(name);
+    if (signal.words.has(found.join("")) || carriesAny(found, signal.words)) {
+      return true;
+    }
+    if (carriesAny(found, signal.weak) && carriesAny(everyWord ?? found, signal.corroborators)) {
       return true;
     }
   }
@@ -335,11 +389,11 @@ function namesCarry(
 }
 
 function namesAreStale(names: readonly string[]): boolean {
-  return namesCarry(names, STALE_PRICE_WORDS, WEAK_STALE_PRICE_WORDS);
+  return namesCarry(names, STALE_PRICE_SIGNAL);
 }
 
 function namesAreOtherProduct(names: readonly string[]): boolean {
-  return namesCarry(names, OTHER_PRODUCT_WORDS, WEAK_OTHER_PRODUCT_WORDS);
+  return namesCarry(names, OTHER_PRODUCT_SIGNAL);
 }
 
 function looksGenerated(token: string): boolean {
@@ -355,8 +409,15 @@ function looksGenerated(token: string): boolean {
 /**
  * The same judgement for a *quoted* attribute value, which may legitimately
  * hold what a CSS identifier may not — `product:price:amount` is the most
- * stable place a price lives. Only the quoting characters have to go, plus a
- * value that is itself a number and would pin today's price into the selector.
+ * stable place a price lives. Only the quoting characters have to go, plus any
+ * value that reads as money.
+ *
+ * That last one is the point: `[data-price="£24.99"]` identifies the element
+ * today and matches nothing the moment the price moves, so the watch breaks on
+ * precisely the change it exists to catch. Asking `parsePrice` rather than
+ * testing for a bare number catches `£24.99` and `24.99 GBP` too, and it is
+ * the right way round to be wrong — a rejected value costs one candidate,
+ * while an accepted one costs the watch.
  */
 function looksGeneratedValue(value: string): boolean {
   return (
@@ -366,7 +427,8 @@ function looksGeneratedValue(value: string): boolean {
     MANY_DIGITS.test(value) ||
     NUMERIC_VALUE.test(value) ||
     QUOTES.test(value) ||
-    UNQUOTABLE.test(value)
+    UNQUOTABLE.test(value) ||
+    parsePrice(value) !== null
   );
 }
 
@@ -525,7 +587,6 @@ function narrowedSelector(
   element: CheerioElement,
   budget: SelectorBudget
 ): SelfSelector | null {
-  budget.element = MAX_SELECTOR_QUERIES_PER_ELEMENT;
   const own = selfSelectors(element);
   for (const entry of own) {
     if (!entry.weak && identifies($, entry.selector, element, budget)) {
@@ -712,6 +773,32 @@ function priceAttributes(
   return found;
 }
 
+/** Attributes whose value names what an element is, for {@link attributeSaysPrice}. */
+const PRICE_NAMING_ATTRIBUTES = ["class", "id", "itemprop", "property", "name"];
+
+/**
+ * Whether an attribute worth reading says it holds a *price*.
+ *
+ * `data-product-id="499"` parses to 499 on a page selling something for £499,
+ * and it will still read 499 after the price moves — the silent wrong reading
+ * the `unnamed` flag exists for, and the one the JSON side already refuses.
+ * The attribute's own name usually settles it. `content` and `value` carry no
+ * meaning of their own, so for those the element has to say it instead, which
+ * is what makes `<meta itemprop="price" content="24.99">` the shape it is.
+ */
+function attributeSaysPrice(attributes: Attributes, name: string): boolean {
+  if (carriesAny(nameWords(name), PRICE_WORDS)) {
+    return true;
+  }
+  if (!(name === "content" || name === "value")) {
+    return false;
+  }
+  return PRICE_NAMING_ATTRIBUTES.some((attribute) => {
+    const value = attributes[attribute];
+    return Boolean(value) && carriesAny(nameWords(value as string), PRICE_WORDS);
+  });
+}
+
 function attributeDraft(
   $: CheerioAPI,
   element: CheerioElement,
@@ -738,7 +825,7 @@ function attributeDraft(
     prose: (value.match(LETTERS)?.length ?? 0) > MAX_PRICE_TEXT_LETTERS,
     struck: isStruck($, element),
     tier: 1,
-    unnamed: false,
+    unnamed: !attributeSaysPrice("attribs" in element ? element.attribs : {}, name),
     weak: selector.weak,
   };
 }
@@ -785,6 +872,10 @@ function inspectElement(
     return 0;
   }
   const node = $(element);
+  // Once per element, not once per narrowing: an element with three
+  // price-bearing attributes and matching text attempts it four times, and
+  // resetting the allowance each time let one element spend most of the call's.
+  budget.element = MAX_SELECTOR_QUERIES_PER_ELEMENT;
   const attributes: Attributes = element.attribs;
   const priceNamed = isPriceNamed(attributes);
   const text = collapse(node.text());
@@ -865,18 +956,18 @@ function pathNames(path: readonly (string | number)[], source: string): string[]
 /**
  * Whether the field a scalar sits in says it holds a price.
  *
- * The nearest named key, so `prices[1]` is named by `prices`. Without this a
- * page carrying `{ "stock": 499 }` and showing `£499` has `$..stock` as its
- * most durable candidate, and the pin reads the stock count from then on.
+ * Any key on the path, not only the leaf: `priceInfo.current` is as plainly a
+ * price as `product.price`, and reading the leaf alone marked it as some
+ * number that happened to match. `{ "stock": 499 }` on a page showing `£499`
+ * still has nothing naming it, which is the case this exists for — without it
+ * `$..stock` is the most durable candidate and the pin reads the stock count
+ * from then on.
  */
 function pathIsPriceNamed(path: readonly (string | number)[]): boolean {
-  for (let index = path.length - 1; index >= 0; index -= 1) {
-    const segment = path[index];
-    if (typeof segment === "string") {
-      return nameWords(segment).some((word) => PRICE_WORDS.has(word));
-    }
-  }
-  return false;
+  return path.some(
+    (segment) =>
+      typeof segment === "string" && nameWords(segment).some((word) => PRICE_WORDS.has(word))
+  );
 }
 
 /**

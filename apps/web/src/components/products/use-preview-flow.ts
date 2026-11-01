@@ -49,6 +49,31 @@ export function automaticAlreadyReadsIt(
 }
 
 /**
+ * Whether the locator still owes an answer for what is in the price field.
+ *
+ * Deliberately not gated on the typed value being usable. When a located price
+ * is edited into something unusable, the previous price's answer is still the
+ * current one for a debounce, and a pin derived from it must stop counting at
+ * once rather than staying saveable behind an "unusable" message. The panel
+ * still reads `unusable` rather than `searching`, because `locatorOutcome`
+ * asks that question first.
+ */
+export function isLocatingPrice({
+  expectedPrice,
+  isFetching,
+  settledExpectedPrice,
+}: {
+  expectedPrice: string;
+  isFetching: boolean;
+  settledExpectedPrice: string;
+}): boolean {
+  if (expectedPrice.trim() !== settledExpectedPrice.trim()) {
+    return true;
+  }
+  return expectedPriceIsUsable(expectedPrice) && isFetching;
+}
+
+/**
  * The expression a suggestion pins, or `null` for none.
  *
  * `null` is as meaningful an answer as a candidate. A price that matched
@@ -434,9 +459,11 @@ export function usePreviewFlow({
   const expressionIsSettled = expression.trim() === trimmedExpression;
   const isTesting =
     trimmedExpression.length > 0 && (!expressionIsSettled || expressionTest.isFetching);
-  const isLocating =
-    expectedPriceIsUsable(expectedPrice) &&
-    (expectedPrice.trim() !== trimmedExpectedPrice || suggestion.isFetching);
+  const isLocating = isLocatingPrice({
+    expectedPrice,
+    isFetching: suggestion.isFetching,
+    settledExpectedPrice: trimmedExpectedPrice,
+  });
 
   // Whichever half of the flow produced a price is what gets saved. The picker
   // wins when it is open and working, so a page whose JSON-LD quotes the wrong

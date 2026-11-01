@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   failedBrowserAttempt,
   isCurrentPreviewRequest,
+  isLocatingPrice,
   locatorPin,
   normalizePreviewLocale,
   transportReloadControl,
@@ -321,5 +322,39 @@ describe("locatorPin", () => {
         })
       )
     ).toEqual({ expression: ".price", mode: "selector" });
+  });
+});
+
+describe("isLocatingPrice", () => {
+  it("is locating while the typed price has not settled", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "19.99", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("is locating while the request is in flight", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99", isFetching: true, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("keeps locating when a located price is edited into an unusable one", () => {
+    // The settled value is still the previous price, so its answer — and any
+    // pin derived from it — is stale and must stop counting immediately.
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99x", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("is settled once the answer for the typed price is in", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(false);
+  });
+
+  it("is settled while the advanced picker is used and no price is typed", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "", isFetching: false, settledExpectedPrice: "" })
+    ).toBe(false);
   });
 });
