@@ -214,6 +214,22 @@ test('ignores generated output in a Git checkout while including untracked sourc
 	assert.deepEqual(checkPrimitivesMapPaths(map, root).map(({ path }) => path), ['src/*.ts', '**/generated.ts'])
 })
 
+test('checks an ignored export inside another checkout without using the parent Git index', (t) => {
+	const parent = mkdtempSync(join(tmpdir(), 'primitives-map-'))
+	t.after(() => rmSync(parent, { recursive: true, force: true }))
+	execFileSync('git', ['init', '--quiet', parent])
+	writeFileSync(join(parent, '.gitignore'), 'tmp/\n')
+	const root = join(parent, 'tmp/export')
+	mkdirSync(join(root, 'src'), { recursive: true })
+	writeFileSync(join(root, 'src/index.ts'), '')
+	const map = parsePrimitivesMap(`primitives:
+  - id: example
+    code:
+      - src/*.ts
+`)
+	assert.deepEqual(checkPrimitivesMapPaths(map, root), [])
+})
+
 test('skips unreadable and disappearing directories when checking an export without Git', (t) => {
 	const root = mkdtempSync(join(tmpdir(), 'primitives-map-'))
 	t.after(() => rmSync(root, { recursive: true, force: true }))

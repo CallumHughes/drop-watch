@@ -5,7 +5,7 @@
  * and invariant records, folded text, and path lists. Not a general YAML parser.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { minimatch } from 'minimatch'
 
@@ -317,23 +317,27 @@ export function checkPrimitivesMapPaths(
 /** @param {string} repoRoot */
 function listPaths(repoRoot) {
 	try {
-		const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
+		const options = {
 			cwd: repoRoot,
 			encoding: 'utf8',
 			stdio: ['ignore', 'pipe', 'ignore'],
 			maxBuffer: 16 * 1024 * 1024,
-		})
-		const paths = new Set()
-		for (const file of output.split('\0').filter(Boolean)) {
-			if (!existsSync(resolve(repoRoot, file))) continue
-			paths.add(file)
-			let parent = file
-			while (parent.includes('/')) {
-				parent = parent.slice(0, parent.lastIndexOf('/'))
-				paths.add(parent)
-			}
 		}
-		return [...paths]
+		const gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], options).replace(/\r?\n$/, '')
+		if (realpathSync(gitRoot) === realpathSync(repoRoot)) {
+			const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], options)
+			const paths = new Set()
+			for (const file of output.split('\0').filter(Boolean)) {
+				if (!existsSync(resolve(repoRoot, file))) continue
+				paths.add(file)
+				let parent = file
+				while (parent.includes('/')) {
+					parent = parent.slice(0, parent.lastIndexOf('/'))
+					paths.add(parent)
+				}
+			}
+			return [...paths]
+		}
 	} catch (error) {
 		if (error.status !== 128 && error.code !== 'ENOENT') throw error
 	}

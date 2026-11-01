@@ -1,7 +1,8 @@
 # The system primitives of DropWATCH, as used by the `visual-recap` skill to
 # classify a change. `id` values are stable and quoted verbatim in recap
-# blocks. `code` globs map changed paths to a primitive; first match wins,
-# most specific glob first.
+# blocks. `code` globs map changed paths to a primitive; first match wins.
+# Build configuration leads so its broad build globs own every Dockerfile.
+# Order the remaining primitives from specific to general, excluding overlaps.
 #
 # Keep this current: a PR that adds, removes, or reshapes a primitive updates
 # this file in the same PR.
