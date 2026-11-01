@@ -657,6 +657,8 @@ interface Draft {
   unnamed: boolean;
   /** Identified only by its ancestors and tag. */
   weak: boolean;
+  /** Contains the element that holds the price, so a tighter pin exists. */
+  wrapper: boolean;
 }
 
 interface Walked {
@@ -714,6 +716,43 @@ function isPriceNamed(attributes: Attributes): boolean {
 }
 
 /**
+ * Whether a descendant element also reads this price, so a tighter pin exists.
+ *
+ * An ancestor whose whole text is just the price validates exactly as the
+ * price element does — `<div class="price-block"><span class="product-price">`
+ * is the commonest markup there is — and with nothing to separate them,
+ * document order decides, which picks the outermost: the least durable of the
+ * set. `.price-block` reads £24.99 today and reads a "Save £5" badge the day
+ * one is inserted before the price. The `.product-price` inside it cannot.
+ *
+ * Only a demotion, never a refusal: the wrapper is the right answer when the
+ * element inside holds a bare number and the wrapper carries the currency,
+ * which is why this penalty has to stay well under
+ * {@link NO_CURRENCY_PENALTY}.
+ */
+function wrapsAPriceElement(
+  $: CheerioAPI,
+  element: CheerioElement,
+  expected: bigint,
+  locale: string | undefined
+): boolean {
+  for (const descendant of $(element).find("*").toArray()) {
+    if (!("tagName" in descendant) || SKIPPED_TAGS.has(descendant.tagName)) {
+      continue;
+    }
+    const text = collapse($(descendant).text());
+    if (text.length === 0 || text.length > MAX_PRICE_TEXT_CHARS) {
+      continue;
+    }
+    const parsed = parsePrice(text, { ...(locale ? { locale } : {}) });
+    if (parsed && equalsExpected(parsed.amount, expected)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * The draft for an element whose text is the price.
  *
  * An element qualifies on its *whole* text, not its own text nodes, because
@@ -725,6 +764,7 @@ function textDraft(
   $: CheerioAPI,
   element: CheerioElement,
   text: string,
+  expected: bigint,
   locale: string | undefined,
   budget: SelectorBudget
 ): Draft | null {
@@ -742,6 +782,7 @@ function textDraft(
     tier: 2,
     unnamed: false,
     weak: selector.weak,
+    wrapper: wrapsAPriceElement($, element, expected, locale),
   };
 }
 
@@ -827,6 +868,8 @@ function attributeDraft(
     tier: 1,
     unnamed: !attributeSaysPrice("attribs" in element ? element.attribs : {}, name),
     weak: selector.weak,
+    // The attribute is on this element; what its descendants hold is not read.
+    wrapper: false,
   };
 }
 
@@ -900,7 +943,7 @@ function inspectElement(
   }
   if (parsed && equalsExpected(parsed.amount, expected)) {
     synthesised += 1;
-    const draft = textDraft($, element, text, locale, budget);
+    const draft = textDraft($, element, text, expected, locale, budget);
     if (draft) {
       out.drafts.push(draft);
     }
@@ -999,6 +1042,7 @@ function pathDrafts(
       tier: 0,
       unnamed,
       weak: false,
+      wrapper: false,
     });
   }
   const concrete = concretePath(path);
@@ -1016,6 +1060,7 @@ function pathDrafts(
     tier: indexed ? 2 : 0,
     unnamed,
     weak: false,
+    wrapper: false,
   });
 }
 
@@ -1108,12 +1153,25 @@ const STRUCK_PENALTY = 2400;
 const PROSE_PENALTY = 2300;
 /** No currency anywhere: on the candidate, and none on file for the listing. */
 const NO_CURRENCY_PENALTY = 2200;
-/** The listing already has one, so a bare number still checks out. */
-const BARE_NUMBER_PENALTY = 50;
+/**
+ * The listing already has one, so a bare number still checks out — but reading
+ * the currency off the page beats trusting what was stored, because a page that
+ * switches currency would otherwise go on being recorded in the old one. Above
+ * {@link WRAPPER_PENALTY}, so the wrapper that carries `£` is still preferred
+ * to the bare number inside it, and well under a tier, so a durable path is
+ * not displaced by markup over the currency alone.
+ */
+const BARE_NUMBER_PENALTY = 600;
 /** Which of several prices this reads depends on their order in the markup. */
 const POSITIONAL_PENALTY = 1500;
 /** Identified only by its ancestors and tag, so a markup change can move it. */
 const WEAK_SELECTOR_PENALTY = 500;
+/**
+ * It contains the price element rather than being it. Enough to settle what
+ * document order was settling arbitrarily, and nowhere near enough to lose to
+ * the bare number inside it.
+ */
+const WRAPPER_PENALTY = 400;
 /** Length only breaks ties: a shorter expression has fewer things to rot. */
 const LENGTH_DIVISOR = 10;
 
@@ -1217,6 +1275,9 @@ function score(
   if (draft.weak) {
     total += WEAK_SELECTOR_PENALTY;
   }
+  if (draft.wrapper) {
+    total += WRAPPER_PENALTY;
+  }
   if (namesAreStale(draft.names)) {
     total += STALE_PRICE_PENALTY;
   }
@@ -1271,6 +1332,11 @@ function reasonFor(
   }
   if (draft.weak) {
     caveats.push("it has no stable class or id of its own, so a markup change may break it again");
+  }
+  if (draft.wrapper) {
+    caveats.push(
+      "it wraps the element the price sits in rather than being it, so anything added inside it would be read first"
+    );
   }
   if (namesAreStale(draft.names)) {
     caveats.push("its surroundings name it as a was-price");

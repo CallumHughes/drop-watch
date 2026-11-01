@@ -72,6 +72,41 @@ describe("suggestExpressions — markup", () => {
     expect(candidates.at(-1)?.reason).toContain("another product");
   });
 
+  it("prefers the price element to the block that wraps it", () => {
+    // The commonest markup there is. Both read £24.99 today; only the inner
+    // one keeps reading it when a "Save £5" badge is added to the block.
+    const html = page(
+      "",
+      '<section class="buybox"><div class="price-block"><span class="product-price">£24.99</span></div></section>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.reason).toBe("Reads the price element's text.");
+    expect(
+      candidates.find((candidate) => candidate.expression === ".price-block")?.reason
+    ).toContain("wraps the element the price sits in");
+  });
+
+  it("still prefers a wrapper that reads its own currency to the bare number inside it", () => {
+    // The demotion must never cost the currency: a bare number is recorded in
+    // whatever the listing last stored, so a page that switches currency would
+    // go on being reported in the old one.
+    const html = page("", '<span class="price">£<span class="amount">24.99</span></span>');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".price");
+    expect(candidates[0]?.currency).toBe("GBP");
+  });
+
   it("prefers the wrapper that carries the currency over the bare number", () => {
     const html = page("", '<span class="price">£<span class="amount">24.99</span></span>');
 
