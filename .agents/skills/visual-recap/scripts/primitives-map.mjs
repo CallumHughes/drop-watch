@@ -1,15 +1,15 @@
 /**
- * Shared parser + path classifier for docs/contributing/architecture/primitives.yaml.
+ * Shared parser + path classifier for docs/architecture/primitives.yaml.
  *
- * Constrained YAML subset (version/groups/primitives/invariants with scalar fields
- * and string lists). Not a general YAML parser.
+ * Constrained YAML subset used by the repository map: group mappings, primitive
+ * and invariant records, folded text, and path lists. Not a general YAML parser.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
+import { matchesGlob, resolve } from 'node:path'
 
 export const defaultMapPath = resolve(
 	import.meta.dirname,
-	'../../../../docs/contributing/architecture/primitives.yaml',
+	'../../../../docs/architecture/primitives.yaml',
 )
 
 /**
@@ -20,6 +20,7 @@ export const defaultMapPath = resolve(
  *   summary?: string
  *   code: Array<string>
  *   docs: Array<string>
+ *   excludes: Array<string>
  * }} Primitive
  */
 
@@ -50,8 +51,9 @@ export function parsePrimitivesMap(text) {
 	let section = 'root'
 	/** @type {Primitive | { id: string, name: string } | null} */
 	let current = null
-	/** @type {'code' | 'docs' | null} */
+	/** @type {'code' | 'docs' | 'excludes' | null} */
 	let listField = null
+	let foldedSummary = false
 
 	function finishCurrent() {
 		if (!current || !('id' in current)) return
@@ -61,27 +63,23 @@ export function parsePrimitivesMap(text) {
 			const primitive = /** @type {Primitive} */ (current)
 			primitive.code ??= []
 			primitive.docs ??= []
+			primitive.excludes ??= []
 			map.primitives.push(primitive)
 		} else if (section === 'invariants') {
 			const invariant = /** @type {Primitive} */ (current)
 			invariant.code ??= []
 			invariant.docs ??= []
+			invariant.excludes ??= []
 			map.invariants.push(invariant)
 		}
 		current = null
 		listField = null
+		foldedSummary = false
 	}
 
 	for (const rawLine of lines) {
-		const commentIndex = rawLine.indexOf('#')
-		const line =
-			commentIndex === -1
-				? rawLine
-				: // Keep `#` inside quoted scalars; our map never quotes.
-					/^\s*#/.test(rawLine)
-					? ''
-					: rawLine
-		if (!line.trim()) continue
+		const line = rawLine
+		if (!line.trim() || /^\s*#/.test(line)) continue
 
 		const sectionMatch = line.match(/^(groups|primitives|invariants):\s*$/)
 		if (sectionMatch) {
@@ -98,14 +96,21 @@ export function parsePrimitivesMap(text) {
 			continue
 		}
 
+		const groupMatch = line.match(/^ {2}([\w-]+):\s+(.+?)\s*$/)
+		if (section === 'groups' && groupMatch) {
+			map.groups.push({ id: groupMatch[1], name: unquote(groupMatch[2]) })
+			continue
+		}
+
 		const itemMatch = line.match(/^ {2}- id:\s+(.+?)\s*$/)
 		if (itemMatch) {
 			finishCurrent()
 			current = {
 				id: unquote(itemMatch[1]),
-				name: '',
+				name: unquote(itemMatch[1]),
 				code: [],
 				docs: [],
+				excludes: [],
 			}
 			listField = null
 			continue
@@ -113,47 +118,38 @@ export function parsePrimitivesMap(text) {
 
 		if (!current) continue
 
-		const listStart = line.match(/^ {4}(code|docs):\s*$/)
+		const listStart = line.match(/^ {4}(code|docs|excludes):\s*$/)
 		if (listStart) {
-			listField = /** @type {'code' | 'docs'} */ (listStart[1])
+			listField = /** @type {'code' | 'docs' | 'excludes'} */ (listStart[1])
+			foldedSummary = false
 			continue
 		}
 
 		const listItem = line.match(/^ {6}- (.+?)\s*$/)
 		if (listItem && listField && 'code' in current) {
 			const value = unquote(listItem[1])
-			if (listField === 'code') current.code.push(value)
-			else current.docs.push(value)
+			current[listField].push(value)
 			continue
 		}
 
-		const emptySummary = line.match(/^ {4}summary:\s*$/)
-		if (emptySummary) {
-			listField = null
-			current.summary = ''
+		if (foldedSummary && /^ {6}\S/.test(line)) {
+			current.summary = `${current.summary} ${line.trim()}`.trim()
 			continue
 		}
+		foldedSummary = false
+		listField = null
 
-		const summaryContinuation = line.match(/^ {6}(.+?)\s*$/)
-		if (
-			summaryContinuation &&
-			listField === null &&
-			'code' in current &&
-			current.summary === ''
-		) {
-			current.summary = unquote(summaryContinuation[1])
-			continue
-		}
-
-		const fieldMatch = line.match(/^ {4}(group|name|summary):\s+(.+?)\s*$/)
+		const fieldMatch = line.match(/^ {4}(group|name|summary|statement):\s+(.+?)\s*$/)
 		if (fieldMatch) {
 			listField = null
 			const key = fieldMatch[1]
 			const value = unquote(fieldMatch[2])
 			if (key === 'group') current.group = value
 			else if (key === 'name') current.name = value
-			else current.summary = value
-			continue
+			else {
+				foldedSummary = value === '>' || value === '>-' || value === '>+'
+				current.summary = foldedSummary ? '' : value
+			}
 		}
 	}
 
@@ -180,24 +176,14 @@ function unquote(value) {
  */
 export function pathMatchesRoot(filePath, root) {
 	const normalizedFile = filePath.replaceAll('\\', '/')
-	const isDirRoot = root.endsWith('/')
-	const normalizedRoot = root.replaceAll('\\', '/').replace(/\/$/, '')
+	const normalizedRoot = root.replaceAll('\\', '/')
 	if (!normalizedRoot) return false
-	if (isDirRoot) {
-		return (
-			normalizedFile === normalizedRoot ||
-			normalizedFile.startsWith(`${normalizedRoot}/`)
-		)
-	}
-	return (
-		normalizedFile === normalizedRoot ||
-		normalizedFile.startsWith(normalizedRoot)
-	)
+	return matchesGlob(normalizedFile, normalizedRoot)
 }
 
 /**
- * Longest-prefix match: each path maps to the primitive(s) whose matching
- * `code` root is longest. Equal-length ties return every tied primitive.
+ * First matching primitive wins, following the order in the repository map.
+ * Exclusions apply before testing a primitive's code globs.
  *
  * @param {Array<string>} paths
  * @param {PrimitivesMap} map
@@ -212,37 +198,24 @@ export function classifyPaths(paths, map) {
 		const filePath = rawPath.replaceAll('\\', '/').replace(/^\.\//, '')
 		if (!filePath || filePath.endsWith('/')) continue
 
-		/** @type {Array<{ primitive: Primitive, root: string }>} */
-		const matches = []
-		for (const primitive of map.primitives) {
-			for (const root of primitive.code) {
-				if (pathMatchesRoot(filePath, root)) {
-					matches.push({ primitive, root })
-				}
-			}
-		}
-
-		if (matches.length === 0) {
+		const primitive = map.primitives.find((entry) =>
+			!entry.excludes.some((glob) => pathMatchesRoot(filePath, glob)) &&
+			entry.code.some((glob) => pathMatchesRoot(filePath, glob)),
+		)
+		if (!primitive) {
 			unmatched.push(filePath)
 			continue
 		}
 
-		const maxLen = Math.max(...matches.map((match) => match.root.length))
-		const winners = matches.filter((match) => match.root.length === maxLen)
-		const seen = new Set()
-		for (const winner of winners) {
-			if (seen.has(winner.primitive.id)) continue
-			seen.add(winner.primitive.id)
-			const existing = byId.get(winner.primitive.id)
-			if (existing) {
-				existing.files.push(filePath)
-			} else {
-				byId.set(winner.primitive.id, {
-					primitive: winner.primitive,
-					root: winner.root,
-					files: [filePath],
-				})
-			}
+		const existing = byId.get(primitive.id)
+		if (existing) {
+			existing.files.push(filePath)
+		} else {
+			byId.set(primitive.id, {
+				primitive,
+				root: primitive.code.find((glob) => pathMatchesRoot(filePath, glob)),
+				files: [filePath],
+			})
 		}
 	}
 
@@ -261,8 +234,7 @@ export function loadPrimitivesMap(mapPath = defaultMapPath) {
 
 /**
  * Validate that every `code` and `docs` path resolves on disk.
- * Directory roots may end with `/`. Prefix roots (no trailing `/`) must match
- * at least one existing file or directory under the repo root.
+ * Code globs must match at least one existing path under the repo root.
  *
  * @param {PrimitivesMap} map
  * @param {string} [repoRoot]
@@ -292,23 +264,13 @@ export function checkPrimitivesMapPaths(
 		}
 
 		for (const codePath of entry.code) {
-			const absolute = resolve(repoRoot, codePath.replace(/\/$/, ''))
+			const absolute = resolve(repoRoot, codePath)
 			if (existsSync(absolute)) continue
-
-			// Prefix roots (e.g. handlers/community, app/oauth-) must hit something.
-			if (!codePath.endsWith('/')) {
-				const parent = resolve(
-					repoRoot,
-					codePath.split('/').slice(0, -1).join('/'),
-				)
-				const prefix = codePath.split('/').at(-1) ?? ''
-				if (existsSync(parent) && statSync(parent).isDirectory()) {
-					const hit = readdirSafe(parent).some((name) =>
-						name.startsWith(prefix),
-					)
-					if (hit) continue
-				}
-			}
+			const matches = globSync(codePath, {
+				cwd: repoRoot,
+				exclude: ['**/node_modules/**', '**/.git/**', '**/.next/**'],
+			})
+			if (matches.length > 0) continue
 
 			errors.push({
 				kind,
@@ -322,15 +284,4 @@ export function checkPrimitivesMapPaths(
 	for (const primitive of map.primitives) checkEntry(primitive, 'primitive')
 	for (const invariant of map.invariants) checkEntry(invariant, 'invariant')
 	return errors
-}
-
-/**
- * @param {string} dir
- */
-function readdirSafe(dir) {
-	try {
-		return readdirSync(dir)
-	} catch {
-		return []
-	}
 }

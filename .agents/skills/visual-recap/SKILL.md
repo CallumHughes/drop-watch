@@ -52,6 +52,14 @@ node .agents/skills/visual-recap/scripts/upsert-recap-block.mjs <pr-number> <blo
 node .agents/skills/visual-recap/scripts/check-primitives-map.mjs
 ```
 
+The shared loader resolves `docs/architecture/primitives.yaml` relative to the
+scripts. Classification follows the map's ordered code globs and exclusions.
+After changing these scripts, run their regression checks:
+
+```bash
+node --test .agents/skills/visual-recap/scripts/primitives-map.test.mjs
+```
+
 The upsert script checks mermaid, then replaces the marker block or appends it.
 It does not edit text outside the markers. Re-run both commands after a
 significant push.

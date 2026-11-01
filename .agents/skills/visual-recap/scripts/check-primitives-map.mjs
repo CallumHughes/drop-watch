@@ -4,7 +4,7 @@
  * - parses
  * - unique ids
  * - every code/docs path resolves on disk
- * - summaries stay single-line and short (no feature-changelog essays)
+ * - primitive summaries and invariant statements are present
  */
 import {
 	checkPrimitivesMapPaths,
@@ -12,7 +12,6 @@ import {
 	loadPrimitivesMap,
 } from './primitives-map.mjs'
 
-const maxSummaryLength = 120
 const map = loadPrimitivesMap()
 /** @type {Array<string>} */
 const errors = []
@@ -31,10 +30,6 @@ for (const primitive of map.primitives) {
 	}
 	if (!primitive.summary?.trim()) {
 		errors.push(`primitive ${primitive.id} missing summary`)
-	} else if (primitive.summary.length > maxSummaryLength) {
-		errors.push(
-			`primitive ${primitive.id} summary is ${primitive.summary.length} chars (max ${maxSummaryLength}); put detail in docs`,
-		)
 	}
 	if (/\n/.test(primitive.summary ?? '')) {
 		errors.push(`primitive ${primitive.id} summary must be a single line`)
@@ -49,10 +44,6 @@ for (const invariant of map.invariants) {
 	invariantIds.add(invariant.id)
 	if (!invariant.summary?.trim()) {
 		errors.push(`invariant ${invariant.id} missing summary`)
-	} else if (invariant.summary.length > maxSummaryLength) {
-		errors.push(
-			`invariant ${invariant.id} summary is ${invariant.summary.length} chars (max ${maxSummaryLength}); put detail in docs`,
-		)
 	}
 }
 
