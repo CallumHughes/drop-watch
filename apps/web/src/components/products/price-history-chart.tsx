@@ -35,12 +35,14 @@ const TARGET_LABEL = {
 /**
  * Cycled deterministically by series order — five hues before repeating. The
  * first is the brand colour, so a single-listing product draws the same line
- * here as its dashboard tile does.
+ * here as its dashboard tile does. `--chart-3` is absent because the brand
+ * aliases it; second place goes to the palest step instead, so a product with
+ * two stores gets two lines that are easy to tell apart.
  */
 const SERIES_COLORS = [
   "var(--chart-brand)",
+  "var(--chart-1)",
   "var(--chart-2)",
-  "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
 ] as const;
