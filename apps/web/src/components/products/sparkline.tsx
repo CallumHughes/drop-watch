@@ -45,7 +45,7 @@ export function Sparkline({ samples }: { samples: readonly PriceSample[] }) {
   return (
     <svg
       aria-label={`Price trend over the last ${samples.length} checks`}
-      className="h-8 w-full text-chart-3"
+      className="h-8 w-full text-chart-brand"
       preserveAspectRatio="none"
       role="img"
       viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}

@@ -32,9 +32,13 @@ const TARGET_LABEL = {
   value: "target",
 } as const;
 
-/** Cycled deterministically by series order — five hues before repeating. */
+/**
+ * Cycled deterministically by series order — five hues before repeating. The
+ * first is the brand colour, so a single-listing product draws the same line
+ * here as its dashboard tile does.
+ */
 const SERIES_COLORS = [
-  "var(--chart-1)",
+  "var(--chart-brand)",
   "var(--chart-2)",
   "var(--chart-3)",
   "var(--chart-4)",
@@ -178,7 +182,7 @@ export function PriceHistoryChart({
           {target === null ? null : (
             <ReferenceLine
               label={TARGET_LABEL}
-              stroke="var(--chart-2)"
+              stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
               y={target}
             />
