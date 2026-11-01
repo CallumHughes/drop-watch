@@ -112,7 +112,7 @@ export function priceAlertSubject(payload: NotificationPayload): string {
 export interface PriceAlertProps {
   payload: NotificationPayload;
   /**
-   * Absolute link to the product page in DropWatch, or `null` when
+   * Absolute link to the product page in DropWATCH, or `null` when
    * `APP_URL` is unset. Omitted rather than rendered relative: a dead link in
    * a mail client cannot be fixed by the reader, and the shop link below still
    * makes the mail useful.

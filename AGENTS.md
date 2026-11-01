@@ -1,4 +1,4 @@
-# DropWatch
+# DropWATCH
 
 Self-hosted price tracker: watches product pages on a schedule, records price
 history, and alerts on target price, percentage drop, or restock.

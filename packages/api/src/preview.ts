@@ -318,7 +318,7 @@ function materiallyChangesTrackedObservation(
  * 503) are exactly the ones a reverse proxy treats as "my upstream is broken":
  * it replaces the body with its own error page, oRPC's client can no longer
  * parse it, and the real message — the one naming the 403 — is replaced by the
- * generic status text from its own table. Anyone running DropWatch behind a
+ * generic status text from its own table. Anyone running DropWATCH behind a
  * proxy saw "Bad Gateway" and nothing else. A 422 is passed through untouched.
  */
 export interface PreviewFailure {

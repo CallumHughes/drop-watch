@@ -1,6 +1,6 @@
 # Installation
 
-DropWatch runs as three containers — `web`, `worker`, and a one-shot `migrate`
+DropWATCH runs as three containers — `web`, `worker`, and a one-shot `migrate`
 job — against a PostgreSQL database, with an optional fourth for browser-mode
 listings. The images are published to GitHub Container Registry, so the normal
 way to deploy is to pull them; building from source is also supported and is
@@ -125,7 +125,7 @@ DATABASE_URL=postgresql://drop_watch:choose-something-long@host.docker.internal:
 
 ### Create the database and role
 
-Give DropWatch its own database and role rather than a schema inside another
+Give DropWATCH its own database and role rather than a schema inside another
 service's database:
 
 ```sql

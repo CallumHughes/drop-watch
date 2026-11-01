@@ -53,7 +53,7 @@ export interface ChangeEmailInput extends AuthEmailInput {
 }
 
 /**
- * Absolute link to a product page in DropWatch, or `null` when `APP_URL`
+ * Absolute link to a product page in DropWATCH, or `null` when `APP_URL`
  * is unset. `null` rather than a relative path on purpose: the templates fall
  * back to the shop's own URL, which is at least clickable from an inbox.
  */

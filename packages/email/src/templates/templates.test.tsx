@@ -72,7 +72,7 @@ describe("PriceAlert", () => {
     expect(html).toContain("Bulbasaur");
   });
 
-  it("links to DropWatch and to the shop", async () => {
+  it("links to DropWATCH and to the shop", async () => {
     const html = await render(<PriceAlert payload={alert} watchUrl={WATCH_URL} />);
 
     expect(html).toContain(WATCH_URL);
@@ -158,7 +158,7 @@ describe("priceAlertSubject", () => {
   });
 
   it("labels a test send as one", () => {
-    expect(priceAlertSubject({ ...alert, rule: "test" })).toBe("Test alert from DropWatch");
+    expect(priceAlertSubject({ ...alert, rule: "test" })).toBe("Test alert from DropWATCH");
   });
 });
 
