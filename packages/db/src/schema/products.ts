@@ -132,7 +132,7 @@ export const listings = pgTable(
     /** `auto` runs the full fallback chain; anything else pins one strategy. */
     extractor: text("extractor").$type<ListingExtractor>().default("auto").notNull(),
     id: uuid("id").primaryKey().defaultRandom(),
-    intervalMinutes: integer("interval_minutes").default(180).notNull(),
+    intervalMinutes: integer("interval_minutes").default(720).notNull(),
     /** Spread of the reschedule, so listings on one interval do not stampede. */
     jitterPercent: integer("jitter_percent").default(20).notNull(),
     lastModified: text("last_modified"),
