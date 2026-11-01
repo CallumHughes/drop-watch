@@ -729,7 +729,8 @@ function isPriceNamed(attributes: Attributes): boolean {
  * element inside holds a bare number and the wrapper carries the currency.
  * That contest is decided against {@link BARE_NUMBER_PENALTY}, not
  * {@link NO_CURRENCY_PENALTY} — it only arises once the listing has a currency
- * on file — so this penalty has to stay below 600, not below 2,200.
+ * on file — so this penalty has to stay under the former, which is the smaller
+ * of the two.
  */
 function wrapsAPriceElement(
   $: CheerioAPI,
