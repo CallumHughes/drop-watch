@@ -823,12 +823,17 @@ const PRICE_NAMING_ATTRIBUTES = ["class", "id", "itemprop", "property", "name"];
  * `content` has no job but to carry metadata, so a class naming the element a
  * price is enough to say what its `content` holds. `value` is the live value
  * of a form control — a selected variant, a quantity — and a class on the
- * control says what the control is *about*, not that its value is the price.
- * `<input class="price" name="qty" value="499">` is the shape that matters: on
- * a page selling at £499 the quantity field reads as the price, and the pin is
- * an expression that says `qty`. Only an explicit annotation settles it.
+ * control says what the control is *about*, not that its value is the price:
+ * `<input class="price" name="qty" value="499">` on a page selling at £499
+ * made the quantity field read as the price, pinned by an expression that
+ * says `qty`. Dropping `class` and `id` is what settles that.
+ *
+ * `name` stays, because on a form control it is the key the value is
+ * submitted under and so does speak for it —
+ * `<input type="hidden" name="price" value="24.99">` is an ordinary cart-form
+ * shape, and it says exactly what it holds.
  */
-const VALUE_NAMING_ATTRIBUTES = ["itemprop", "property"];
+const VALUE_NAMING_ATTRIBUTES = ["itemprop", "name", "property"];
 
 /**
  * Price words specific enough to money to stand on their own.

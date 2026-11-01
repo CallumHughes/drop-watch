@@ -316,6 +316,21 @@ describe("suggestExpressions — markup", () => {
     ).toContain("says it holds a price");
   });
 
+  it("takes a form field's own name at its word", () => {
+    // On a control, `name` is the key the value is submitted under, so it does
+    // speak for the value — unlike a class, which says what the control is
+    // about. This is an ordinary cart-form shape.
+    const html = page("", '<input name="price" type="hidden" value="24.99" />');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe('[name="price"]');
+    expect(candidates[0]?.reason).toBe("Reads an attribute on the price element.");
+  });
+
   it("takes an annotated value attribute at its word", () => {
     const html = page("", '<input itemprop="price" value="24.99" />');
 
