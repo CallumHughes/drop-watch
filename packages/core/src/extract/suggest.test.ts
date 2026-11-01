@@ -296,6 +296,38 @@ describe("suggestExpressions — markup", () => {
     }
   });
 
+  it("does not take a form control's value for a price on the strength of a class", () => {
+    // A class says what the control is about, not that its value is the price.
+    // Without that distinction the quantity field read as the price and the
+    // pin was an expression that says `qty`.
+    const html = page(
+      "",
+      '<input class="price" name="qty" value="499" /><span class="product-price">£499</span>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(
+      candidates.find((candidate) => candidate.expression === '[name="qty"]')?.reason
+    ).toContain("says it holds a price");
+  });
+
+  it("takes an annotated value attribute at its word", () => {
+    const html = page("", '<input itemprop="price" value="24.99" />');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe('[itemprop="price"]');
+    expect(candidates[0]?.reason).toBe("Reads an attribute on the price element.");
+  });
+
   it("does not take a generic data-value for a price", () => {
     const html = page(
       "",

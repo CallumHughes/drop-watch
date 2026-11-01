@@ -817,6 +817,18 @@ function priceAttributes(
 
 /** Attributes whose value names what an element is, for {@link attributeSaysPrice}. */
 const PRICE_NAMING_ATTRIBUTES = ["class", "id", "itemprop", "property", "name"];
+/**
+ * The narrower set that can speak for a `value` attribute.
+ *
+ * `content` has no job but to carry metadata, so a class naming the element a
+ * price is enough to say what its `content` holds. `value` is the live value
+ * of a form control — a selected variant, a quantity — and a class on the
+ * control says what the control is *about*, not that its value is the price.
+ * `<input class="price" name="qty" value="499">` is the shape that matters: on
+ * a page selling at £499 the quantity field reads as the price, and the pin is
+ * an expression that says `qty`. Only an explicit annotation settles it.
+ */
+const VALUE_NAMING_ATTRIBUTES = ["itemprop", "property"];
 
 /**
  * Words that say an *attribute name* holds a price.
@@ -848,12 +860,15 @@ const PRICE_ATTRIBUTE_WORDS = new Set([
  * word: testing the name first answered for it and the element-level test —
  * the only thing that can speak for those two — never ran, so an
  * `<option value="499">` or a hidden `<input name="product_id" value="499">`
- * passed as a price. Everything else is settled by its own name, which is what
- * makes `<meta itemprop="price" content="24.99">` the shape it is.
+ * passed as a price. They are asked differently, too: see
+ * {@link VALUE_NAMING_ATTRIBUTES}. Everything else is settled by its own name,
+ * which is what makes `<meta itemprop="price" content="24.99">` the shape it
+ * is.
  */
 function attributeSaysPrice(attributes: Attributes, name: string): boolean {
   if (name === "content" || name === "value") {
-    return PRICE_NAMING_ATTRIBUTES.some((attribute) => {
+    const naming = name === "value" ? VALUE_NAMING_ATTRIBUTES : PRICE_NAMING_ATTRIBUTES;
+    return naming.some((attribute) => {
       const value = attributes[attribute];
       return Boolean(value) && carriesAny(nameWords(value as string), PRICE_WORDS);
     });
