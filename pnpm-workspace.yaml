@@ -42,3 +42,4 @@ catalog:
   tailwindcss: ^4.3.3
   tsx: ^4.23.15
   vitest: ^5.0.4
+  minimatch: 11.0.1

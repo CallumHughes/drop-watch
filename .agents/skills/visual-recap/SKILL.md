@@ -52,6 +52,22 @@ node .agents/skills/visual-recap/scripts/upsert-recap-block.mjs <pr-number> <blo
 node .agents/skills/visual-recap/scripts/check-primitives-map.mjs
 ```
 
+The shared loader resolves `docs/architecture/primitives.yaml` relative to the
+scripts. Classification follows the map's ordered code globs and exclusions,
+including hidden files. Summaries and invariant statements accept scalar or
+folded (`>`) text, including indentation and chomping indicators. Folded text
+is normalized to a single line for recaps; literal (`|`) blocks are rejected.
+Exclusions must match an existing path covered by the same primitive's code
+globs. Git checkouts validate tracked and untracked source paths while omitting
+ignored files; archive exports use a guarded walk that skips build output.
+The classifier uses the primitive id as its label when `name` is omitted.
+
+`pnpm test` and CI include these regression checks. To run them alone:
+
+```bash
+pnpm test:skills
+```
+
 The upsert script checks mermaid, then replaces the marker block or appends it.
 It does not edit text outside the markers. Re-run both commands after a
 significant push.

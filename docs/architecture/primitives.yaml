@@ -1,7 +1,8 @@
 # The system primitives of DropWATCH, as used by the `visual-recap` skill to
 # classify a change. `id` values are stable and quoted verbatim in recap
-# blocks. `code` globs map changed paths to a primitive; first match wins,
-# most specific glob first.
+# blocks. `code` globs map changed paths to a primitive; first match wins.
+# Build configuration leads so its broad build globs own every Dockerfile.
+# Order the remaining primitives from specific to general, excluding overlaps.
 #
 # Keep this current: a PR that adds, removes, or reshapes a primitive updates
 # this file in the same PR.
@@ -13,6 +14,23 @@ groups:
   platform: Cross-cutting services the surfaces build on.
 
 primitives:
+  - id: build-config
+    group: platform
+    summary: >
+      Shared tsconfig, turbo pipeline, lint preset, Docker images, CI — and the
+      distribution of those images: CI publishes them to GHCR on merge to main,
+      and `deploy/` is the self-contained Compose artefact that consumes them.
+    code:
+      - packages/config/**
+      - turbo.json
+      - .github/workflows/**
+      - .github/dependabot.yml
+      - "**/Dockerfile"
+      - .dockerignore
+      - docker-compose*.yml
+      - deploy/**
+      - biome.json
+
   - id: web-dashboard
     group: surfaces
     summary: >
@@ -152,6 +170,7 @@ primitives:
     excludes:
       - packages/db/src/queue.ts
       - packages/db/src/migrate.ts
+      - packages/db/src/schema/auth.ts
     depends_on: [env-config]
 
   - id: job-queue
@@ -210,23 +229,6 @@ primitives:
     summary: The product name and the logo artwork, plus the script that cleans and renders them.
     code:
       - packages/brand/**
-
-  - id: build-config
-    group: platform
-    summary: >
-      Shared tsconfig, turbo pipeline, lint preset, Docker images, CI — and the
-      distribution of those images: CI publishes them to GHCR on merge to main,
-      and `deploy/` is the self-contained Compose artefact that consumes them.
-    code:
-      - packages/config/**
-      - turbo.json
-      - .github/workflows/**
-      - .github/dependabot.yml
-      - "**/Dockerfile"
-      - .dockerignore
-      - docker-compose*.yml
-      - deploy/**
-      - biome.json
 
   - id: e2e-harness
     group: platform
