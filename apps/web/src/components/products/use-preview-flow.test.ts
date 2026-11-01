@@ -4,15 +4,23 @@ import {
   toPreviewAttemptSummary,
   toPreviewExtraction,
 } from "@drop-watch/api/preview";
-import type { PagePreview } from "@drop-watch/api/routers/preview";
+import type {
+  ExpressionMatch,
+  PagePreview,
+  PriceSuggestion,
+} from "@drop-watch/api/routers/preview";
 import { describe, expect, it } from "vitest";
 
 import {
   failedBrowserAttempt,
   isCurrentPreviewRequest,
+  isLocatingPrice,
+  locatorPin,
   normalizePreviewLocale,
   transportReloadControl,
 } from "./use-preview-flow";
+
+const SAMPLE: ExpressionMatch = { context: '<span class="price">£24.99</span>', value: "£24.99" };
 
 function preview(attempts: PagePreview["attempts"]): PagePreview {
   return {
@@ -267,4 +275,86 @@ describe("transportReloadControl with a failed escalation", () => {
       });
     }
   );
+});
+
+describe("locatorPin", () => {
+  const candidate = { currency: "GBP", expression: ".price", mode: "selector" as const };
+  const suggestion = (overrides: Partial<PriceSuggestion> = {}): PriceSuggestion => ({
+    automatic: null,
+    candidates: [],
+    pricesOnPage: [],
+    ...overrides,
+  });
+
+  it("pins the top candidate", () => {
+    expect(
+      locatorPin(suggestion({ candidates: [{ ...candidate, reason: "", sample: SAMPLE }] }))
+    ).toEqual({ expression: ".price", mode: "selector" });
+  });
+
+  it("pins nothing when the price matched nothing on the page", () => {
+    expect(locatorPin(suggestion())).toBeNull();
+  });
+
+  it("pins nothing while no answer has arrived", () => {
+    // The same answer as "found nothing", on purpose: a stale pin from the
+    // previous price must not survive into this one.
+    expect(locatorPin(undefined)).toBeNull();
+  });
+
+  it("pins nothing when the automatic chain already reads the price", () => {
+    expect(
+      locatorPin(
+        suggestion({
+          automatic: { agrees: true, ambiguous: false, currency: "GBP", price: "24.99" },
+          candidates: [{ ...candidate, reason: "", sample: SAMPLE }],
+        })
+      )
+    ).toBeNull();
+  });
+
+  it("still pins when the chain agrees but its gate would refuse the result", () => {
+    expect(
+      locatorPin(
+        suggestion({
+          automatic: { agrees: true, ambiguous: true, currency: "GBP", price: "24.99" },
+          candidates: [{ ...candidate, reason: "", sample: SAMPLE }],
+        })
+      )
+    ).toEqual({ expression: ".price", mode: "selector" });
+  });
+});
+
+describe("isLocatingPrice", () => {
+  it("is locating while the typed price has not settled", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "19.99", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("is locating while the request is in flight", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99", isFetching: true, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("keeps locating when a located price is edited into an unusable one", () => {
+    // The settled value is still the previous price, so its answer — and any
+    // pin derived from it — is stale and must stop counting immediately.
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99x", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(true);
+  });
+
+  it("is settled once the answer for the typed price is in", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "24.99", isFetching: false, settledExpectedPrice: "24.99" })
+    ).toBe(false);
+  });
+
+  it("is settled while the advanced picker is used and no price is typed", () => {
+    expect(
+      isLocatingPrice({ expectedPrice: "", isFetching: false, settledExpectedPrice: "" })
+    ).toBe(false);
+  });
 });

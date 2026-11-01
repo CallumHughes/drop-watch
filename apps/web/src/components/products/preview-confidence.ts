@@ -25,9 +25,9 @@ export function automaticPreviewNeedsRepair(preview: PagePreview): boolean {
 /** Explain why an automatic result needs a user-verified expression. */
 export function automaticPreviewRepairMessage(preview: PagePreview): string {
   if (preview.extraction) {
-    return "The automatic price is ambiguous — this page offers more than one price and nothing identifies which one is being sold. Choose a CSS selector or JSONPath and wait for a successful test.";
+    return "The automatic price is ambiguous — this page offers more than one price and nothing identifies which one is being sold. Tell us the price it shows and we will work out where it comes from.";
   }
-  return "No price could be read from this page automatically. Choose a CSS selector or JSONPath and wait for a successful test.";
+  return "No price could be read from this page automatically. Tell us the price it shows and we will work out where it comes from.";
 }
 
 /**

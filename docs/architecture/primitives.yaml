@@ -122,7 +122,12 @@ primitives:
       microdata and OpenGraph in precedence order; a listing may instead be
       pinned to one expression strategy — a CSS selector (optionally reading an
       attribute with `::attr(name)`) or a JSONPath over the page's embedded JSON.
-      This package
+      It also derives those expressions rather than only running them: given a
+      price a reader can see, it synthesises the candidates that read exactly
+      that value from exactly one place, ranks them by how well they should
+      survive a redesign, and reports what else the page quotes when the value
+      is not on it. That is what the dashboard asks for now; writing an
+      expression by hand is an escape hatch, not the path. This package
       owns the list of strategy names, which is why `listings.extractor` is a
       text column rather than a pg enum.
     code:

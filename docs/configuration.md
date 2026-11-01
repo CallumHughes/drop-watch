@@ -151,6 +151,14 @@ Postgres is the interface between the web app and the worker:
 - **Email alerts** — per user, on their own account.
 
 Per-product settings (title, target price, which rules are armed, active/paused)
-live on the product. Per-listing settings (check interval, jitter, the extractor
-and selector, active/paused for that store alone) live on each store you add to
-it. Both are edited from the product's detail page.
+live on the product. Per-listing settings (check interval, jitter, how the price
+is found, active/paused for that store alone) live on each store you add to it.
+Both are edited from the product's detail page.
+
+How the price is found is not typed in directly. The listing editor shows it and
+nothing more; to change it, use "Re-preview and repair", which fetches the page
+and asks what price it shows. The expression it derives is what gets stored, in
+`listings.extractor` and `listings.expression` — still writable through the API
+(`listings.update`) and still testable from the CLI
+(`pnpm --filter @drop-watch/core test-url`) for anything scripted. The price you
+type is not stored: it only has to be true of the page in front of you.

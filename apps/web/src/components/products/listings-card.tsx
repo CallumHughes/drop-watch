@@ -128,7 +128,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
         </div>
       </div>
 
-      {editing ? <ListingSettingsForm listing={listing} onSaved={onSaved} /> : null}
+      {editing ? <ListingSettingsForm latest={latest} listing={listing} onSaved={onSaved} /> : null}
     </div>
   );
 }

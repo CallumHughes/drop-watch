@@ -16,6 +16,7 @@
 import { randomUUID } from "node:crypto";
 import { testExpression } from "@drop-watch/core/extract";
 import { EXPRESSION_MODES } from "@drop-watch/core/extract/strategies";
+import { suggestExpressions } from "@drop-watch/core/extract/suggest";
 import { fetchPage, withDomainQueue } from "@drop-watch/core/fetch";
 import { checkUrl } from "@drop-watch/core/net/guard";
 import { type RetrieveResult, renderPage } from "@drop-watch/core/render";
@@ -33,6 +34,7 @@ import {
   PREVIEW_REQUEST_MODES,
   PreviewCache,
   type PreviewEntry,
+  type PriceSuggestion,
   previewConfigurationRejection,
   previewFailure,
   previewTransports,
@@ -41,8 +43,9 @@ import {
   toPreviewAttemptSummary,
   toPreviewExtraction,
   toPreviewExtractionError,
+  toPriceSuggestion,
 } from "../preview";
-import { MAX_EXPRESSION_LENGTH, type RenderMode } from "../schemas/products";
+import { MAX_EXPRESSION_LENGTH, PRICE_PATTERN, type RenderMode } from "../schemas/products";
 
 const MAX_LOCALE_LENGTH = 35;
 
@@ -52,10 +55,14 @@ const MAX_LOCALE_LENGTH = 35;
  */
 export type { ExpressionMatch, ExpressionMode } from "@drop-watch/core/extract";
 export type {
+  AutomaticAgreement,
   ExpressionPreview,
   PagePreview,
   PreviewAttemptSummary,
   PreviewExtraction,
+  PriceSuggestion,
+  SuggestedExpression,
+  SuggestedPrice,
 } from "../preview";
 
 /**
@@ -277,6 +284,57 @@ export const previewRouter = {
         totalBytes: entry.html.length,
         truncated: entry.html.length > MAX_SOURCE_CHARS,
       };
+    }),
+
+  /**
+   * Works out which expressions read a price the user can already see, from
+   * the cached body. **No fetch happens here** either.
+   *
+   * Every candidate has already been run against the page and matched exactly
+   * one value equal to `expectedPrice`, which is the same condition the apply
+   * gate enforces — so a suggestion can never be one the user is then refused.
+   * The expected price is not stored: it only has to be true of the page in
+   * front of them, and it stops being true as soon as the price moves.
+   *
+   * `listingCurrency` only changes the ranking: with one on file the worker
+   * accepts a bare number, and without one a currency-less candidate is a
+   * check failure however durable its shape.
+   */
+  suggestExpressions: protectedProcedure
+    .input(
+      previewIdInput.extend({
+        expectedPrice: z.string().regex(PRICE_PATTERN),
+        listingCurrency: z.string().length(3).optional(),
+        locale: z.string().max(MAX_LOCALE_LENGTH).optional(),
+      })
+    )
+    .handler(({ input }): PriceSuggestion => {
+      const entry = requireEntry(input.previewId);
+      const suggestion = suggestExpressions(entry.html, {
+        expectedPrice: input.expectedPrice,
+        url: entry.url,
+        ...(input.listingCurrency ? { listingCurrency: input.listingCurrency } : {}),
+        ...(input.locale ? { locale: input.locale } : {}),
+      });
+      const log = createLogger({
+        action: "preview_suggest_expressions",
+        previewId: input.previewId,
+      });
+      log.set({
+        agrees: suggestion.automatic?.agrees ?? null,
+        ambiguous: suggestion.automatic?.ambiguous ?? null,
+        candidates: suggestion.candidates.length,
+        // The price itself is the user's reading of their own page, not a
+        // secret, and without it a ranked-nothing result is undiagnosable.
+        expectedPrice: input.expectedPrice,
+        fetched: false,
+        htmlBytes: entry.html.length,
+        pricesOnPage: suggestion.pricesOnPage.length,
+        topMode: suggestion.candidates[0]?.mode ?? null,
+      });
+      log.info("expressions suggested from an expected price");
+      log.emit();
+      return toPriceSuggestion(suggestion);
     }),
 
   /**

@@ -10,6 +10,7 @@
 
 import type {
   ExpressionMatch,
+  ExpressionMode,
   ExpressionTest,
   ExtractionConfidence,
   ExtractionEvidence,
@@ -18,6 +19,7 @@ import type {
 } from "@drop-watch/core/extract";
 import { extract } from "@drop-watch/core/extract";
 import { challengeReason } from "@drop-watch/core/extract/challenge";
+import type { Suggestion } from "@drop-watch/core/extract/suggest";
 import type { UrlVerdict } from "@drop-watch/core/net/guard";
 import type { RetrieveResult } from "@drop-watch/core/render";
 import type { RenderMode } from "./schemas/products";
@@ -570,5 +572,75 @@ export function toExpressionPreview(test: ExpressionTest): ExpressionPreview {
     invalidReason: test.invalidReason,
     matchCount: test.matchCount,
     samples: test.samples,
+  };
+}
+
+/**
+ * One expression the engine worked out from a price the user could already
+ * read, as the UI needs it.
+ *
+ * The expression itself is here because the save path and an agent both need
+ * it; the panel shows `sample` and `reason` instead, since choosing between two
+ * selectors is the job this flow exists to remove.
+ */
+export interface SuggestedExpression {
+  /** `null` means the listing must supply one — see `toCheckOutcome`. */
+  currency: string | null;
+  expression: string;
+  mode: ExpressionMode;
+  /** Why it ranked where it did, already a sentence. */
+  reason: string;
+  /** The matched value and its surroundings, for confirming the right one. */
+  sample: ExpressionMatch;
+}
+
+/** A money value the page carries, offered when the typed one is not on it. */
+export interface SuggestedPrice {
+  amount: string;
+  context: string;
+  currency: string | null;
+}
+
+/** What the automatic chain reads, next to what the user typed. */
+export interface AutomaticAgreement {
+  agrees: boolean;
+  /**
+   * The chain's result is one `isAmbiguousExtraction` refuses to record, so
+   * agreement alone does not repair the listing.
+   */
+  ambiguous: boolean;
+  currency: string | null;
+  price: string;
+}
+
+export interface PriceSuggestion {
+  automatic: AutomaticAgreement | null;
+  /** Ranked most durable first; the panel applies the first. */
+  candidates: SuggestedExpression[];
+  pricesOnPage: SuggestedPrice[];
+}
+
+export function toPriceSuggestion(suggestion: Suggestion): PriceSuggestion {
+  return {
+    automatic: suggestion.automatic
+      ? {
+          agrees: suggestion.automatic.agrees,
+          ambiguous: suggestion.automatic.ambiguous,
+          currency: suggestion.automatic.currency ?? null,
+          price: suggestion.automatic.price,
+        }
+      : null,
+    candidates: suggestion.candidates.map((candidate) => ({
+      currency: candidate.currency ?? null,
+      expression: candidate.expression,
+      mode: candidate.mode,
+      reason: candidate.reason,
+      sample: candidate.sample,
+    })),
+    pricesOnPage: suggestion.pricesOnPage.map((sighting) => ({
+      amount: sighting.amount,
+      context: sighting.context,
+      currency: sighting.currency ?? null,
+    })),
   };
 }

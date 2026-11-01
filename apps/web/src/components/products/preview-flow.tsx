@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-  ExpressionMode,
-  ExpressionPreview,
-  PagePreview,
-} from "@drop-watch/api/routers/preview";
+import type { PagePreview } from "@drop-watch/api/routers/preview";
 import { Button } from "@drop-watch/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@drop-watch/ui/components/card";
 import { Input } from "@drop-watch/ui/components/input";
@@ -13,8 +9,10 @@ import { useId } from "react";
 import { productHost } from "@/lib/format";
 
 import { ExpressionPicker } from "./expression-picker";
+import { automaticDisagreementNote, locatorOutcome } from "./locate-price";
 import { automaticPreviewRepairMessage } from "./preview-confidence";
 import { PreviewSummary } from "./preview-summary";
+import { PriceLocator } from "./price-locator";
 import type { PreviewFlow as PreviewFlowState } from "./use-preview-flow";
 
 /** A labelled control, shared by every step of the add-product/add-listing flows. */
@@ -92,30 +90,32 @@ function TransportReload({ reload }: { reload: NonNullable<PreviewFlowState["tra
   );
 }
 
-/** What the chain found, plus the manual override when one is being worked on. */
+/**
+ * What the chain found, and — when it needs correcting — the one question that
+ * corrects it.
+ *
+ * Writing an expression lives behind a closed disclosure. It is still the only
+ * thing that gets saved, but choosing it is the engine's job now: a reader can
+ * see the price and should not have to describe where it is.
+ */
 function PreviewPanel({
-  expression,
-  isTesting,
-  mode,
-  onExpressionChange,
-  onModeChange,
-  onTogglePicker,
+  currency,
+  flow,
   preview,
-  requiresManualRepair,
-  test,
-  transportReload,
 }: {
-  expression: string;
-  isTesting: boolean;
-  mode: ExpressionMode | null;
-  onExpressionChange: (expression: string) => void;
-  onModeChange: (mode: ExpressionMode) => void;
-  onTogglePicker: () => void;
+  currency: string | null;
+  flow: PreviewFlowState;
   preview: PagePreview;
-  requiresManualRepair: boolean;
-  test: ExpressionPreview | undefined;
-  transportReload: PreviewFlowState["transportReload"];
 }) {
+  const { mode, suggestion, transportReload } = flow;
+  const requiresManualRepair = flow.automaticRepairRequired;
+  const outcome = locatorOutcome({
+    error: suggestion.error,
+    expectedPrice: flow.expectedPrice,
+    isLocating: flow.isLocating,
+    suggestion: suggestion.data,
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -139,35 +139,56 @@ function PreviewPanel({
               <div>
                 <Button
                   disabled={transportReload?.isPending}
-                  onClick={onTogglePicker}
+                  onClick={flow.togglePicker}
                   size="sm"
                   type="button"
                   variant="outline"
                 >
-                  {mode === null ? "Pick the price myself" : "Use the automatic result"}
+                  {mode === null ? "Set the price myself" : "Use the automatic result"}
                 </Button>
               </div>
             )}
           </>
         ) : (
           <p className="text-sm">
-            Nothing matched automatically: {preview.extractionError}. Pick the price yourself below.
+            Nothing matched automatically: {preview.extractionError}. Tell us the price the page
+            shows and we’ll find where it comes from.
           </p>
         )}
 
         {transportReload ? <TransportReload reload={transportReload} /> : null}
 
         {mode === null ? null : (
-          <ExpressionPicker
-            expression={expression}
-            isPending={isTesting}
-            mode={mode}
-            onExpressionChange={onExpressionChange}
-            onModeChange={onModeChange}
-            previewId={preview.previewId}
-            test={test}
-            url={preview.url}
-          />
+          <div className="flex flex-col gap-4">
+            <PriceLocator
+              automaticNote={automaticDisagreementNote(suggestion.data, flow.expectedPrice)}
+              currency={currency}
+              expectedPrice={flow.expectedPrice}
+              onExpectedPriceChange={flow.onExpectedPriceChange}
+              onPickPagePrice={flow.onPickPagePrice}
+              outcome={outcome}
+            />
+            {/* Native `details` rather than a primitive: it needs no JavaScript
+                to open, and it is the escape hatch for a page whose price the
+                engine cannot read at all. */}
+            <details className="rounded-md border border-dashed p-3">
+              <summary className="cursor-pointer text-muted-foreground text-xs">
+                Advanced: point at the price with a CSS selector or JSONPath
+              </summary>
+              <div className="pt-3">
+                <ExpressionPicker
+                  expression={flow.expression}
+                  isPending={flow.isTesting}
+                  mode={mode}
+                  onExpressionChange={flow.onExpressionChange}
+                  onModeChange={flow.onModeChange}
+                  previewId={preview.previewId}
+                  test={flow.expressionTest.data}
+                  url={preview.url}
+                />
+              </div>
+            </details>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -181,9 +202,12 @@ function PreviewPanel({
  * `flow.chosen`/`flow.preview` once a price is on the screen.
  */
 export function PreviewFlow({
+  currency = null,
   flow,
   lockUrl = false,
 }: {
+  /** The listing's recorded currency, used when the page itself gives none. */
+  currency?: string | null;
   flow: PreviewFlowState;
   lockUrl?: boolean;
 }) {
@@ -196,8 +220,7 @@ export function PreviewFlow({
       {lockUrl ? (
         <div className="flex flex-col gap-2">
           <p className="text-muted-foreground text-xs">
-            Re-preview this listing URL to test a replacement CSS selector or JSONPath against its
-            current page.
+            Re-preview this listing URL, then tell us the price its page shows now.
           </p>
           <div>
             <Button disabled={isLoadingPreview} onClick={flow.loadPreview} type="button">
@@ -233,16 +256,9 @@ export function PreviewFlow({
 
       {flow.preview ? (
         <PreviewPanel
-          expression={flow.expression}
-          isTesting={flow.isTesting}
-          mode={flow.mode}
-          onExpressionChange={flow.onExpressionChange}
-          onModeChange={flow.onModeChange}
-          onTogglePicker={flow.togglePicker}
+          currency={currency ?? flow.preview.extraction?.currency ?? null}
+          flow={flow}
           preview={flow.preview}
-          requiresManualRepair={flow.automaticRepairRequired}
-          test={flow.expressionTest.data}
-          transportReload={flow.transportReload}
         />
       ) : null}
     </>

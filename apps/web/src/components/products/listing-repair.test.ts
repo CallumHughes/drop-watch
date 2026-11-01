@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSingleMatchExtraction,
   type ListingExtractionSettings,
+  listingExtractionNote,
   listingExtractionSettings,
   repairActionLabel,
   repairSummary,
@@ -157,5 +158,118 @@ describe("repairSummary", () => {
     expect(
       repairSummary({ expression: ".new-price", extractor: "selector", render: "browser" }, pinned)
     ).toBe("Applying will pin the tested CSS selector.");
+  });
+});
+
+describe("listingExtractionNote", () => {
+  it.each([
+    {
+      expected: "Found automatically from the page's own product data.",
+      settings: { expression: null, extractor: "auto", render: "http" },
+    },
+    {
+      expected:
+        "Found automatically from the page's own product data, loaded in a headless browser.",
+      settings: { expression: null, extractor: "auto", render: "browser" },
+    },
+    {
+      expected: "Read from a spot on the page you confirmed.",
+      settings: { expression: ".price", extractor: "selector", render: "http" },
+    },
+    {
+      expected: "Read from a spot on the page you confirmed, loaded in a headless browser.",
+      settings: { expression: "$..price", extractor: "jsonpath", render: "browser" },
+    },
+  ] as const)("describes $settings.extractor over $settings.render", ({ expected, settings }) => {
+    expect(listingExtractionNote(settings)).toBe(expected);
+  });
+
+  it("never names the expression", () => {
+    expect(
+      listingExtractionNote({
+        expression: "[data-price]::attr(data-price)",
+        extractor: "selector",
+        render: "http",
+      })
+    ).not.toContain("data-price");
+  });
+});
+
+describe("repairSummary — the tracked price", () => {
+  const pinned: ListingExtractionSettings = {
+    expression: ".price",
+    extractor: "selector",
+    render: "http",
+  };
+  const automatic: ListingExtractionSettings = {
+    expression: null,
+    extractor: "auto",
+    render: "http",
+  };
+
+  it("warns that the next check will read as a price change", () => {
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: "49.99",
+        previousCurrency: "GBP",
+      })
+    ).toBe(
+      "Applying will pin the tested CSS selector. It will record £24.99 where £49.99 is on record, so the next check will read as a price change and may alert."
+    );
+  });
+
+  it("says nothing extra when the price is unchanged", () => {
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.990",
+        previous: "24.99",
+        previousCurrency: "GBP",
+      })
+    ).toBe("Applying will pin the tested CSS selector.");
+  });
+
+  it("names each price in the currency it was read in", () => {
+    // Formatting the price on record with the repaired reading's currency
+    // reported a figure in a currency it was never in.
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "USD",
+        next: "24.99",
+        previous: "24.99",
+        previousCurrency: "GBP",
+      })
+    ).toBe(
+      "Applying will pin the tested CSS selector. It will record US$24.99 where £24.99 is on record — a different currency, so this listing's history no longer compares like for like."
+    );
+  });
+
+  it("treats an unknown previous currency as unknown, not as a switch", () => {
+    // The earlier reading carried no currency and the repair found one. That
+    // is not a currency change, and the reader still needs the alert warning.
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: "49.99",
+        previousCurrency: null,
+      })
+    ).toBe(
+      "Applying will pin the tested CSS selector. It will record £24.99 where 49.99 is on record, so the next check will read as a price change and may alert."
+    );
+  });
+
+  it("says nothing extra with no price on record, or no tracked price at all", () => {
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: null,
+        previousCurrency: "GBP",
+      })
+    ).toBe("Applying will pin the tested CSS selector.");
+    expect(repairSummary(pinned, automatic)).toBe("Applying will pin the tested CSS selector.");
   });
 });
