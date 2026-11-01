@@ -22,9 +22,6 @@ for (const primitive of map.primitives) {
 		errors.push(`duplicate primitive id: ${primitive.id}`)
 	}
 	primitiveIds.add(primitive.id)
-	if (!primitive.name?.trim()) {
-		errors.push(`primitive ${primitive.id} missing name`)
-	}
 	if (!primitive.group?.trim()) {
 		errors.push(`primitive ${primitive.id} missing group`)
 	}

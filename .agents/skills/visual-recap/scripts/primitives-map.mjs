@@ -4,6 +4,7 @@
  * Constrained YAML subset used by the repository map: group mappings, primitive
  * and invariant records, folded text, and path lists. Not a general YAML parser.
  */
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { minimatch } from 'minimatch'
@@ -55,6 +56,7 @@ export function parsePrimitivesMap(text) {
 	/** @type {'code' | 'docs' | 'excludes' | null} */
 	let listField = null
 	let foldedSummary = false
+	let summaryIndent = null
 
 	function finishCurrent() {
 		if (!current || !('id' in current)) return
@@ -76,10 +78,20 @@ export function parsePrimitivesMap(text) {
 		current = null
 		listField = null
 		foldedSummary = false
+		summaryIndent = null
 	}
 
 	for (const rawLine of lines) {
 		const line = rawLine
+		if (foldedSummary && line.trim()) {
+			const indent = line.match(/^ */)[0].length
+			if (indent >= (summaryIndent ?? 5)) {
+				summaryIndent ??= indent
+				current.summary = `${current.summary} ${line.trim()}`.trim()
+				continue
+			}
+			foldedSummary = false
+		}
 		if (!line.trim() || /^\s*#/.test(line)) continue
 
 		const sectionMatch = line.match(/^(groups|primitives|invariants):\s*$/)
@@ -133,10 +145,6 @@ export function parsePrimitivesMap(text) {
 			continue
 		}
 
-		if (foldedSummary && /^ {6}\S/.test(line)) {
-			current.summary = `${current.summary} ${line.trim()}`.trim()
-			continue
-		}
 		foldedSummary = false
 		listField = null
 
@@ -148,10 +156,17 @@ export function parsePrimitivesMap(text) {
 			if (key === 'group') current.group = value
 			else if (key === 'name') current.name = value
 			else {
-				if (/^\|[1-9+-]*$/.test(fieldMatch[2])) {
+				const indicator = fieldMatch[2].replace(/\s+#.*$/, '')
+				if (/^\|[1-9+-]*$/.test(indicator)) {
 					throw new Error(`Literal block scalars are unsupported for ${key}; use folded > text instead`)
 				}
-				foldedSummary = value === '>' || value === '>-' || value === '>+'
+				const foldedMatch = indicator.match(/^>(?:([1-9])[+-]?|[+-]([1-9])?)?$/)
+				if (indicator.startsWith('>') && !foldedMatch) {
+					throw new Error(`Unsupported folded block indicator: ${indicator}`)
+				}
+				foldedSummary = foldedMatch !== null
+				const indent = foldedMatch?.[1] ?? foldedMatch?.[2]
+				summaryIndent = indent ? 4 + Number(indent) : null
 				current.summary = foldedSummary ? '' : value
 			}
 		}
@@ -301,10 +316,40 @@ export function checkPrimitivesMapPaths(
 
 /** @param {string} repoRoot */
 function listPaths(repoRoot) {
+	try {
+		const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
+			cwd: repoRoot,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore'],
+			maxBuffer: 16 * 1024 * 1024,
+		})
+		const paths = new Set()
+		for (const file of output.split('\0').filter(Boolean)) {
+			if (!existsSync(resolve(repoRoot, file))) continue
+			paths.add(file)
+			let parent = file
+			while (parent.includes('/')) {
+				parent = parent.slice(0, parent.lastIndexOf('/'))
+				paths.add(parent)
+			}
+		}
+		return [...paths]
+	} catch (error) {
+		if (error.status !== 128 && error.code !== 'ENOENT') throw error
+	}
+
+	// Archive exports and standalone fixtures have no Git index.
 	const paths = []
 	function visit(directory) {
-		for (const entry of readdirSync(resolve(repoRoot, directory), { withFileTypes: true })) {
-			if (['node_modules', '.git', '.next', '.turbo'].includes(entry.name)) continue
+		let entries
+		try {
+			entries = readdirSync(resolve(repoRoot, directory), { withFileTypes: true })
+		} catch (error) {
+			if (['EACCES', 'EPERM', 'ENOENT', 'ENOTDIR'].includes(error.code)) return
+			throw error
+		}
+		for (const entry of entries) {
+			if (['node_modules', '.git', '.next', '.next-e2e', '.turbo', 'dist', 'build', 'out', 'coverage', 'playwright-report', 'test-results'].includes(entry.name)) continue
 			const path = directory ? `${directory}/${entry.name}` : entry.name
 			paths.push(path)
 			if (entry.isDirectory()) visit(path)

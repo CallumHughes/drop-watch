@@ -13,6 +13,23 @@ groups:
   platform: Cross-cutting services the surfaces build on.
 
 primitives:
+  - id: build-config
+    group: platform
+    summary: >
+      Shared tsconfig, turbo pipeline, lint preset, Docker images, CI — and the
+      distribution of those images: CI publishes them to GHCR on merge to main,
+      and `deploy/` is the self-contained Compose artefact that consumes them.
+    code:
+      - packages/config/**
+      - turbo.json
+      - .github/workflows/**
+      - .github/dependabot.yml
+      - "**/Dockerfile"
+      - .dockerignore
+      - docker-compose*.yml
+      - deploy/**
+      - biome.json
+
   - id: web-dashboard
     group: surfaces
     summary: >
@@ -206,23 +223,6 @@ primitives:
     summary: The product name and the logo artwork, plus the script that cleans and renders them.
     code:
       - packages/brand/**
-
-  - id: build-config
-    group: platform
-    summary: >
-      Shared tsconfig, turbo pipeline, lint preset, Docker images, CI — and the
-      distribution of those images: CI publishes them to GHCR on merge to main,
-      and `deploy/` is the self-contained Compose artefact that consumes them.
-    code:
-      - packages/config/**
-      - turbo.json
-      - .github/workflows/**
-      - .github/dependabot.yml
-      - "**/Dockerfile"
-      - .dockerignore
-      - docker-compose*.yml
-      - deploy/**
-      - biome.json
 
   - id: e2e-harness
     group: platform

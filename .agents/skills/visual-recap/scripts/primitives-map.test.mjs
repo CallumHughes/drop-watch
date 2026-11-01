@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import fs from 'node:fs'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
@@ -65,6 +67,43 @@ test('matches recursive and filename globs without matching sibling prefixes', (
 	assert.equal(pathMatchesRoot('deploy/.env.example', 'deploy/*'), true)
 })
 
+test('reads folded blocks with indentation and chomping indicators', () => {
+	for (const indicator of ['>', '>-', '>+', '>2', '>-2', '>2-', '>+2', '>2+']) {
+		for (const field of ['summary', 'statement']) {
+			const map = parsePrimitivesMap(`primitives:
+  - id: example
+    ${field}: ${indicator}
+      First part
+      second part.
+`)
+			assert.equal(map.primitives[0].summary, 'First part second part.', `${field}: ${indicator}`)
+		}
+	}
+	assert.equal(parsePrimitivesMap(`primitives:
+  - id: example
+    summary: >1
+     One-space content.
+`).primitives[0].summary, 'One-space content.')
+	assert.equal(parsePrimitivesMap(`primitives:
+  - id: example
+    summary: ">"
+`).primitives[0].summary, '>')
+})
+
+test('normalizes deeper-indented folded text without dropping subsequent lines', () => {
+	const map = parsePrimitivesMap(`primitives:
+  - id: example
+    summary: > # folded text
+      First part
+        indented note
+      rest of the summary.
+      # This is scalar content.
+    group: domain
+`)
+	assert.equal(map.primitives[0].summary, 'First part indented note rest of the summary. # This is scalar content.')
+	assert.equal(map.primitives[0].group, 'domain')
+})
+
 test('classifies using map order and exclusions', () => {
 	const paths = [
 		'packages/core/src/net/identity.ts',
@@ -74,6 +113,9 @@ test('classifies using map order and exclusions', () => {
 		'packages/db/src/index.ts',
 		'packages/db/src/schema/auth.ts',
 		'apps/web/Dockerfile',
+		'apps/worker/Dockerfile',
+		'apps/renderer/Dockerfile',
+		'packages/db/Dockerfile',
 		'deploy/.env.example',
 		'apps/worker/.env.example',
 		'unknown.txt',
@@ -83,7 +125,10 @@ test('classifies using map order and exclusions', () => {
 		'app-db': ['packages/db/src/index.ts'],
 		auth: ['packages/db/src/schema/auth.ts'],
 		'browser-identity': ['packages/core/src/net/identity.ts'],
-		'build-config': ['apps/web/Dockerfile', 'deploy/.env.example'],
+		'build-config': [
+			'apps/web/Dockerfile', 'apps/worker/Dockerfile', 'apps/renderer/Dockerfile',
+			'packages/db/Dockerfile', 'deploy/.env.example',
+		],
 		'job-queue': ['packages/db/src/queue.ts'],
 		migrations: ['packages/db/src/migrate.ts'],
 		'outbound-network-guard': ['packages/core/src/net/guard.ts'],
@@ -144,6 +189,54 @@ test('reports unmatched code globs and missing documentation', (t) => {
       - missing.md
 `)
 	assert.deepEqual(checkPrimitivesMapPaths(map, root).map(({ path }) => path), ['missing.md', 'src/*.missing'])
+})
+
+test('ignores generated output in a Git checkout while including untracked source files', (t) => {
+	const root = mkdtempSync(join(tmpdir(), 'primitives-map-'))
+	t.after(() => rmSync(root, { recursive: true, force: true }))
+	execFileSync('git', ['init', '--quiet', root])
+	writeFileSync(join(root, '.gitignore'), 'dist/\n.next-e2e/\ncoverage/\n')
+	mkdirSync(join(root, 'src'))
+	writeFileSync(join(root, 'src/index.ts'), '')
+	for (const directory of ['dist', '.next-e2e', 'coverage']) {
+		mkdirSync(join(root, directory))
+		writeFileSync(join(root, directory, 'generated.ts'), '')
+	}
+	const map = parsePrimitivesMap(`primitives:
+  - id: example
+    code:
+      - src/*.ts
+      - **/generated.ts
+`)
+	assert.deepEqual(checkPrimitivesMapPaths(map, root).map(({ path }) => path), ['**/generated.ts'])
+	execFileSync('git', ['add', 'src/index.ts'], { cwd: root })
+	rmSync(join(root, 'src/index.ts'))
+	assert.deepEqual(checkPrimitivesMapPaths(map, root).map(({ path }) => path), ['src/*.ts', '**/generated.ts'])
+})
+
+test('skips unreadable and disappearing directories when checking an export without Git', (t) => {
+	const root = mkdtempSync(join(tmpdir(), 'primitives-map-'))
+	t.after(() => rmSync(root, { recursive: true, force: true }))
+	mkdirSync(join(root, 'src'))
+	mkdirSync(join(root, 'unavailable'))
+	writeFileSync(join(root, 'src/index.ts'), '')
+	const readDirectory = fs.readdirSync
+	let code = 'EACCES'
+	t.mock.method(fs, 'readdirSync', (path, options) => {
+		if (path === join(root, 'unavailable')) throw Object.assign(new Error('unavailable'), { code })
+		return readDirectory(path, options)
+	})
+	syncBuiltinESMExports()
+	t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports() })
+	const map = parsePrimitivesMap(`primitives:
+  - id: example
+    code:
+      - src/*.ts
+`)
+	for (const failureCode of ['EACCES', 'ENOENT', 'ENOTDIR', 'EPERM']) {
+		code = failureCode
+		assert.deepEqual(checkPrimitivesMapPaths(map, root), [], code)
+	}
 })
 
 test('both CLIs find the map when invoked from another directory', () => {
