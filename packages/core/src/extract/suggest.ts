@@ -726,9 +726,10 @@ function isPriceNamed(attributes: Attributes): boolean {
  * one is inserted before the price. The `.product-price` inside it cannot.
  *
  * Only a demotion, never a refusal: the wrapper is the right answer when the
- * element inside holds a bare number and the wrapper carries the currency,
- * which is why this penalty has to stay well under
- * {@link NO_CURRENCY_PENALTY}.
+ * element inside holds a bare number and the wrapper carries the currency.
+ * That contest is decided against {@link BARE_NUMBER_PENALTY}, not
+ * {@link NO_CURRENCY_PENALTY} — it only arises once the listing has a currency
+ * on file — so this penalty has to stay below 600, not below 2,200.
  */
 function wrapsAPriceElement(
   $: CheerioAPI,
@@ -818,26 +819,46 @@ function priceAttributes(
 const PRICE_NAMING_ATTRIBUTES = ["class", "id", "itemprop", "property", "name"];
 
 /**
+ * Words that say an *attribute name* holds a price.
+ *
+ * Narrower than {@link PRICE_WORDS} on purpose. `value`, `total` and `rate`
+ * name a price when they are a class or a JSON key, but as attribute names
+ * they are the generic slots every form control and widget has, and
+ * `data-value="499"` says nothing about money.
+ */
+const PRICE_ATTRIBUTE_WORDS = new Set([
+  "amount",
+  "amounts",
+  "cost",
+  "fee",
+  "money",
+  "price",
+  "prices",
+  "pricing",
+]);
+
+/**
  * Whether an attribute worth reading says it holds a *price*.
  *
  * `data-product-id="499"` parses to 499 on a page selling something for £499,
  * and it will still read 499 after the price moves — the silent wrong reading
  * the `unnamed` flag exists for, and the one the JSON side already refuses.
- * The attribute's own name usually settles it. `content` and `value` carry no
- * meaning of their own, so for those the element has to say it instead, which
- * is what makes `<meta itemprop="price" content="24.99">` the shape it is.
+ *
+ * `content` and `value` are asked first, because `value` is itself a price
+ * word: testing the name first answered for it and the element-level test —
+ * the only thing that can speak for those two — never ran, so an
+ * `<option value="499">` or a hidden `<input name="product_id" value="499">`
+ * passed as a price. Everything else is settled by its own name, which is what
+ * makes `<meta itemprop="price" content="24.99">` the shape it is.
  */
 function attributeSaysPrice(attributes: Attributes, name: string): boolean {
-  if (carriesAny(nameWords(name), PRICE_WORDS)) {
-    return true;
+  if (name === "content" || name === "value") {
+    return PRICE_NAMING_ATTRIBUTES.some((attribute) => {
+      const value = attributes[attribute];
+      return Boolean(value) && carriesAny(nameWords(value as string), PRICE_WORDS);
+    });
   }
-  if (!(name === "content" || name === "value")) {
-    return false;
-  }
-  return PRICE_NAMING_ATTRIBUTES.some((attribute) => {
-    const value = attributes[attribute];
-    return Boolean(value) && carriesAny(nameWords(value as string), PRICE_WORDS);
-  });
+  return carriesAny(nameWords(name), PRICE_ATTRIBUTE_WORDS);
 }
 
 function attributeDraft(
@@ -997,20 +1018,50 @@ function pathNames(path: readonly (string | number)[], source: string): string[]
 }
 
 /**
+ * Price words strong enough to name a key's *descendants* as well as itself.
+ *
+ * `value` and `total` are not among them: `initialValue`, `totals` and
+ * `pageValue` wrap whole payloads in app state, and letting one of those name
+ * everything beneath it puts `{ "stock": 499 }` back in the structured-data
+ * tier as soon as the payload is nested a level down.
+ */
+const STRONG_PRICE_WORDS = new Set(["cost", "fee", "price", "prices", "pricing"]);
+
+/**
+ * How the keys on a path speak for the number at the end of it.
+ *
+ * Two answers rather than one, because the two expressions {@link pathDrafts}
+ * emits carry different parts of the path. `$..current` carries only the leaf;
+ * what made `priceInfo.current` a price is a key the shorthand throws away.
+ */
+interface PathNaming {
+  /** The leaf alone says price, which is all `$..leaf` can claim. */
+  leaf: boolean;
+  /** Some key on the path says price, which the concrete path spells out. */
+  path: boolean;
+}
+
+/**
  * Whether the field a scalar sits in says it holds a price.
  *
- * Any key on the path, not only the leaf: `priceInfo.current` is as plainly a
- * price as `product.price`, and reading the leaf alone marked it as some
- * number that happened to match. `{ "stock": 499 }` on a page showing `£499`
- * still has nothing naming it, which is the case this exists for — without it
- * `$..stock` is the most durable candidate and the pin reads the stock count
- * from then on.
+ * Not the leaf alone: `priceInfo.current` is as plainly a price as
+ * `product.price`, and reading `current` by itself called it some number that
+ * happened to match. A parent has to say it strongly, though — see
+ * {@link STRONG_PRICE_WORDS}. `{ "stock": 499 }` on a page showing `£499` is
+ * named by nothing either way, which is the case this exists for: without it
+ * `$..stock` is the most durable candidate on the page and the pin reads the
+ * stock count from then on.
  */
-function pathIsPriceNamed(path: readonly (string | number)[]): boolean {
-  return path.some(
-    (segment) =>
-      typeof segment === "string" && nameWords(segment).some((word) => PRICE_WORDS.has(word))
+function pathNaming(path: readonly (string | number)[]): PathNaming {
+  const last = path.at(-1);
+  const leaf = typeof last === "string" && carriesAny(nameWords(last), PRICE_WORDS);
+  if (leaf) {
+    return { leaf, path: true };
+  }
+  const named = path.some(
+    (segment) => typeof segment === "string" && carriesAny(nameWords(segment), STRONG_PRICE_WORDS)
   );
+  return { leaf, path: named };
 }
 
 /**
@@ -1027,7 +1078,7 @@ function pathDrafts(
   path: readonly (string | number)[],
   source: string,
   drafts: Draft[],
-  unnamed: boolean
+  naming: PathNaming
 ): void {
   const names = pathNames(path, source);
   const last = path.at(-1);
@@ -1040,7 +1091,8 @@ function pathDrafts(
       prose: false,
       struck: false,
       tier: 0,
-      unnamed,
+      // Only what the leaf says, because the leaf is all this expression has.
+      unnamed: !naming.leaf,
       weak: false,
       wrapper: false,
     });
@@ -1058,7 +1110,7 @@ function pathDrafts(
     prose: false,
     struck: false,
     tier: indexed ? 2 : 0,
-    unnamed,
+    unnamed: !naming.path,
     weak: false,
     wrapper: false,
   });
@@ -1093,7 +1145,9 @@ function walkJsonValue(
     // what made it offer-shaped, so it is named by construction.
     const offer = jsonValuePrice(value, locale);
     if (offer?.currency && equalsExpected(offer.amount, expected)) {
-      pathDrafts(path, source, out.drafts, false);
+      // Named by its shape rather than its key: `jsonValuePrice` only read it
+      // because it carries its own `price` and `priceCurrency`.
+      pathDrafts(path, source, out.drafts, { leaf: true, path: true });
     }
     for (const [key, entry] of Object.entries(value)) {
       walkJsonValue(entry, [...path, key], depth + 1, state, expected, locale, source, out);
@@ -1108,8 +1162,8 @@ function walkJsonValue(
   if (!parsed) {
     return;
   }
-  const priceNamed = pathIsPriceNamed(path);
-  if (priceNamed) {
+  const naming = pathNaming(path);
+  if (naming.path) {
     addSighting(out.sightings, {
       amount: parsed.amount,
       context: `${source} ${path.join(".")}`,
@@ -1118,7 +1172,7 @@ function walkJsonValue(
     });
   }
   if (equalsExpected(parsed.amount, expected)) {
-    pathDrafts(path, source, out.drafts, !priceNamed);
+    pathDrafts(path, source, out.drafts, naming);
   }
 }
 
@@ -1334,8 +1388,11 @@ function reasonFor(
     caveats.push("it has no stable class or id of its own, so a markup change may break it again");
   }
   if (draft.wrapper) {
+    // Deliberately only about this element: a descendant holding the price has
+    // not necessarily yielded a candidate of its own, so promising a tighter
+    // pin would send the reader looking for one that is not on offer.
     caveats.push(
-      "it wraps the element the price sits in rather than being it, so anything added inside it would be read first"
+      "it contains the price rather than being it, so anything inserted above the price inside it would be read instead"
     );
   }
   if (namesAreStale(draft.names)) {

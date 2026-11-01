@@ -89,7 +89,7 @@ describe("suggestExpressions — markup", () => {
     expect(candidates[0]?.reason).toBe("Reads the price element's text.");
     expect(
       candidates.find((candidate) => candidate.expression === ".price-block")?.reason
-    ).toContain("wraps the element the price sits in");
+    ).toContain("contains the price rather than being it");
   });
 
   it("still prefers a wrapper that reads its own currency to the bare number inside it", () => {
@@ -273,6 +273,44 @@ describe("suggestExpressions — markup", () => {
     for (const candidate of candidates) {
       expect(candidate.expression).not.toContain("24.99");
     }
+  });
+
+  it("does not take a form control's value for a price", () => {
+    // `value` is itself a price word, so testing the attribute name first
+    // answered for it and the element-level test never ran — an option value
+    // that happens to equal the price passed as one.
+    const html = page(
+      "",
+      `<select name="variant"><option value="499" selected>Large</option></select>
+       <span class="product-price">£499</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    for (const candidate of candidates.slice(1)) {
+      expect(candidate.reason).toContain("says it holds a price");
+    }
+  });
+
+  it("does not take a generic data-value for a price", () => {
+    const html = page(
+      "",
+      '<div class="tile" data-value="499">In stock</div><span class="product-price">£499</span>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(
+      candidates.find((candidate) => candidate.expression === ".tile::attr(data-value)")?.reason
+    ).toContain("says it holds a price");
   });
 
   it("does not take an attribute for a price just because the number matches", () => {
@@ -578,8 +616,33 @@ describe("suggestExpressions — ranking against what the listing already knows"
       listingCurrency: "GBP",
     });
 
-    expect(candidates[0]?.expression).toBe("$..current");
+    // The concrete path carries the key that made this a price; `$..current`
+    // throws it away, so it is the one that has to admit to naming nothing.
+    expect(candidates[0]?.expression).toBe("$.priceInfo.current");
     expect(candidates[0]?.reason).toBe("Reads the page's structured data.");
+    expect(candidates.find((candidate) => candidate.expression === "$..current")?.reason).toContain(
+      "says it holds a price"
+    );
+  });
+
+  it("does not let a broad ancestor key name every number beneath it", () => {
+    // `initialValue` wraps a whole payload in app state. Letting `value` name
+    // its descendants put the stock count back in the structured-data tier.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ initialValue: { product: { stock: 499 } } })}</script>
+       <span class="product-price">£499</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates.find((candidate) => candidate.expression === "$..stock")?.reason).toContain(
+      "says it holds a price"
+    );
   });
 
   it("does not take an unnamed number for a price, however durable the path", () => {
