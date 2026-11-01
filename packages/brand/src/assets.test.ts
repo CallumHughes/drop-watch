@@ -60,8 +60,14 @@ describe("the frame the components draw in", () => {
     const drawn = box(WORDMARK_HORIZONTAL.viewBox);
 
     expect([drawn.x, drawn.w]).toEqual([asset.x, asset.w]);
-    expect(drawn.y).toBeLessThan(asset.y);
     expect(drawn.y + drawn.h).toBeCloseTo(asset.y + asset.h, 1);
+
+    // The space added above is the space below the baseline, and a baseline
+    // past the half-way mark would not be one — so this bounds a measurement
+    // that went wrong, not just the direction it went in.
+    const added = asset.y - drawn.y;
+    expect(added).toBeGreaterThan(0);
+    expect(added).toBeLessThan(asset.h / 2);
   });
 });
 

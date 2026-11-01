@@ -197,9 +197,17 @@ async function balanced(svg) {
   // Descenders are a few strokes wide where the x-height band runs the whole
   // word, so the fall at the baseline is an order of magnitude, not a nudge.
   const floor = Math.max(...ink) * DESCENDER_SHARE;
+  const first = ink.findIndex((row) => row > 0);
+  const last = ink.findLastIndex((row) => row > floor);
+  // A blank or unreadable raster would otherwise land both at -1 and write a
+  // plausible-looking box from nothing, the way an unchecked diff would.
+  if (first === -1 || last <= first) {
+    throw new Error(`no letterforms found to centre on (caps ${first}, baseline ${last})`);
+  }
+
   const unit = (row) => minY + row / scale;
-  const caps = unit(ink.findIndex((row) => row > 0));
-  const baseline = unit(ink.findLastIndex((row) => row > floor));
+  const caps = unit(first);
+  const baseline = unit(last);
   const bottom = minY + h;
   const top = Math.min(caps - (bottom - baseline), minY);
 
