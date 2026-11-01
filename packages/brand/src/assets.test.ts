@@ -9,6 +9,7 @@ const ASSETS = join(dirname(fileURLToPath(import.meta.url)), "../assets");
 
 const VIEW_BOX = /viewBox="([-\d.\s]+)"/;
 const PATH_DATA = /<path[^>]*\sd="([^"]+)"/g;
+const WHITESPACE = /\s+/;
 
 const read = (name: string) => readFileSync(join(ASSETS, `${name}.svg`), "utf8");
 
@@ -17,6 +18,11 @@ function art(svg: string) {
     paths: [...svg.matchAll(PATH_DATA)].map((m) => m[1]),
     viewBox: svg.match(VIEW_BOX)?.[1] ?? "",
   };
+}
+
+function box(viewBox: string) {
+  const [x = 0, y = 0, w = 0, h = 0] = viewBox.trim().split(WHITESPACE).map(Number);
+  return { h, w, x, y };
 }
 
 /**
@@ -31,10 +37,31 @@ describe("the generated paths match the assets they came from", () => {
     ["wordmark-horizontal", WORDMARK_HORIZONTAL],
     ["wordmark-stacked", WORDMARK_STACKED],
   ])("%s", (name, generated) => {
-    expect(art(read(name))).toEqual({
-      paths: [...generated.paths],
-      viewBox: generated.viewBox,
-    });
+    expect(art(read(name)).paths).toEqual([...generated.paths]);
+  });
+});
+
+describe("the frame the components draw in", () => {
+  it.each([
+    ["mark", MARK],
+    ["wordmark-stacked", WORDMARK_STACKED],
+  ])("%s keeps the asset's own box", (name, generated) => {
+    expect(art(read(name)).viewBox).toBe(generated.viewBox);
+  });
+
+  /**
+   * The horizontal wordmark is the exception: its box stops at the "p"
+   * descender, so centring it hangs the lettering high. `brand:generate`
+   * mirrors that space above the caps instead. Same artwork and the same
+   * baseline — only the top edge moves.
+   */
+  it("wordmark-horizontal is re-centred on its caps", () => {
+    const asset = box(art(read("wordmark-horizontal")).viewBox);
+    const drawn = box(WORDMARK_HORIZONTAL.viewBox);
+
+    expect([drawn.x, drawn.w]).toEqual([asset.x, asset.w]);
+    expect(drawn.y).toBeLessThan(asset.y);
+    expect(drawn.y + drawn.h).toBeCloseTo(asset.y + asset.h, 1);
   });
 });
 

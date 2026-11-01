@@ -84,6 +84,14 @@ that could not scale.
 | `apps/web/public/icon-maskable-512.png` | `badge-maskable.svg` |
 | `src/paths.generated.ts` | all three marks, for the React components |
 
+The horizontal wordmark is the one place the generated module and the asset
+disagree, and deliberately: the asset's box stops at the "p" descender, so
+anything that centres it hangs the lettering high. `generate` measures the
+baseline and mirrors the space below it above the caps, which is what type
+itself does. Same paths, same baseline — only the top edge moves, and only for
+the components. The rasters place the artwork themselves and keep the asset's
+own frame.
+
 ### Why the app icons are a badge
 
 The mark is roughly **1:2.8** — tall and narrow. Rendered bare at 16px its shaft

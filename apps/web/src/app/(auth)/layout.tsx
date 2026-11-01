@@ -11,7 +11,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <Link aria-label={APP_NAME} className="flex items-center gap-2.5" href="/">
         <Mark className="h-7 w-auto" />
-        <Wordmark className="h-5 w-auto" />
+        <Wordmark className="h-6 w-auto" />
       </Link>
       <div className="w-full max-w-md">{children}</div>
     </div>
