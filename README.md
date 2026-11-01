@@ -49,9 +49,9 @@ out, or unknown. Mainly this exists so the restock rule has something to go on.
 **Alerts.** Three rules per product, in any combination: target price, percentage
 drop, restock. The target rule is evaluated against whichever tracked store is
 currently cheapest; drop and restock fire on the store that was just checked.
-Each fires once and then keeps quiet for a cooldown, on the theory that being
-told the same thing every three hours is how a notifier gets muted. A lower
-price reopens it.
+Each fires once and then keeps quiet for a cooldown — twelve hours by
+default — on the theory that being told the same thing over and over is how a
+notifier gets muted. A lower price reopens it.
 
 **Broken watches.** Markup rots. A shop changes its page, the tracker stops
 finding a price, and left alone it would sit there indefinitely saying nothing.
@@ -59,9 +59,10 @@ After a few consecutive failures it sends a `watch_broken` alert, then shuts up
 until the product recovers. Repairing one is the same question as setting it up:
 re-fetch the page and say what price it shows now.
 
-**Scheduling.** Interval is per store, five minutes to a week, with some jitter
-so a batch added in one sitting does not hit the same shop on the same minute.
-Each store can be paused, or checked on demand, independently of its siblings.
+**Scheduling.** Interval is per store, five minutes to a week and twelve hours
+by default, with some jitter so a batch added in one sitting does not hit the
+same shop on the same minute. Each store can be paused, or checked on demand,
+independently of its siblings.
 
 **More than one person.** The first account created is the admin. After that
 sign-up closes and people join by invite — single-use links, good for 48 hours.
