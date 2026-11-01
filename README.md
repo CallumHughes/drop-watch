@@ -49,9 +49,9 @@ out, or unknown. Mainly this exists so the restock rule has something to go on.
 **Alerts.** Three rules per product, in any combination: target price, percentage
 drop, restock. The target rule is evaluated against whichever tracked store is
 currently cheapest; drop and restock fire on the store that was just checked.
-Each fires once and then keeps quiet for a cooldown, on the theory that being
-told the same thing on every check is how a notifier gets muted. A lower price
-reopens it.
+Each fires once and then keeps quiet for a cooldown — twelve hours by
+default — on the theory that being told the same thing over and over is how a
+notifier gets muted. A lower price reopens it.
 
 **Broken watches.** Markup rots. A shop changes its page, the tracker stops
 finding a price, and left alone it would sit there indefinitely saying nothing.

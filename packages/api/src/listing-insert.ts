@@ -58,8 +58,8 @@ export type ListingInsertInput = Omit<ListingCreateInput, "productId">;
 /**
  * Only the supplied settings, plus `nextCheckAt` pinned to now so the minutely
  * dispatcher picks the listing up on its next tick rather than after a first
- * full interval — adding something and watching nothing happen for three hours
- * reads as a bug.
+ * full interval — adding something and watching nothing happen for twelve
+ * hours reads as a bug.
  */
 export function buildListingInsert(
   input: ListingInsertInput,
