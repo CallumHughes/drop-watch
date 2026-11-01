@@ -106,7 +106,7 @@ export default function SignUpForm({
   return (
     <Card>
       <CardHeader className="text-center">
-        <h1 className="cn-font-heading font-medium text-xl">Create Account</h1>
+        <h1 className="font-medium text-xl">Create Account</h1>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit}>
