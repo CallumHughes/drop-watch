@@ -246,6 +246,21 @@ describe("repairSummary — the tracked price", () => {
     );
   });
 
+  it("treats an unknown previous currency as unknown, not as a switch", () => {
+    // The earlier reading carried no currency and the repair found one. That
+    // is not a currency change, and the reader still needs the alert warning.
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: "49.99",
+        previousCurrency: null,
+      })
+    ).toBe(
+      "Applying will pin the tested CSS selector. It will record £24.99 where 49.99 is on record, so the next check will read as a price change and may alert."
+    );
+  });
+
   it("says nothing extra with no price on record, or no tracked price at all", () => {
     expect(
       repairSummary(pinned, automatic, {

@@ -127,7 +127,15 @@ function trackedPriceSentence(tracked: TrackedPriceChange | undefined): string |
   // Each price in the currency it was actually read in. Formatting the price
   // on record with the repaired reading's currency reported a figure in a
   // currency it was never in, in the one sentence meant to be exact about it.
-  const switched = tracked.previousCurrency !== tracked.currency;
+  //
+  // Two *known* currencies that differ. An unknown one on either side is
+  // unknown, not different: a listing whose earlier reading carried no
+  // currency would otherwise be told its history does not compare, when all
+  // that happened is the repair found a currency where there was none.
+  const switched =
+    tracked.previousCurrency !== null &&
+    tracked.currency !== null &&
+    tracked.previousCurrency !== tracked.currency;
   let changed = false;
   try {
     changed = toMinorUnits(tracked.previous) !== toMinorUnits(tracked.next);

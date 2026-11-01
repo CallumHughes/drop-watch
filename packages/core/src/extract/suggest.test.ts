@@ -118,6 +118,35 @@ describe("suggestExpressions — markup", () => {
     expect(candidates[0]?.reason).not.toContain("another product");
   });
 
+  it("does not borrow a price word from one class to condemn another", () => {
+    // `w-full` is on half the price elements on the web. Read together with a
+    // `product-price` class beside it, `full` + `price` said was-price.
+    const html = page(
+      "",
+      `<main class="product-main"><del class="rrp">£49.99</del>
+       <span class="w-full product-price">£24.99</span></main>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.reason).toBe("Reads the price element's text.");
+  });
+
+  it("still reads a hyphenated was-price name as one", () => {
+    const html = page(
+      "",
+      `<main class="product-main"><span class="list-none old-price">£24.99</span>
+       <span class="w-full price-now">£19.99</span></main>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates.find((candidate) => candidate.expression === ".old-price")?.reason).toContain(
+      "was-price"
+    );
+  });
+
   it("describes an element read through its content attribute as an attribute", () => {
     const html = page(
       "",

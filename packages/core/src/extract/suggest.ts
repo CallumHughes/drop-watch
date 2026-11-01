@@ -314,6 +314,8 @@ const WEAK_OTHER_PRODUCT_WORDS = new Set(["also", "more", "other", "suggest"]);
  * Each name is read word by word and also whole with its separators removed,
  * so `cross-sell` matches `crosssell`. A `weak` word only counts when the same
  * name also says "price": `old-price` is a was-price, `font-bold` is a weight.
+ * One name means one class or one id, never a whole attribute — see
+ * {@link elementNames} for why that distinction is the whole point.
  */
 function namesCarry(
   names: readonly string[],
@@ -542,14 +544,27 @@ function narrowedSelector(
   return null;
 }
 
-/** The names this element goes by: one entry per attribute, never merged. */
+/**
+ * The names this element goes by: one entry per class, id or microdata token.
+ *
+ * Split this finely because {@link namesCarry} looks for its corroborating
+ * price word *within* a name, and one name has to mean one thing. A whole
+ * `class` attribute does not: `class="w-full product-price"` yields `full` from
+ * one class and `price` from another, which read together say was-price — and
+ * `w-full` is on half the price elements on the web. The cost is that a
+ * was-price spelled across two classes, `class="old price"`, is no longer read
+ * as one; `old-price` and `price--old` still are, and the strong words need no
+ * corroboration at all.
+ */
 function elementNames(element: CheerioElement): string[] {
   const attributes: Attributes = "attribs" in element ? element.attribs : {};
-  // Kept apart so a weak word in one attribute cannot borrow corroboration
-  // from another: `class="font-regular" id="product-price"` is not a was-price.
-  return [attributes.class, attributes.id, attributes.itemprop].filter((value): value is string =>
-    Boolean(value)
-  );
+  const names: string[] = [];
+  for (const value of [attributes.class, attributes.id, attributes.itemprop]) {
+    if (value) {
+      names.push(...value.split(COLLAPSE_WHITESPACE).filter((token) => token.length > 0));
+    }
+  }
+  return names;
 }
 
 /** Where an element sits, for the reason line and the demotion rules. */
