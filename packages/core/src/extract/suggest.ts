@@ -831,14 +831,17 @@ const PRICE_NAMING_ATTRIBUTES = ["class", "id", "itemprop", "property", "name"];
 const VALUE_NAMING_ATTRIBUTES = ["itemprop", "property"];
 
 /**
- * Words that say an *attribute name* holds a price.
+ * Price words specific enough to money to stand on their own.
  *
- * Narrower than {@link PRICE_WORDS} on purpose. `value`, `total` and `rate`
- * name a price when they are a class or a JSON key, but as attribute names
- * they are the generic slots every form control and widget has, and
- * `data-value="499"` says nothing about money.
+ * Narrower than {@link PRICE_WORDS}, and used wherever a single word has to
+ * carry the claim by itself: an attribute name, and a JSON leaf key that
+ * becomes the whole of a `$..leaf` expression. `value`, `total` and `rate` are
+ * not here — alone, each is the generic slot every form control, widget and
+ * state blob has, so `data-value="499"` and `$..value` say nothing about money
+ * and a `total` is as likely to be a basket's as a product's. Reached through
+ * a parent that says price, they are fine: see {@link pathNaming}.
  */
-const PRICE_ATTRIBUTE_WORDS = new Set([
+const STANDALONE_PRICE_WORDS = new Set([
   "amount",
   "amounts",
   "cost",
@@ -847,6 +850,7 @@ const PRICE_ATTRIBUTE_WORDS = new Set([
   "price",
   "prices",
   "pricing",
+  "subtotal",
 ]);
 
 /**
@@ -873,7 +877,7 @@ function attributeSaysPrice(attributes: Attributes, name: string): boolean {
       return Boolean(value) && carriesAny(nameWords(value as string), PRICE_WORDS);
     });
   }
-  return carriesAny(nameWords(name), PRICE_ATTRIBUTE_WORDS);
+  return carriesAny(nameWords(name), STANDALONE_PRICE_WORDS);
 }
 
 function attributeDraft(
@@ -1062,17 +1066,22 @@ interface PathNaming {
  * Not the leaf alone: `priceInfo.current` is as plainly a price as
  * `product.price`, and reading `current` by itself called it some number that
  * happened to match. A parent has to say it strongly, though — see
- * {@link STRONG_PRICE_WORDS}. `{ "stock": 499 }` on a page showing `£499` is
- * named by nothing either way, which is the case this exists for: without it
- * `$..stock` is the most durable candidate on the page and the pin reads the
- * stock count from then on.
+ * {@link STRONG_PRICE_WORDS} — and a leaf has to say it on its own, see
+ * {@link STANDALONE_PRICE_WORDS}, so `{ "inventory": { "value": 499 } }` is no
+ * more a price than `{ "stock": 499 }`. Both are named by nothing, which is
+ * the case this exists for: without it `$..value` is the most durable
+ * candidate on the page and the pin reads the stock count from then on.
  */
 function pathNaming(path: readonly (string | number)[]): PathNaming {
   const last = path.at(-1);
-  const leaf = typeof last === "string" && carriesAny(nameWords(last), PRICE_WORDS);
+  // The leaf has to stand alone, because `$..leaf` is all of it.
+  const leaf = typeof last === "string" && carriesAny(nameWords(last), STANDALONE_PRICE_WORDS);
   if (leaf) {
     return { leaf, path: true };
   }
+  // Anything else — a generic `value` or `total`, or a key saying nothing at
+  // all — is a price only if a parent says so, and only the concrete path
+  // spells that parent out.
   const named = path.some(
     (segment) => typeof segment === "string" && carriesAny(nameWords(segment), STRONG_PRICE_WORDS)
   );

@@ -657,6 +657,45 @@ describe("suggestExpressions — ranking against what the listing already knows"
     );
   });
 
+  it("does not let a generic leaf key name itself", () => {
+    // `value` is about as generic as a JSON key gets, so `$..value` carries no
+    // claim about money — this is `{ "stock": 499 }` one level down.
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ inventory: { value: 499 } })}</script>
+       <span class="product-price">£499</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    for (const candidate of candidates.slice(1)) {
+      expect(candidate.reason).toContain("says it holds a price");
+    }
+  });
+
+  it("reaches a generic leaf through a parent that names it", () => {
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ price: { value: 499 } })}</script>
+       <span class="product-price">£499</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe("$.price.value");
+    expect(candidates[0]?.reason).toBe("Reads the page's structured data.");
+    expect(candidates.find((candidate) => candidate.expression === "$..value")?.reason).toContain(
+      "says it holds a price"
+    );
+  });
+
   it("does not let a broad ancestor key name every number beneath it", () => {
     // `initialValue` wraps a whole payload in app state. Letting `value` name
     // its descendants put the stock count back in the structured-data tier.
