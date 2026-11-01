@@ -157,7 +157,13 @@ export function ListingSettingsForm({
   const [locale, setLocale] = useState(listing.locale ?? "");
   const [renderMode, setRenderMode] = useState(listing.render);
   const [repairOpen, setRepairOpen] = useState(false);
-  const repairFlow = usePreviewFlow({ initialUrl: listing.url, locale });
+  // The listing's currency reaches the suggester, which needs it to rank: a
+  // bare number is a check failure without one and perfectly fine with one.
+  const repairFlow = usePreviewFlow({
+    initialUrl: listing.url,
+    locale,
+    ...(listing.currency ? { listingCurrency: listing.currency } : {}),
+  });
 
   // This form only mounts inside the expanded editor, so the query fires on
   // open rather than paying for it on every dashboard load.
@@ -213,6 +219,7 @@ export function ListingSettingsForm({
         currency: repairFlow.chosen.currency ?? latest?.currency ?? listing.currency,
         next: repairFlow.chosen.price,
         previous: latest?.price ?? null,
+        previousCurrency: latest?.currency ?? listing.currency,
       }
     : undefined;
   const openRepair = useCallback(() => {

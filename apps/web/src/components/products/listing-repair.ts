@@ -103,10 +103,13 @@ export function repairActionLabel(next: ListingExtractionSettings | null): strin
 
 /** The price this listing records now, and the price the repair would record. */
 export interface TrackedPriceChange {
+  /** The currency the repaired reading carries. */
   currency: string | null;
   next: string;
   /** The last price recorded for this listing; `null` when there is none. */
   previous: string | null;
+  /** The currency *that* price was recorded in, which need not be the same. */
+  previousCurrency: string | null;
 }
 
 /**
@@ -121,17 +124,26 @@ function trackedPriceSentence(tracked: TrackedPriceChange | undefined): string |
   if (!tracked?.previous) {
     return null;
   }
+  // Each price in the currency it was actually read in. Formatting the price
+  // on record with the repaired reading's currency reported a figure in a
+  // currency it was never in, in the one sentence meant to be exact about it.
+  const switched = tracked.previousCurrency !== tracked.currency;
   let changed = false;
   try {
     changed = toMinorUnits(tracked.previous) !== toMinorUnits(tracked.next);
   } catch {
     return null;
   }
-  if (!changed) {
+  if (!(changed || switched)) {
     return null;
   }
-  const from = formatPrice(tracked.previous, tracked.currency);
+  const from = formatPrice(tracked.previous, tracked.previousCurrency);
   const to = formatPrice(tracked.next, tracked.currency);
+  // Across a currency switch the two figures are not comparable amounts at
+  // all, so the sentence says that rather than promising a rise or a fall.
+  if (switched) {
+    return ` It will record ${to} where ${from} is on record — a different currency, so this listing's history no longer compares like for like.`;
+  }
   return ` It will record ${to} where ${from} is on record, so the next check will read as a price change and may alert.`;
 }
 

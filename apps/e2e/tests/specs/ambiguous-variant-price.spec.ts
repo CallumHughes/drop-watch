@@ -90,6 +90,16 @@ test("an ambiguous size price is rejected until the displayed price is named", a
     await settings.repairButton.click();
     await settings.locatePrice("479.00");
     await expect(settings.applyRepairButton).toBeEnabled();
+
+    // Correcting the figure has to withdraw what the previous one found. The
+    // pin used to survive, so Apply went on offering an expression for a price
+    // the panel was simultaneously reporting as not on the page.
+    await settings.expectedPriceInput.fill("12.34");
+    await expect(settings.notFoundNote).toBeVisible();
+    await expect(settings.applyRepairButton).toBeDisabled();
+
+    await settings.locatePrice("479.00");
+    await expect(settings.applyRepairButton).toBeEnabled();
     await settings.applyRepairButton.click();
     await expect(settings.extractionNote).toContainText("Read from a spot");
     await settings.saveButton.click();

@@ -4,15 +4,22 @@ import {
   toPreviewAttemptSummary,
   toPreviewExtraction,
 } from "@drop-watch/api/preview";
-import type { PagePreview } from "@drop-watch/api/routers/preview";
+import type {
+  ExpressionMatch,
+  PagePreview,
+  PriceSuggestion,
+} from "@drop-watch/api/routers/preview";
 import { describe, expect, it } from "vitest";
 
 import {
   failedBrowserAttempt,
   isCurrentPreviewRequest,
+  locatorPin,
   normalizePreviewLocale,
   transportReloadControl,
 } from "./use-preview-flow";
+
+const SAMPLE: ExpressionMatch = { context: '<span class="price">£24.99</span>', value: "£24.99" };
 
 function preview(attempts: PagePreview["attempts"]): PagePreview {
   return {
@@ -267,4 +274,52 @@ describe("transportReloadControl with a failed escalation", () => {
       });
     }
   );
+});
+
+describe("locatorPin", () => {
+  const candidate = { currency: "GBP", expression: ".price", mode: "selector" as const };
+  const suggestion = (overrides: Partial<PriceSuggestion> = {}): PriceSuggestion => ({
+    automatic: null,
+    candidates: [],
+    pricesOnPage: [],
+    ...overrides,
+  });
+
+  it("pins the top candidate", () => {
+    expect(
+      locatorPin(suggestion({ candidates: [{ ...candidate, reason: "", sample: SAMPLE }] }))
+    ).toEqual({ expression: ".price", mode: "selector" });
+  });
+
+  it("pins nothing when the price matched nothing on the page", () => {
+    expect(locatorPin(suggestion())).toBeNull();
+  });
+
+  it("pins nothing while no answer has arrived", () => {
+    // The same answer as "found nothing", on purpose: a stale pin from the
+    // previous price must not survive into this one.
+    expect(locatorPin(undefined)).toBeNull();
+  });
+
+  it("pins nothing when the automatic chain already reads the price", () => {
+    expect(
+      locatorPin(
+        suggestion({
+          automatic: { agrees: true, ambiguous: false, currency: "GBP", price: "24.99" },
+          candidates: [{ ...candidate, reason: "", sample: SAMPLE }],
+        })
+      )
+    ).toBeNull();
+  });
+
+  it("still pins when the chain agrees but its gate would refuse the result", () => {
+    expect(
+      locatorPin(
+        suggestion({
+          automatic: { agrees: true, ambiguous: true, currency: "GBP", price: "24.99" },
+          candidates: [{ ...candidate, reason: "", sample: SAMPLE }],
+        })
+      )
+    ).toEqual({ expression: ".price", mode: "selector" });
+  });
 });

@@ -295,11 +295,16 @@ export const previewRouter = {
    * gate enforces — so a suggestion can never be one the user is then refused.
    * The expected price is not stored: it only has to be true of the page in
    * front of them, and it stops being true as soon as the price moves.
+   *
+   * `listingCurrency` only changes the ranking: with one on file the worker
+   * accepts a bare number, and without one a currency-less candidate is a
+   * check failure however durable its shape.
    */
   suggestExpressions: protectedProcedure
     .input(
       previewIdInput.extend({
         expectedPrice: z.string().regex(PRICE_PATTERN),
+        listingCurrency: z.string().length(3).optional(),
         locale: z.string().max(MAX_LOCALE_LENGTH).optional(),
       })
     )
@@ -308,6 +313,7 @@ export const previewRouter = {
       const suggestion = suggestExpressions(entry.html, {
         expectedPrice: input.expectedPrice,
         url: entry.url,
+        ...(input.listingCurrency ? { listingCurrency: input.listingCurrency } : {}),
         ...(input.locale ? { locale: input.locale } : {}),
       });
       const log = createLogger({

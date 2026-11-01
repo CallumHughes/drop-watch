@@ -36,6 +36,14 @@ const MAX_VALIDATIONS = 40;
 const MAX_CANDIDATES = 5;
 /** Distinct money values reported when nothing matched. */
 const MAX_SIGHTINGS = 12;
+/**
+ * Money values collected before ranking cuts them to {@link MAX_SIGHTINGS}.
+ *
+ * Truncating in document order put a basket total, a delivery threshold and a
+ * mega-menu promo in the list and left the product's own price out of it —
+ * which is the one case the list exists for.
+ */
+const MAX_COLLECTED_SIGHTINGS = 60;
 /** Matches the picker's own sample budget in `./index`. */
 const MAX_SAMPLE_CHARS = 300;
 /**
@@ -56,6 +64,22 @@ const MAX_PRICE_TEXT_LETTERS = 6;
  * turn one keystroke into thousands of traversals.
  */
 const MAX_SYNTHESISED = 60;
+/**
+ * Full-document selector queries one call may spend.
+ *
+ * {@link identifies} scans the whole tree, which on a large page costs around
+ * half a millisecond a time, and this runs synchronously in the API handler on
+ * every debounced keystroke. The ceiling that matters is the event loop's
+ * rather than any single page's, so narrowing stops looking when the budget is
+ * gone — the same outcome as finding nothing, which is what it would have
+ * found on a page where every selector matches five hundred elements.
+ */
+const MAX_SELECTOR_QUERIES = 600;
+/**
+ * And per element, so one element whose every selector is ambiguous cannot
+ * spend the whole call's budget before the next one is looked at.
+ */
+const MAX_SELECTOR_QUERIES_PER_ELEMENT = 48;
 /** Ancestors prepended while narrowing a selector. Beyond this it is a path,
  * and a path is what breaks next week. */
 const MAX_SELECTOR_DEPTH = 3;
@@ -69,6 +93,13 @@ const NUMBER_RUNS = /-?\d[\d\s.,'’]*/g;
 const JSON_NAME = /^[A-Za-z_$][\w$-]*$/;
 const CSS_IDENTIFIER = /^-?[A-Za-z_][\w-]*$/;
 const QUOTES = /['"]/;
+/** Characters that cannot survive even a quoted attribute selector. */
+const UNQUOTABLE = /[\\\n\r]/;
+/**
+ * A value that is nothing but a number, which on a price element is the price.
+ * Baking it into the selector makes the pin break the moment the price moves.
+ */
+const NUMERIC_VALUE = /^[-\d.,'’\s]+$/;
 const MANY_DIGITS = /\d{4,}/;
 /** `css-1x2y3z`, `sc-AbCdEf`, `jsx-123` — a build step's output, not a name. */
 const GENERATED_PREFIX = /^(?:css|sc|jsx|emotion|svelte|_)-/i;
@@ -76,25 +107,37 @@ const GENERATED_PREFIX = /^(?:css|sc|jsx|emotion|svelte|_)-/i;
 const HASHED_SUFFIX = /[-_](?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{5,}$/i;
 /** Names that say the element holds a price. */
 const PRICE_TOKEN = /price|amount|cost|money|total|value/i;
-/**
- * Names that say it holds a *different* price on the right product — the
- * crossed-out one. Validation cannot catch these: they parse to the same
- * number when the page is on offer at the figure the user read elsewhere.
- */
-const STALE_PRICE_TOKEN = /compare|was|rrp|msrp|list|old|regular|strike|before|original/i;
-/** Names that say it holds the right price for the *wrong* product. */
-const OTHER_PRODUCT_TOKEN =
-  /related|recommend|also|upsell|cross-?sell|carousel|recent|similar|bundle|you-?may|suggest/i;
 /** Tailwind-shaped utilities: unstable and semantically empty. */
 const UTILITY_CLASS =
   /^(?:text|font|bg|p|m|[pm][xytrbl]|w|h|min|max|flex|grid|gap|border|rounded|shadow|leading|tracking|items|justify|inline|block|hidden|absolute|relative|fixed|sticky|top|left|right|bottom|z|opacity|space|overflow|whitespace|align|order|col|row|gradient|from|to|via|sm|md|lg|xl|2xl)(?:-|$)/;
 /** Attributes worth reading explicitly, most machine-readable first. */
 const ATTRIBUTE_PREFERENCE = ["content", "data-price", "data-product-price", "value"] as const;
-/** Attributes that identify an element without describing its looks. */
-const IDENTIFYING_ATTRIBUTES = ["itemprop", "data-testid", "data-test", "data-qa", "data-price"];
+/**
+ * Attributes that identify an element without describing its looks.
+ *
+ * `property` and `name` are here for `<meta property="product:price:amount">`,
+ * which is among the most stable places a price lives and has no usable
+ * ancestor to be narrowed against — without them it is found and then
+ * discarded.
+ */
+const IDENTIFYING_ATTRIBUTES = [
+  "itemprop",
+  "data-testid",
+  "data-test",
+  "data-qa",
+  "data-price",
+  "property",
+  "name",
+];
 
 /** `element.attribs` as it actually behaves: any name may simply be absent. */
 type Attributes = Partial<Record<string, string>>;
+
+/** Full-document queries left: `queries` for the call, `element` for this one. */
+interface SelectorBudget {
+  element: number;
+  queries: number;
+}
 
 export interface PriceSighting {
   /** Decimal string, as `parsePrice` produced it. */
@@ -102,6 +145,11 @@ export interface PriceSighting {
   /** Where it was seen, so the reader can tell two equal prices apart. */
   context: string;
   currency?: string;
+}
+
+/** A sighting and how likely it is to be the price being sold. Lower is better. */
+interface RankedSighting extends PriceSighting {
+  rank: number;
 }
 
 export interface ExpressionCandidate {
@@ -121,6 +169,14 @@ export interface ExpressionCandidate {
 export interface SuggestOptions {
   /** Decimal string. Compared in minor units, never as a float. */
   expectedPrice: string;
+  /**
+   * The currency this listing already records, if any.
+   *
+   * It decides how badly a currency-less candidate ranks: with one on file the
+   * worker accepts a bare number, and without one that pin is an
+   * `extract_failed` on the very next check.
+   */
+  listingCurrency?: string;
   locale?: string;
   url?: string;
 }
@@ -159,6 +215,131 @@ function equalsExpected(price: string, expected: bigint): boolean {
   }
 }
 
+/** `originalPrice` → `original price`, so a JSON key reads like a class name. */
+const CAMEL_BOUNDARY = /([a-z\d])([A-Z])/g;
+/** Everything between one word of a name and the next, once lowercased. */
+const NAME_SEPARATORS = /[^a-z\d]+/;
+
+/**
+ * The words a name is made of, lowercased.
+ *
+ * Whole words, because every token below is a substring of some perfectly
+ * ordinary class name: `old` sits in `font-bold`, `list` in `product-listing`,
+ * `before` in Tailwind's `before:` variants. Testing the raw attribute put a
+ * was-price penalty — and a reason line announcing one — on the real price of
+ * any page styled with utilities.
+ */
+function nameWords(value: string): string[] {
+  return value
+    .replace(CAMEL_BOUNDARY, "$1 $2")
+    .toLowerCase()
+    .split(NAME_SEPARATORS)
+    .filter((word) => word.length > 0);
+}
+
+/** Words that say a name holds a price. */
+const PRICE_WORDS = new Set([
+  "amount",
+  "amounts",
+  "cost",
+  "fee",
+  "money",
+  "price",
+  "prices",
+  "pricing",
+  "rate",
+  "subtotal",
+  "total",
+  "value",
+]);
+/**
+ * Words that say a name holds a *different* price on the right product — the
+ * crossed-out one. Validation cannot catch these: they parse to the same
+ * number when the page is on offer at the figure the user read elsewhere.
+ */
+const STALE_PRICE_WORDS = new Set([
+  "compare",
+  "compareat",
+  "crossed",
+  "msrp",
+  "rrp",
+  "slashed",
+  "strike",
+  "strikethrough",
+  "struck",
+  "was",
+  "wasprice",
+]);
+/** The same, for words that mean nothing on their own — see {@link namesCarry}. */
+const WEAK_STALE_PRICE_WORDS = new Set([
+  "before",
+  "full",
+  "list",
+  "old",
+  "original",
+  "previous",
+  "regular",
+  "retail",
+]);
+/** Words that say a name holds the right price for the *wrong* product. */
+const OTHER_PRODUCT_WORDS = new Set([
+  "alsobought",
+  "alsoviewed",
+  "bundle",
+  "bundled",
+  "bundles",
+  "carousel",
+  "crosssell",
+  "crosssells",
+  "recent",
+  "recently",
+  "recommend",
+  "recommendation",
+  "recommendations",
+  "recommended",
+  "related",
+  "similar",
+  "suggested",
+  "suggestions",
+  "upsell",
+  "upsells",
+  "youmayalsolike",
+  "youmaylike",
+]);
+const WEAK_OTHER_PRODUCT_WORDS = new Set(["also", "more", "other", "suggest"]);
+
+/**
+ * Whether any of these names carries one of `words`.
+ *
+ * Each name is read word by word and also whole with its separators removed,
+ * so `cross-sell` matches `crosssell`. A `weak` word only counts when the same
+ * name also says "price": `old-price` is a was-price, `font-bold` is a weight.
+ */
+function namesCarry(
+  names: readonly string[],
+  words: ReadonlySet<string>,
+  weak: ReadonlySet<string>
+): boolean {
+  for (const name of names) {
+    const found = nameWords(name);
+    if (words.has(found.join("")) || found.some((word) => words.has(word))) {
+      return true;
+    }
+    if (found.some((word) => weak.has(word)) && found.some((word) => PRICE_WORDS.has(word))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function namesAreStale(names: readonly string[]): boolean {
+  return namesCarry(names, STALE_PRICE_WORDS, WEAK_STALE_PRICE_WORDS);
+}
+
+function namesAreOtherProduct(names: readonly string[]): boolean {
+  return namesCarry(names, OTHER_PRODUCT_WORDS, WEAK_OTHER_PRODUCT_WORDS);
+}
+
 function looksGenerated(token: string): boolean {
   return (
     token.length > 40 ||
@@ -166,6 +347,24 @@ function looksGenerated(token: string): boolean {
     HASHED_SUFFIX.test(token) ||
     MANY_DIGITS.test(token) ||
     !CSS_IDENTIFIER.test(token)
+  );
+}
+
+/**
+ * The same judgement for a *quoted* attribute value, which may legitimately
+ * hold what a CSS identifier may not — `product:price:amount` is the most
+ * stable place a price lives. Only the quoting characters have to go, plus a
+ * value that is itself a number and would pin today's price into the selector.
+ */
+function looksGeneratedValue(value: string): boolean {
+  return (
+    value.length > 60 ||
+    GENERATED_PREFIX.test(value) ||
+    HASHED_SUFFIX.test(value) ||
+    MANY_DIGITS.test(value) ||
+    NUMERIC_VALUE.test(value) ||
+    QUOTES.test(value) ||
+    UNQUOTABLE.test(value)
   );
 }
 
@@ -196,7 +395,7 @@ function selfSelectors(element: CheerioElement): SelfSelector[] {
 
   for (const name of IDENTIFYING_ATTRIBUTES) {
     const value = attributes[name];
-    if (value && !(looksGenerated(value) || QUOTES.test(value))) {
+    if (value && !looksGeneratedValue(value)) {
       selectors.push({ selector: `[${name}="${value}"]`, weak: false });
     }
   }
@@ -236,7 +435,18 @@ function parentElement($: CheerioAPI, element: CheerioElement): CheerioElement |
   return parent;
 }
 
-function identifies($: CheerioAPI, selector: string, element: CheerioElement): boolean {
+/** Whether `selector` reaches this element and nothing else, document-wide. */
+function identifies(
+  $: CheerioAPI,
+  selector: string,
+  element: CheerioElement,
+  budget: SelectorBudget
+): boolean {
+  if (budget.queries <= 0 || budget.element <= 0) {
+    return false;
+  }
+  budget.queries -= 1;
+  budget.element -= 1;
   try {
     const matched = $(selector);
     return matched.length === 1 && matched.get(0) === element;
@@ -246,58 +456,119 @@ function identifies($: CheerioAPI, selector: string, element: CheerioElement): b
 }
 
 /**
+ * The same question asked inside one subtree, which costs nothing like a
+ * document-wide scan and so is not charged to the budget.
+ */
+function identifiesWithin(
+  scope: ReturnType<CheerioAPI>,
+  selector: string,
+  element: CheerioElement
+): boolean {
+  try {
+    const found = scope.find(selector);
+    return found.length === 1 && found.get(0) === element;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The selector one ancestor's prefixes give for this element, or null.
+ *
+ * A prefix is tested once rather than once per pair. When it names its
+ * ancestor uniquely, `prefix own` is by definition the ancestor's descendants
+ * matching `own`, so the rest of the search is a subtree query instead of
+ * prefixes × own scans of the whole page. A prefix that is *not* unique still
+ * has to be asked the long way, because `.row .figure` can be unique when
+ * neither half is — and that is the case the budget exists for.
+ */
+function narrowedUnder(
+  $: CheerioAPI,
+  ancestor: CheerioElement,
+  element: CheerioElement,
+  own: readonly SelfSelector[],
+  budget: SelectorBudget
+): SelfSelector | null {
+  const scope = $(ancestor);
+  for (const prefix of selfSelectors(ancestor)) {
+    if (prefix.weak) {
+      continue;
+    }
+    const scoped = identifies($, prefix.selector, ancestor, budget);
+    for (const entry of own) {
+      const matched = scoped
+        ? identifiesWithin(scope, entry.selector, element)
+        : identifies($, `${prefix.selector} ${entry.selector}`, element, budget);
+      if (matched) {
+        return { selector: `${prefix.selector} ${entry.selector}`, weak: entry.weak };
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * The shortest selector that reaches this element and nothing else.
  *
  * Ancestors are prepended with the descendant combinator rather than `>` —
  * a store inserting one more wrapper div should not break the watch — and the
  * walk stops at {@link MAX_SELECTOR_DEPTH}. Positional selectors are never
  * emitted at all: `:nth-child(3)` is the expression that breaks next week.
+ *
+ * Returns null once the budget is spent, which is the same outcome as finding
+ * nothing: no candidate, rather than a slow one.
  */
-function narrowedSelector($: CheerioAPI, element: CheerioElement): SelfSelector | null {
+function narrowedSelector(
+  $: CheerioAPI,
+  element: CheerioElement,
+  budget: SelectorBudget
+): SelfSelector | null {
+  budget.element = MAX_SELECTOR_QUERIES_PER_ELEMENT;
   const own = selfSelectors(element);
   for (const entry of own) {
-    if (!entry.weak && identifies($, entry.selector, element)) {
+    if (!entry.weak && identifies($, entry.selector, element, budget)) {
       return entry;
     }
   }
 
   let ancestor = parentElement($, element);
   for (let depth = 0; depth < MAX_SELECTOR_DEPTH && ancestor; depth += 1) {
-    for (const prefix of selfSelectors(ancestor)) {
-      if (prefix.weak) {
-        continue;
-      }
-      for (const entry of own) {
-        const combined = `${prefix.selector} ${entry.selector}`;
-        if (identifies($, combined, element)) {
-          return { selector: combined, weak: entry.weak };
-        }
-      }
+    const under = narrowedUnder($, ancestor, element, own, budget);
+    if (under) {
+      return under;
     }
     ancestor = parentElement($, ancestor);
   }
   return null;
 }
 
+/** The names this element goes by: one entry per attribute, never merged. */
+function elementNames(element: CheerioElement): string[] {
+  const attributes: Attributes = "attribs" in element ? element.attribs : {};
+  // Kept apart so a weak word in one attribute cannot borrow corroboration
+  // from another: `class="font-regular" id="product-price"` is not a was-price.
+  return [attributes.class, attributes.id, attributes.itemprop].filter((value): value is string =>
+    Boolean(value)
+  );
+}
+
 /** Where an element sits, for the reason line and the demotion rules. */
-function ancestryText($: CheerioAPI, element: CheerioElement): string {
-  const parts: string[] = [];
+function ancestryNames($: CheerioAPI, element: CheerioElement): string[] {
+  const names: string[] = [];
   let current: CheerioElement | null = element;
   for (let depth = 0; depth <= MAX_ANCESTOR_DEPTH && current; depth += 1) {
-    const attributes: Attributes = "attribs" in current ? current.attribs : {};
-    const tag = "tagName" in current ? current.tagName : "";
-    parts.push(`${tag} ${attributes.class ?? ""} ${attributes.id ?? ""}`);
+    names.push(...elementNames(current));
     current = parentElement($, current);
   }
-  return parts.join(" ");
+  return names;
 }
 
 /** A candidate expression before it has been run against the page. */
 interface Draft {
   expression: string;
   mode: ExpressionMode;
-  /** Text around the match, read by the demotion rules and the reason line. */
-  neighbourhood: string;
+  /** The names around the match, read by the demotion rules and the reason. */
+  names: string[];
   /** The text holds more than one price, so the match depends on their order. */
   positional: boolean;
   /** The matched text reads as a sentence, not a price. */
@@ -306,13 +577,15 @@ interface Draft {
   struck: boolean;
   /** Durability tier: structured data, explicit attribute, then element text. */
   tier: 0 | 1 | 2;
+  /** Nothing about the field it reads says it holds a price. */
+  unnamed: boolean;
   /** Identified only by its ancestors and tag. */
   weak: boolean;
 }
 
 interface Walked {
   drafts: Draft[];
-  sightings: PriceSighting[];
+  sightings: RankedSighting[];
 }
 
 /** Elements whose text is markup or data rather than something a shopper reads. */
@@ -340,10 +613,10 @@ function distinctPrices(text: string, locale: string | undefined): number {
   return amounts.size;
 }
 
-function addSighting(sightings: PriceSighting[], sighting: PriceSighting): void {
+function addSighting(sightings: RankedSighting[], sighting: RankedSighting): void {
   const key = `${sighting.amount}|${sighting.currency ?? ""}`;
   const seen = sightings.some((entry) => `${entry.amount}|${entry.currency ?? ""}` === key);
-  if (!seen && sightings.length < MAX_SIGHTINGS) {
+  if (!seen && sightings.length < MAX_COLLECTED_SIGHTINGS) {
     sightings.push(sighting);
   }
 }
@@ -376,31 +649,38 @@ function textDraft(
   $: CheerioAPI,
   element: CheerioElement,
   text: string,
-  locale: string | undefined
+  locale: string | undefined,
+  budget: SelectorBudget
 ): Draft | null {
-  const selector = narrowedSelector($, element);
+  const selector = narrowedSelector($, element, budget);
   if (!selector) {
     return null;
   }
   return {
     expression: selector.selector,
     mode: "selector",
-    neighbourhood: ancestryText($, element),
+    names: ancestryNames($, element),
     positional: distinctPrices(text, locale) > 1,
     prose: (text.match(LETTERS)?.length ?? 0) > MAX_PRICE_TEXT_LETTERS,
     struck: isStruck($, element),
     tier: 2,
+    unnamed: false,
     weak: selector.weak,
   };
 }
 
-/** Attributes worth reading, paired with the value they hold. */
+/** An attribute worth reading, and the value it holds. */
+interface PriceAttribute {
+  name: string;
+  value: string;
+}
+
 function priceAttributes(
   attributes: Attributes,
   expected: bigint,
   locale: string | undefined
-): string[] {
-  const names: string[] = [];
+): PriceAttribute[] {
+  const found: PriceAttribute[] = [];
   for (const [name, value] of Object.entries(attributes)) {
     if (!value || value.length > MAX_ATTRIBUTE_CHARS) {
       continue;
@@ -411,28 +691,39 @@ function priceAttributes(
     }
     const parsed = parsePrice(value, { ...(locale ? { locale } : {}) });
     if (parsed && equalsExpected(parsed.amount, expected)) {
-      names.push(name);
+      found.push({ name, value });
     }
   }
-  return names;
+  return found;
 }
 
-function attributeDraft($: CheerioAPI, element: CheerioElement, name: string): Draft | null {
-  const selector = narrowedSelector($, element);
+function attributeDraft(
+  $: CheerioAPI,
+  element: CheerioElement,
+  attribute: PriceAttribute,
+  locale: string | undefined,
+  budget: SelectorBudget
+): Draft | null {
+  const selector = narrowedSelector($, element, budget);
   if (!selector) {
     return null;
   }
+  const { name, value } = attribute;
   // `content` and `value` are already read ahead of text by
   // `extractBySelector`, so naming them again only adds a moving part.
   const implicit = name === "content" || name === "value";
   return {
     expression: implicit ? selector.selector : `${selector.selector}::attr(${name})`,
     mode: "selector",
-    neighbourhood: `${name} ${ancestryText($, element)}`,
-    positional: false,
-    prose: false,
+    names: [name, ...ancestryNames($, element)],
+    // An attribute value is read exactly as element text is, so it earns the
+    // same caveats: `<meta name="description" content="Buy it for £24.99">`
+    // parses to the price and is a sentence about the product, not its price.
+    positional: distinctPrices(value, locale) > 1,
+    prose: (value.match(LETTERS)?.length ?? 0) > MAX_PRICE_TEXT_LETTERS,
     struck: isStruck($, element),
     tier: 1,
+    unnamed: false,
     weak: selector.weak,
   };
 }
@@ -445,18 +736,23 @@ function attributeDraft($: CheerioAPI, element: CheerioElement, name: string): D
  */
 function recordSighting(
   node: ReturnType<CheerioAPI>,
+  element: CheerioElement,
   text: string,
   parsed: ParsedPrice | null,
   priceNamed: boolean,
-  sightings: PriceSighting[]
+  sightings: RankedSighting[]
 ): void {
   const holdsOnePrice = node.children().length === 0 || priceNamed;
   if (!(parsed && holdsOnePrice && (parsed.currency || priceNamed))) {
     return;
   }
+  // Only computed for a value that is actually going in the list, because the
+  // walk reaches every element on the page and most contribute nothing.
+  const names = elementNames(element);
   addSighting(sightings, {
     amount: parsed.amount,
     context: truncate(text, MAX_PRICE_TEXT_CHARS),
+    rank: (priceNamed ? 0 : 2) + (namesAreOtherProduct(names) ? 1 : 0),
     ...(parsed.currency ? { currency: parsed.currency } : {}),
   });
 }
@@ -467,7 +763,8 @@ function inspectElement(
   element: CheerioElement,
   expected: bigint,
   locale: string | undefined,
-  out: Walked
+  out: Walked,
+  budget: SelectorBudget
 ): number {
   if (!("tagName" in element) || SKIPPED_TAGS.has(element.tagName)) {
     return 0;
@@ -481,19 +778,23 @@ function inspectElement(
       ? parsePrice(text, { ...(locale ? { locale } : {}) })
       : null;
 
-  recordSighting(node, text, parsed, priceNamed, out.sightings);
+  recordSighting(node, element, text, parsed, priceNamed, out.sightings);
 
   let synthesised = 0;
-  if (parsed && equalsExpected(parsed.amount, expected)) {
+  // Attributes first: an element whose `content` holds the price and whose
+  // text also reads it yields the same bare selector twice, and the attribute
+  // is what `extractBySelector` actually reads. The dedupe below keeps the
+  // lower tier either way; this keeps the two in the order they are read.
+  for (const attribute of priceAttributes(attributes, expected, locale)) {
     synthesised += 1;
-    const draft = textDraft($, element, text, locale);
+    const draft = attributeDraft($, element, attribute, locale, budget);
     if (draft) {
       out.drafts.push(draft);
     }
   }
-  for (const name of priceAttributes(attributes, expected, locale)) {
+  if (parsed && equalsExpected(parsed.amount, expected)) {
     synthesised += 1;
-    const draft = attributeDraft($, element, name);
+    const draft = textDraft($, element, text, locale, budget);
     if (draft) {
       out.drafts.push(draft);
     }
@@ -505,13 +806,17 @@ function inspectElement(
 function walkDom(context: StrategyContext, expected: bigint, locale: string | undefined): Walked {
   const { $ } = context;
   const out: Walked = { drafts: [], sightings: [] };
+  const budget: SelectorBudget = {
+    element: MAX_SELECTOR_QUERIES_PER_ELEMENT,
+    queries: MAX_SELECTOR_QUERIES,
+  };
   let synthesised = 0;
 
   for (const element of $("*").toArray().slice(0, MAX_ELEMENTS)) {
     if (synthesised >= MAX_SYNTHESISED) {
       break;
     }
-    synthesised += inspectElement($, element, expected, locale, out);
+    synthesised += inspectElement($, element, expected, locale, out, budget);
   }
 
   return out;
@@ -537,6 +842,28 @@ function concretePath(path: readonly (string | number)[]): string | null {
   return expression;
 }
 
+/** The names a JSON path goes by: the document, then each key, kept apart. */
+function pathNames(path: readonly (string | number)[], source: string): string[] {
+  return [source, ...path.map((segment) => String(segment))];
+}
+
+/**
+ * Whether the field a scalar sits in says it holds a price.
+ *
+ * The nearest named key, so `prices[1]` is named by `prices`. Without this a
+ * page carrying `{ "stock": 499 }` and showing `£499` has `$..stock` as its
+ * most durable candidate, and the pin reads the stock count from then on.
+ */
+function pathIsPriceNamed(path: readonly (string | number)[]): boolean {
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const segment = path[index];
+    if (typeof segment === "string") {
+      return nameWords(segment).some((word) => PRICE_WORDS.has(word));
+    }
+  }
+  return false;
+}
+
 /**
  * The shorthand first, then the concrete path.
  *
@@ -547,18 +874,24 @@ function concretePath(path: readonly (string | number)[]): string | null {
  * is worse than breaking, so it drops out of the structured-data tier and sits
  * with the markup candidates, which at least fail loudly.
  */
-function pathDrafts(path: readonly (string | number)[], source: string, drafts: Draft[]): void {
-  const neighbourhood = `${source} ${path.join(".")}`;
+function pathDrafts(
+  path: readonly (string | number)[],
+  source: string,
+  drafts: Draft[],
+  unnamed: boolean
+): void {
+  const names = pathNames(path, source);
   const last = path.at(-1);
   if (typeof last === "string" && JSON_NAME.test(last)) {
     drafts.push({
       expression: `$..${last}`,
       mode: "jsonpath",
-      neighbourhood,
+      names,
       positional: false,
       prose: false,
       struck: false,
       tier: 0,
+      unnamed,
       weak: false,
     });
   }
@@ -570,11 +903,12 @@ function pathDrafts(path: readonly (string | number)[], source: string, drafts: 
   drafts.push({
     expression: concrete,
     mode: "jsonpath",
-    neighbourhood,
+    names,
     positional: indexed,
     prose: false,
     struck: false,
     tier: indexed ? 2 : 0,
+    unnamed,
     weak: false,
   });
 }
@@ -604,10 +938,11 @@ function walkJsonValue(
   if (isRecord(value)) {
     // An offer-shaped object is worth pointing at in its own right: it is the
     // only shape that carries its own currency, and a bare number is a check
-    // failure unless the listing already learned one.
+    // failure unless the listing already learned one. Its own `price` key is
+    // what made it offer-shaped, so it is named by construction.
     const offer = jsonValuePrice(value, locale);
     if (offer?.currency && equalsExpected(offer.amount, expected)) {
-      pathDrafts(path, source, out.drafts);
+      pathDrafts(path, source, out.drafts, false);
     }
     for (const [key, entry] of Object.entries(value)) {
       walkJsonValue(entry, [...path, key], depth + 1, state, expected, locale, source, out);
@@ -622,16 +957,17 @@ function walkJsonValue(
   if (!parsed) {
     return;
   }
-  const key = path.at(-1);
-  if (typeof key === "string" && PRICE_TOKEN.test(key)) {
+  const priceNamed = pathIsPriceNamed(path);
+  if (priceNamed) {
     addSighting(out.sightings, {
       amount: parsed.amount,
       context: `${source} ${path.join(".")}`,
+      rank: namesAreOtherProduct(pathNames(path, source)) ? 1 : 0,
       ...(parsed.currency ? { currency: parsed.currency } : {}),
     });
   }
   if (equalsExpected(parsed.amount, expected)) {
-    pathDrafts(path, source, out.drafts);
+    pathDrafts(path, source, out.drafts, !priceNamed);
   }
 }
 
@@ -647,18 +983,31 @@ function walkJson(
   return out;
 }
 
-/** Tier dominates every penalty; penalties only reorder within a tier's reach. */
+/** Durability of a candidate's *shape*: structured data, attribute, then text. */
 const TIER_WEIGHT = 1000;
-/** A bare number is a check failure unless the listing already has a currency. */
-const NO_CURRENCY_PENALTY = 400;
-const OTHER_PRODUCT_PENALTY = 300;
-const PROSE_PENALTY = 350;
+/**
+ * Every penalty below outweighs a tier, and most outweigh two.
+ *
+ * A tier says how well a candidate's shape will survive the page being
+ * rebuilt. A penalty says it reads the wrong number, or no number the worker
+ * will accept — which no amount of durability redeems. A bare `price` in an
+ * embedded blob is the most durable thing this engine can produce and must
+ * still lose to the markup that carries a currency when the listing has none,
+ * because that pin is an `extract_failed` on the very next check.
+ */
+const STALE_PRICE_PENALTY = 2600;
+const UNNAMED_FIELD_PENALTY = 2600;
+const OTHER_PRODUCT_PENALTY = 2500;
+const STRUCK_PENALTY = 2400;
+const PROSE_PENALTY = 2300;
+/** No currency anywhere: on the candidate, and none on file for the listing. */
+const NO_CURRENCY_PENALTY = 2200;
+/** The listing already has one, so a bare number still checks out. */
+const BARE_NUMBER_PENALTY = 50;
 /** Which of several prices this reads depends on their order in the markup. */
-const POSITIONAL_PENALTY = 300;
-const STRUCK_PENALTY = 250;
+const POSITIONAL_PENALTY = 1500;
 /** Identified only by its ancestors and tag, so a markup change can move it. */
-const WEAK_SELECTOR_PENALTY = 220;
-const STALE_PRICE_PENALTY = 200;
+const WEAK_SELECTOR_PENALTY = 500;
 /** Length only breaks ties: a shorter expression has fewer things to rot. */
 const LENGTH_DIVISOR = 10;
 
@@ -735,12 +1084,19 @@ function validateJsonPath(
   };
 }
 
-function score(draft: Draft, candidate: UnreasonedCandidate): number {
+function score(
+  draft: Draft,
+  candidate: UnreasonedCandidate,
+  listingCurrency: string | undefined
+): number {
   let total = draft.tier * TIER_WEIGHT + Math.floor(candidate.expression.length / LENGTH_DIVISOR);
   if (!candidate.currency) {
-    total += NO_CURRENCY_PENALTY;
+    total += listingCurrency ? BARE_NUMBER_PENALTY : NO_CURRENCY_PENALTY;
   }
-  if (OTHER_PRODUCT_TOKEN.test(draft.neighbourhood)) {
+  if (draft.unnamed) {
+    total += UNNAMED_FIELD_PENALTY;
+  }
+  if (namesAreOtherProduct(draft.names)) {
     total += OTHER_PRODUCT_PENALTY;
   }
   if (draft.positional) {
@@ -755,7 +1111,7 @@ function score(draft: Draft, candidate: UnreasonedCandidate): number {
   if (draft.weak) {
     total += WEAK_SELECTOR_PENALTY;
   }
-  if (STALE_PRICE_TOKEN.test(draft.neighbourhood)) {
+  if (namesAreStale(draft.names)) {
     total += STALE_PRICE_PENALTY;
   }
   return total;
@@ -773,17 +1129,26 @@ function listPhrase(parts: readonly string[]): string {
  * cannot settle: a crossed-out price and a sale price are the same number when
  * the page is on offer at the figure the user read somewhere else.
  */
-function reasonFor(draft: Draft, candidate: UnreasonedCandidate): string {
+function reasonFor(
+  draft: Draft,
+  candidate: UnreasonedCandidate,
+  listingCurrency: string | undefined
+): string {
   let where = "the price element's text";
   if (draft.mode === "jsonpath") {
     where = "the page's structured data";
-  } else if (candidate.expression.includes("::attr(")) {
+  } else if (draft.tier === 1) {
     where = "an attribute on the price element";
   }
 
   const caveats: string[] = [];
-  if (!candidate.currency) {
+  if (!(candidate.currency || listingCurrency)) {
     caveats.push("it reads no currency, so this listing needs one configured");
+  }
+  if (draft.unnamed) {
+    caveats.push(
+      "nothing about the field it reads says it holds a price, so it may be some other number that matches today"
+    );
   }
   if (draft.positional) {
     caveats.push(
@@ -801,10 +1166,10 @@ function reasonFor(draft: Draft, candidate: UnreasonedCandidate): string {
   if (draft.weak) {
     caveats.push("it has no stable class or id of its own, so a markup change may break it again");
   }
-  if (STALE_PRICE_TOKEN.test(draft.neighbourhood)) {
+  if (namesAreStale(draft.names)) {
     caveats.push("its surroundings name it as a was-price");
   }
-  if (OTHER_PRODUCT_TOKEN.test(draft.neighbourhood)) {
+  if (namesAreOtherProduct(draft.names)) {
     caveats.push("its surroundings look like another product's price");
   }
   return caveats.length === 0 ? `Reads ${where}.` : `Reads ${where}, but ${listPhrase(caveats)}.`;
@@ -830,14 +1195,24 @@ function automaticVerdict(
   };
 }
 
-function mergeSightings(...groups: readonly PriceSighting[][]): PriceSighting[] {
-  const merged: PriceSighting[] = [];
+/**
+ * The page's own prices, best guesses first.
+ *
+ * Ranked before truncating rather than after: a storefront's basket total and
+ * delivery threshold come first in document order, and the product's own price
+ * is the one value this list exists to offer.
+ */
+function mergeSightings(...groups: readonly RankedSighting[][]): PriceSighting[] {
+  const merged: RankedSighting[] = [];
   for (const group of groups) {
     for (const sighting of group) {
       addSighting(merged, sighting);
     }
   }
-  return merged;
+  return merged
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, MAX_SIGHTINGS)
+    .map(({ rank: _rank, ...sighting }) => sighting);
 }
 
 /**
@@ -876,16 +1251,19 @@ export function suggestExpressions(html: string, options: SuggestOptions): Sugge
   const fromJson = walkJson(documents, expected, options.locale);
   const fromDom = walkDom(context, expected, options.locale);
 
-  const seen = new Set<string>();
-  const drafts = [...fromJson.drafts, ...fromDom.drafts]
-    .filter((draft) => {
-      const key = `${draft.mode}:${draft.expression}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    })
+  // One draft per expression, keeping the lower tier. The same bare selector
+  // arrives twice for an element whose `content` attribute and whose text both
+  // read the price, and the attribute draft is the one that describes what
+  // `extractBySelector` will do with it.
+  const byExpression = new Map<string, Draft>();
+  for (const draft of [...fromJson.drafts, ...fromDom.drafts]) {
+    const key = `${draft.mode}:${draft.expression}`;
+    const kept = byExpression.get(key);
+    if (!kept || draft.tier < kept.tier) {
+      byExpression.set(key, draft);
+    }
+  }
+  const drafts = [...byExpression.values()]
     .sort((a, b) => a.tier - b.tier)
     .slice(0, MAX_VALIDATIONS);
 
@@ -899,8 +1277,8 @@ export function suggestExpressions(html: string, options: SuggestOptions): Sugge
       continue;
     }
     ranked.push({
-      candidate: { ...validated, reason: reasonFor(draft, validated) },
-      total: score(draft, validated),
+      candidate: { ...validated, reason: reasonFor(draft, validated, options.listingCurrency) },
+      total: score(draft, validated, options.listingCurrency),
     });
   }
   ranked.sort((a, b) => a.total - b.total);

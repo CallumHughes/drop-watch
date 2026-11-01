@@ -209,7 +209,12 @@ describe("repairSummary — the tracked price", () => {
 
   it("warns that the next check will read as a price change", () => {
     expect(
-      repairSummary(pinned, automatic, { currency: "GBP", next: "24.99", previous: "49.99" })
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: "49.99",
+        previousCurrency: "GBP",
+      })
     ).toBe(
       "Applying will pin the tested CSS selector. It will record £24.99 where £49.99 is on record, so the next check will read as a price change and may alert."
     );
@@ -217,13 +222,38 @@ describe("repairSummary — the tracked price", () => {
 
   it("says nothing extra when the price is unchanged", () => {
     expect(
-      repairSummary(pinned, automatic, { currency: "GBP", next: "24.990", previous: "24.99" })
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.990",
+        previous: "24.99",
+        previousCurrency: "GBP",
+      })
     ).toBe("Applying will pin the tested CSS selector.");
+  });
+
+  it("names each price in the currency it was read in", () => {
+    // Formatting the price on record with the repaired reading's currency
+    // reported a figure in a currency it was never in.
+    expect(
+      repairSummary(pinned, automatic, {
+        currency: "USD",
+        next: "24.99",
+        previous: "24.99",
+        previousCurrency: "GBP",
+      })
+    ).toBe(
+      "Applying will pin the tested CSS selector. It will record US$24.99 where £24.99 is on record — a different currency, so this listing's history no longer compares like for like."
+    );
   });
 
   it("says nothing extra with no price on record, or no tracked price at all", () => {
     expect(
-      repairSummary(pinned, automatic, { currency: "GBP", next: "24.99", previous: null })
+      repairSummary(pinned, automatic, {
+        currency: "GBP",
+        next: "24.99",
+        previous: null,
+        previousCurrency: "GBP",
+      })
     ).toBe("Applying will pin the tested CSS selector.");
     expect(repairSummary(pinned, automatic)).toBe("Applying will pin the tested CSS selector.");
   });

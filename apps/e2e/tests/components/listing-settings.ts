@@ -10,6 +10,9 @@ const EXTRACTION_NOTE_PATTERN = /^(Found automatically|Read from a spot)/;
 const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/;
 const ADVANCED_PATTERN = /^Advanced: point at the price/;
 const LOCATED_PATTERN = /^Found that price here/;
+/** Any of the three ways the locator says it has no spot to offer. */
+const NOT_FOUND_PATTERN =
+  /^(That price is not on the page|We could not find that price|That price is on the page, but)/;
 
 /**
  * The inline per-listing settings editor a `ListingRow` opens via `edit()`.
@@ -26,6 +29,8 @@ export class ListingSettingsForm {
   /** How the price is found, now read-only — the repair panel is the only editor. */
   readonly extractionNote: Locator;
   readonly locatedNote: Locator;
+  /** Shown when the typed price yields no spot to track. */
+  readonly notFoundNote: Locator;
   readonly repairButton: Locator;
   readonly saveButton: Locator;
   readonly singleMatchNote: Locator;
@@ -39,6 +44,7 @@ export class ListingSettingsForm {
     this.extractionNote = row.getByText(EXTRACTION_NOTE_PATTERN);
     this.expectedPriceInput = row.getByLabel(EXPECTED_PRICE_PATTERN);
     this.locatedNote = row.getByText(LOCATED_PATTERN);
+    this.notFoundNote = row.getByText(NOT_FOUND_PATTERN);
     this.advancedToggle = row.getByText(ADVANCED_PATTERN);
     this.repairButton = row.getByRole("button", { name: "Re-preview and repair" });
     this.applyRepairButton = row.getByRole("button", { name: APPLY_REPAIR_PATTERN });

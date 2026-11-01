@@ -4,6 +4,7 @@ import type {
   ExpressionMode,
   PagePreview,
   PreviewAttemptSummary,
+  PriceSuggestion,
 } from "@drop-watch/api/routers/preview";
 import { PRICE_PATTERN } from "@drop-watch/api/schemas/products";
 import { APP_NAME } from "@drop-watch/brand";
@@ -45,6 +46,24 @@ export function automaticAlreadyReadsIt(
   automatic: { agrees: boolean; ambiguous: boolean } | null | undefined
 ): boolean {
   return Boolean(automatic?.agrees) && !automatic?.ambiguous;
+}
+
+/**
+ * The expression a suggestion pins, or `null` for none.
+ *
+ * `null` is as meaningful an answer as a candidate. A price that matched
+ * nothing, a price the automatic chain already reads, and a cleared field must
+ * each leave no pin behind — otherwise Apply keeps offering one derived from a
+ * figure the reader has since corrected, while the panel says it found nothing.
+ */
+export function locatorPin(
+  suggestion: PriceSuggestion | undefined
+): { expression: string; mode: ExpressionMode } | null {
+  if (!suggestion || automaticAlreadyReadsIt(suggestion.automatic)) {
+    return null;
+  }
+  const [candidate] = suggestion.candidates;
+  return candidate ? { expression: candidate.expression, mode: candidate.mode } : null;
 }
 
 /** Blank locale drafts should omit the optional preview locale input. */
@@ -157,9 +176,12 @@ function errorMessage(error: unknown): string {
  */
 export function usePreviewFlow({
   initialUrl = "",
+  listingCurrency,
   locale,
 }: {
   initialUrl?: string;
+  /** This listing's recorded currency, which decides how a bare number ranks. */
+  listingCurrency?: string;
   locale?: string;
 } = {}) {
   const [url, setUrl] = useState(initialUrl);
@@ -169,6 +191,11 @@ export function usePreviewFlow({
   const [settledExpression, setSettledExpression] = useState("");
   const [expectedPrice, setExpectedPrice] = useState("");
   const [settledExpectedPrice, setSettledExpectedPrice] = useState("");
+  // Which half of the panel owns `expression`: the locator derives it from the
+  // price, the advanced picker takes it by hand, and whichever was touched
+  // last is in charge. Without this the locator can only ever *add* a pin, so
+  // a corrected price leaves the previous one applied and saveable.
+  const [locatorOwnsExpression, setLocatorOwnsExpression] = useState(true);
   const [transportReloadError, setTransportReloadError] = useState<string | null>(null);
   const [browserReloadPreconditionFailed, setBrowserReloadPreconditionFailed] = useState(false);
   const previewRequestGeneration = useRef(0);
@@ -188,6 +215,7 @@ export function usePreviewFlow({
     setSettledExpression("");
     setExpectedPrice("");
     setSettledExpectedPrice("");
+    setLocatorOwnsExpression(true);
     setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
   }, [localeInput]);
@@ -222,6 +250,7 @@ export function usePreviewFlow({
         setSettledExpression("");
         setExpectedPrice("");
         setSettledExpectedPrice("");
+        setLocatorOwnsExpression(true);
         // Nothing matched automatically, so the picker is the next step rather
         // than an option buried behind a toggle.
         setMode(
@@ -255,6 +284,7 @@ export function usePreviewFlow({
         setSettledExpression("");
         setExpectedPrice("");
         setSettledExpectedPrice("");
+        setLocatorOwnsExpression(true);
         setMode(
           data.extraction === null || automaticPreviewNeedsRepair(data) ? DEFAULT_MODE : null
         );
@@ -287,6 +317,7 @@ export function usePreviewFlow({
       input: {
         expectedPrice: trimmedExpectedPrice,
         previewId,
+        ...(listingCurrency ? { listingCurrency } : {}),
         ...(localeInput ? { locale: localeInput } : {}),
       },
       // Same reason as the expression test: the cached body cannot change, and
@@ -311,26 +342,42 @@ export function usePreviewFlow({
 
   // Applying the top candidate rather than offering the list is the point of
   // the flow: choosing between two selectors that read the same number today
-  // is the judgement nobody should have to make. Keyed on the query result, so
-  // a hand-written expression in the advanced picker is never overwritten.
+  // is the judgement nobody should have to make.
+  //
+  // It *clears* as readily as it sets, which is what keeps the panel and the
+  // save in step. A price that finds nothing, a price the automatic chain
+  // already reads, and a cleared field all leave no pin behind, so Apply can
+  // never offer an expression derived from a figure since corrected. A
+  // hand-written expression is a separate choice and survives until the reader
+  // asks the locator again by editing the price.
   const suggested = suggestion.data;
   useEffect(() => {
-    const candidate = suggested?.candidates[0];
-    if (!candidate || automaticAlreadyReadsIt(suggested?.automatic)) {
+    if (!locatorOwnsExpression) {
       return;
     }
-    setMode(candidate.mode);
-    setExpression(candidate.expression);
-    setSettledExpression(candidate.expression);
-  }, [suggested]);
+    const pin = locatorPin(suggested);
+    if (pin) {
+      setMode(pin.mode);
+    }
+    setExpression(pin?.expression ?? "");
+    setSettledExpression(pin?.expression ?? "");
+  }, [locatorOwnsExpression, suggested]);
 
   const onExpectedPriceChange = useCallback((next: string) => {
     setExpectedPrice(next);
+    setLocatorOwnsExpression(true);
   }, []);
   /** Picking one of the page's own prices re-asks with that value. */
   const onPickPagePrice = useCallback((amount: string) => {
     setExpectedPrice(amount);
     setSettledExpectedPrice(amount);
+    setLocatorOwnsExpression(true);
+  }, []);
+  /** Writing an expression by hand takes it off the locator until it is asked
+   * again. */
+  const onExpressionChange = useCallback((next: string) => {
+    setExpression(next);
+    setLocatorOwnsExpression(false);
   }, []);
   const onUrlChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     previewRequestGeneration.current += 1;
@@ -345,11 +392,13 @@ export function usePreviewFlow({
     setMode((current) => (current === null ? DEFAULT_MODE : null));
   }, []);
   // Switching mode re-reads the same expression in a new language, which is
-  // almost never what was meant — a CSS selector is not a JSONPath.
+  // almost never what was meant — a CSS selector is not a JSONPath. Choosing
+  // one by hand is hand-authoring, so the locator stops writing here too.
   const onModeChange = useCallback((next: ExpressionMode) => {
     setMode(next);
     setExpression("");
     setSettledExpression("");
+    setLocatorOwnsExpression(false);
   }, []);
   const loadPreview = useCallback(() => {
     previewRequestGeneration.current += 1;
@@ -385,12 +434,21 @@ export function usePreviewFlow({
   const expressionIsSettled = expression.trim() === trimmedExpression;
   const isTesting =
     trimmedExpression.length > 0 && (!expressionIsSettled || expressionTest.isFetching);
+  const isLocating =
+    expectedPriceIsUsable(expectedPrice) &&
+    (expectedPrice.trim() !== trimmedExpectedPrice || suggestion.isFetching);
 
   // Whichever half of the flow produced a price is what gets saved. The picker
   // wins when it is open and working, so a page whose JSON-LD quotes the wrong
   // price can still be corrected by hand.
+  //
+  // A locator-derived pin counts for nothing while the locator is still
+  // working: for the first debounce after an edit the outstanding answer is
+  // still the previous price's, and everything downstream — Apply, Track, the
+  // repair summary — would otherwise act on it.
   const expressionExtraction =
     mode !== null &&
+    !(locatorOwnsExpression && isLocating) &&
     trimmedExpression.length > 0 &&
     expressionIsSettled &&
     !expressionTest.isFetching &&
@@ -416,13 +474,10 @@ export function usePreviewFlow({
     setSettledExpression("");
     setExpectedPrice("");
     setSettledExpectedPrice("");
+    setLocatorOwnsExpression(true);
     setTransportReloadError(null);
     setBrowserReloadPreconditionFailed(false);
   }, [initialUrl]);
-
-  const isLocating =
-    expectedPriceIsUsable(expectedPrice) &&
-    (expectedPrice.trim() !== trimmedExpectedPrice || suggestion.isFetching);
 
   return {
     automaticRepairRequired,
@@ -436,7 +491,7 @@ export function usePreviewFlow({
     loadPreview,
     mode,
     onExpectedPriceChange,
-    onExpressionChange: setExpression,
+    onExpressionChange,
     onFetch,
     onModeChange,
     onPickPagePrice,

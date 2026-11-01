@@ -101,6 +101,72 @@ describe("suggestExpressions — markup", () => {
     expect(candidates[0]?.expression).toBe('[itemprop="price"]');
   });
 
+  it("does not read Tailwind utilities as a was-price", () => {
+    // `old` is a substring of `font-bold` and `before` of a Tailwind variant,
+    // so the raw class attribute used to penalise the live price and tell the
+    // reader its surroundings named it a former one.
+    const html = page(
+      "",
+      `<main class="product-main"><del class="rrp">£49.99</del>
+       <span class="text-2xl font-bold before:content-['']">£24.99</span></main>`
+    );
+
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.expression).toBe(".product-main span");
+    expect(candidates[0]?.reason).not.toContain("was-price");
+    expect(candidates[0]?.reason).not.toContain("another product");
+  });
+
+  it("describes an element read through its content attribute as an attribute", () => {
+    const html = page(
+      "",
+      '<span class="product-price" content="24.99">£24.99 including VAT</span>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    // The text draft and the implicit attribute draft are the same selector;
+    // the attribute is what `extractBySelector` reads, so its tier and its
+    // reason are the honest ones — the sentence caveat does not apply.
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.reason).toBe("Reads an attribute on the price element.");
+  });
+
+  it("suggests a price that only exists in a meta property", () => {
+    const html = page('<meta property="product:price:amount" content="24.99" />');
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe('[property="product:price:amount"]');
+  });
+
+  it("does not take a meta description quoting the price for the price", () => {
+    // `[name="description"]` identifies one element and its content parses to
+    // exactly the typed figure, so only the sentence tells it apart from a
+    // price attribute.
+    const html = page(
+      '<meta name="description" content="Buy the Widget for just £24.99 today" />',
+      '<span class="product-price">£24.99</span>'
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(
+      candidates.find((candidate) => candidate.expression === '[name="description"]')?.reason
+    ).toContain("sentence");
+  });
+
   it("never emits a generated class or a positional selector", () => {
     const html = page(
       "",
@@ -294,5 +360,103 @@ describe("suggestExpressions — bounds", () => {
 
     expect(candidates.length).toBeLessThanOrEqual(5);
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  it("stays bounded when no selector on the page identifies anything", () => {
+    // The expensive shape: every class is ambiguous, so narrowing exhausts
+    // ancestors × prefixes × own selectors and finds nothing either way.
+    // Each of those is a scan of the whole tree, and this runs in the API
+    // handler on a keystroke, so the query budget is what bounds it.
+    const filler = Array.from(
+      { length: 8 },
+      (_, index) => `<span class="pad-${index} note item">x</span>`
+    ).join("");
+    const block = `<div class="row alpha beta"><div class="cell gamma delta">${filler}<span class="figure epsilon zeta">£24.99</span></div></div>`;
+    const html = page("", `<main class="product-main">${block.repeat(500)}</main>`);
+
+    const started = Date.now();
+    const { candidates } = suggestExpressions(html, { expectedPrice: "24.99" });
+
+    expect(candidates).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+});
+
+describe("suggestExpressions — ranking against what the listing already knows", () => {
+  const bareJsonAndMarkup = page(
+    "",
+    `<script type="application/json">${JSON.stringify({ price: 24.99 })}</script>
+     <span class="product-price">£24.99</span>`
+  );
+
+  it("prefers currency-bearing markup when the listing has no currency", () => {
+    // A bare number is an `extract_failed` on the next check, which no amount
+    // of structural durability redeems.
+    const { candidates } = suggestExpressions(bareJsonAndMarkup, { expectedPrice: "24.99" });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates[0]?.currency).toBe("GBP");
+  });
+
+  it("prefers the durable path once the listing supplies the currency", () => {
+    const { candidates } = suggestExpressions(bareJsonAndMarkup, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe("$..price");
+    expect(candidates[0]?.reason).toBe("Reads the page's structured data.");
+  });
+
+  it("does not take an unnamed number for a price, however durable the path", () => {
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ stock: 499 })}</script>
+       <span class="product-price">£499.00</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "499.00",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(candidates.find((candidate) => candidate.expression === "$..stock")?.reason).toContain(
+      "says it holds a price"
+    );
+  });
+
+  it("ranks a was-price JSON field below the live price in the markup", () => {
+    const html = page(
+      "",
+      `<script type="application/json">${JSON.stringify({ originalPrice: 24.99 })}</script>
+       <span class="product-price">£24.99</span>`
+    );
+
+    const { candidates } = suggestExpressions(html, {
+      expectedPrice: "24.99",
+      listingCurrency: "GBP",
+    });
+
+    expect(candidates[0]?.expression).toBe(".product-price");
+    expect(
+      candidates.find((candidate) => candidate.expression === "$..originalPrice")?.reason
+    ).toContain("was-price");
+  });
+});
+
+describe("suggestExpressions — the prices the page does show", () => {
+  it("offers the product's own price even when incidental ones come first", () => {
+    const incidental = Array.from(
+      { length: 14 },
+      (_, index) => `<span class="badge">£${index + 1}.00</span>`
+    ).join("");
+    const html = page("", `${incidental}<span class="product-price">£24.99</span>`);
+
+    const { candidates, pricesOnPage } = suggestExpressions(html, { expectedPrice: "99.99" });
+
+    expect(candidates).toEqual([]);
+    // Truncating in document order dropped this one entirely.
+    expect(pricesOnPage[0]).toEqual({ amount: "24.99", context: "£24.99", currency: "GBP" });
   });
 });

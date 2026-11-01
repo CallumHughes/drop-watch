@@ -110,6 +110,7 @@ function PreviewPanel({
   const { mode, suggestion, transportReload } = flow;
   const requiresManualRepair = flow.automaticRepairRequired;
   const outcome = locatorOutcome({
+    error: suggestion.error,
     expectedPrice: flow.expectedPrice,
     isLocating: flow.isLocating,
     suggestion: suggestion.data,

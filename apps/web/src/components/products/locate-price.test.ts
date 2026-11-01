@@ -21,12 +21,67 @@ function suggestion(overrides: Partial<PriceSuggestion> = {}): PriceSuggestion {
 }
 
 describe("locatorOutcome", () => {
-  it("stays idle until the typed price is a usable one", () => {
-    for (const expectedPrice of ["", "  ", "£24.99", "24.999", "abc"]) {
+  it("stays idle until something has been typed", () => {
+    for (const expectedPrice of ["", "  "]) {
       expect(
         locatorOutcome({ expectedPrice, isLocating: false, suggestion: suggestion() })
       ).toEqual({ kind: "idle" });
     }
+  });
+
+  it("says so when what was typed is not a figure it can look for", () => {
+    // The input used to carry a `pattern` for this, which blocked the enclosing
+    // settings form's submit. Saying it here has no such reach.
+    for (const expectedPrice of ["£24.99", "24.999", "1,299.00", "abc"]) {
+      expect(
+        locatorOutcome({ expectedPrice, isLocating: false, suggestion: suggestion() })
+      ).toEqual({ kind: "unusable" });
+    }
+  });
+
+  it("reports a failed lookup rather than searching forever", () => {
+    expect(
+      locatorOutcome({
+        error: new Error("This preview has expired. Fetch the page again."),
+        expectedPrice: "24.99",
+        isLocating: false,
+        suggestion: undefined,
+      })
+    ).toEqual({
+      kind: "failed",
+      message: "Could not look for that price: This preview has expired. Fetch the page again.",
+    });
+  });
+
+  it("does not offer back the price that was just typed", () => {
+    // Picking it would re-ask the same question and get the same answer.
+    const outcome = locatorOutcome({
+      expectedPrice: "24.99",
+      isLocating: false,
+      suggestion: suggestion({
+        pricesOnPage: [
+          { amount: "24.99", context: "£24.99", currency: "GBP" },
+          { amount: "19.99", context: "£19.99", currency: "GBP" },
+        ],
+      }),
+    });
+
+    expect(outcome).toEqual({
+      kind: "unreachable",
+      prices: [{ amount: "19.99", context: "£19.99", currency: "GBP" }],
+    });
+  });
+
+  it("compares the typed price by value, not by spelling", () => {
+    expect(
+      locatorOutcome({
+        expectedPrice: "24.9",
+        isLocating: false,
+        suggestion: suggestion({
+          pricesOnPage: [{ amount: "24.90", context: "£24.90", currency: "GBP" }],
+        }),
+      })
+    ).toEqual({ kind: "unreachable", prices: [] });
   });
 
   it("searches while the request is outstanding or has not been made", () => {
