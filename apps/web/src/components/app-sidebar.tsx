@@ -1,7 +1,7 @@
 "use client";
 
 import { APP_NAME } from "@drop-watch/brand";
-import { Mark, Wordmark } from "@drop-watch/brand/components/logo";
+import { Badge, Wordmark } from "@drop-watch/brand/components/logo";
 import {
   Sidebar,
   SidebarContent,
@@ -35,10 +35,14 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link href="/" />} size="lg">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Mark className="h-5! w-auto!" />
-              </div>
+            {/* Collapsed, the button shrinks to the badge and clips it, so it
+                takes the badge's corners. */}
+            <SidebarMenuButton
+              className="group-data-[collapsible=icon]:rounded-badge"
+              render={<Link href="/" />}
+              size="lg"
+            >
+              <Badge className="size-8 bg-sidebar-primary text-sidebar-primary-foreground" />
               {/* The menu button sizes every descendant svg to 16 square, which
                   letterboxes a 3.8:1 wordmark down to a smudge. Full height
                   instead: the row has width to spare, so the cap band is what

@@ -1,4 +1,4 @@
-import { MARK, WORDMARK_HORIZONTAL, WORDMARK_STACKED } from "../paths.generated";
+import { BADGE, MARK, WORDMARK_HORIZONTAL, WORDMARK_STACKED } from "../paths.generated";
 
 type LogoProps = React.ComponentProps<"svg">;
 
@@ -41,4 +41,40 @@ export function Wordmark(props: LogoProps) {
 /** "Drop" above "WATCH", centred — for narrow or square spaces. */
 export function WordmarkStacked(props: LogoProps) {
   return art(WORDMARK_STACKED, props);
+}
+
+/**
+ * The mark in its rounded square, drawn to the favicon's geometry. Its corners
+ * are the theme's `--brand-badge-radius`, which `brand:generate` bakes into the favicon. The caller
+ * sets the size, the square's colour as a background and the mark's as text:
+ * `<Badge className="size-8 bg-primary text-primary-foreground" />`.
+ */
+export function Badge({ className, style, ...props }: React.ComponentProps<"span">) {
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{
+        borderRadius: `var(--brand-badge-radius, ${BADGE.radius})`,
+        display: "inline-flex",
+        flexShrink: 0,
+        ...style,
+      }}
+      {...props}
+    >
+      {/* Inline size, so a parent's `[&_svg]` sizing can't shrink the mark. */}
+      <svg
+        aria-hidden="true"
+        fill="currentColor"
+        style={{ height: "100%", width: "100%" }}
+        viewBox={BADGE.viewBox}
+      >
+        <g transform={BADGE.transform}>
+          {MARK.paths.map((d) => (
+            <path d={d} key={d} />
+          ))}
+        </g>
+      </svg>
+    </span>
+  );
 }

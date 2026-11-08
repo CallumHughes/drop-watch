@@ -21,3 +21,9 @@ export const WORDMARK_STACKED = {
   ],
   viewBox: "561.84 109.84 892.32 495.57",
 } as const;
+
+export const BADGE = {
+  radius: "18.75%",
+  transform: "translate(12.49 12.98) scale(0.049946)",
+  viewBox: "0 0 100 100",
+} as const;
