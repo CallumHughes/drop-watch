@@ -37,22 +37,24 @@ function Badge({ className, children }: { className?: string; children: React.Re
  */
 export function StatusBadge({
   active,
+  className,
   consecutiveFailures,
   lastStatus,
 }: {
   active: boolean;
+  className?: string;
   consecutiveFailures: number;
   lastStatus: CheckStatus | null;
 }) {
   if (!active) {
-    return <Badge className="text-muted-foreground ring-border">Paused</Badge>;
+    return <Badge className={cn("text-muted-foreground ring-border", className)}>Paused</Badge>;
   }
   if (consecutiveFailures === 0) {
     return null;
   }
   const detail = lastStatus ? checkStatusLabel(lastStatus) : "unknown";
   return (
-    <Badge className="bg-destructive/10 text-destructive ring-destructive/30">
+    <Badge className={cn("bg-destructive/10 text-destructive ring-destructive/30", className)}>
       {consecutiveFailures} failed · {detail}
     </Badge>
   );

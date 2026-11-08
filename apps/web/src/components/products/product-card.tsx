@@ -96,7 +96,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
   return (
     <Card className="relative transition-colors hover:ring-foreground/25">
       <CardHeader>
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           {product.imageUrl ? (
             <Image
               alt=""
@@ -122,12 +122,13 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
               primaryListing={primaryListing}
             />
           </div>
-          <StatusBadge
-            active={product.active}
-            consecutiveFailures={summary.consecutiveFailures}
-            lastStatus={lastCheck?.status ?? null}
-          />
         </div>
+        <StatusBadge
+          active={product.active}
+          className="mt-1.5 justify-self-start"
+          consecutiveFailures={summary.consecutiveFailures}
+          lastStatus={lastCheck?.status ?? null}
+        />
       </CardHeader>
 
       <CardContent className="flex flex-col gap-2">
