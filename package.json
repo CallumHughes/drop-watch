@@ -42,7 +42,7 @@
     "test:skills": "node --test .agents/skills/visual-recap/scripts/primitives-map.test.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.6.5",
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
