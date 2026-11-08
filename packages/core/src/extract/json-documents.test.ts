@@ -50,6 +50,23 @@ describe("collectJsonDocuments", () => {
     });
   });
 
+  it("reads a member assignment and names it by its full target", () => {
+    const documents = collect(
+      '<script>var _BIS = _BIS || {};\n_BIS.product = {"handle":"widget"};</script>'
+    );
+    expect(documents).toEqual([{ source: "_BIS.product =", value: { handle: "widget" } }]);
+  });
+
+  it("does not read a member chain from its middle", () => {
+    expect(collect('<script>a.b.c = {"price":1};</script>')).toEqual([
+      { source: "a.b.c =", value: { price: 1 } },
+    ]);
+  });
+
+  it("ignores comparisons against a literal", () => {
+    expect(collect("<script>if (a.b == {}) {}</script>")).toEqual([]);
+  });
+
   it("ignores assignment-shaped text outside a script", () => {
     const documents = collect(`<pre>window.fake = {"price":1}</pre>
       <script>window.real = {"price":9};</script>`);

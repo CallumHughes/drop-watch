@@ -20,15 +20,17 @@ const MAX_DOCUMENTS = 20;
 const MAX_DOCUMENT_CHARS = 2_000_000;
 
 /**
- * `window.__NEXT_DATA__ = {`, `var __NUXT__ = {`, `window.foo = [`. The
- * lookahead is what keeps this from matching ordinary assignments — only a
- * literal object or array can be a document.
+ * `window.__NEXT_DATA__ = {`, `var __NUXT__ = {`, `window.foo = [`, and
+ * member targets such as `_BISConfig.product = {`. The lookahead is what keeps
+ * this from matching ordinary assignments — only a literal object or array can
+ * be a document.
  */
 const INLINE_ASSIGNMENT =
-  /(?:(?:window|globalThis|self)\s*\.\s*|(?:var|let|const)\s+)(?<name>[A-Za-z_$][\w$]*)\s*=\s*(?=[{[])/gu;
+  /(?<![\w$.])(?:(?:window|globalThis|self)\s*\.\s*(?<global>[A-Za-z_$][\w$]*)|(?:var|let|const)\s+(?<declared>[A-Za-z_$][\w$]*)|(?<member>[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)+))\s*=\s*(?=[{[])/gu;
 const NON_CODE_TOKEN =
   /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//gu;
 const NON_NEWLINE = /[^\r\n]/gu;
+const WHITESPACE = /\s+/gu;
 const EXECUTABLE_SCRIPT_TYPES = new Set([
   "",
   "application/ecmascript",
@@ -118,8 +120,9 @@ function scanInlineAssignments(source: string, documents: JsonDocument[]): void 
     const literal = readJsonLiteral(source, match.index + match[0].length);
     if (literal) {
       try {
+        const name = match.groups?.global ?? match.groups?.declared ?? match.groups?.member;
         documents.push({
-          source: `${match.groups?.name} =`,
+          source: `${name?.replace(WHITESPACE, "")} =`,
           value: JSON.parse(literal.value) as unknown,
         });
       } catch {

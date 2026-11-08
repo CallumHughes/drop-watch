@@ -13,12 +13,13 @@
 
 import { load } from "cheerio";
 import { checkExpression, parseSelectorExpression } from "./expression-guard";
-import { describeJsonValue } from "./json-documents";
+import { collectJsonDocuments, describeJsonValue } from "./json-documents";
 import { extractJsonLd } from "./jsonld";
 import { extractByJsonPath, jsonPathMatches } from "./jsonpath";
 import { extractMicrodata } from "./microdata";
 import { extractOpenGraph, extractPageMetadata } from "./opengraph";
 import { extractBySelector } from "./selector";
+import { shopifyAvailability, shopifyHandle } from "./shopify";
 import type {
   CheerioSelection,
   ExpressionMode,
@@ -105,6 +106,7 @@ function absoluteUrl(imageUrl: string, base: string | undefined): string {
  * The winning strategy owns price, currency and stock. Title and image are
  * merged in from page metadata when it did not supply them — a selector match
  * on a price span knows nothing about the product name, but og:title does.
+ * Stock it said nothing about is read from an embedded Shopify product.
  */
 function backfill(
   candidate: PriceCandidate,
@@ -121,6 +123,13 @@ function backfill(
   }
   if (merged.imageUrl !== undefined) {
     merged.imageUrl = absoluteUrl(merged.imageUrl, url);
+  }
+  if (merged.availability === undefined && merged.inStock === undefined && shopifyHandle(url)) {
+    const stock = shopifyAvailability(collectJsonDocuments(context), url);
+    if (stock) {
+      merged.availability = stock.availability;
+      merged.inStock = stock.inStock;
+    }
   }
   return merged;
 }
