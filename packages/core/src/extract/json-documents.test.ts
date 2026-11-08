@@ -29,6 +29,11 @@ describe("collectJsonDocuments", () => {
     expect(documents[0]?.value).toEqual({ "@type": "Product", offers: { price: "3.00" } });
   });
 
+  it.each(["-->", "--!>"])("unwraps a script body in an HTML comment ending %s", (end) => {
+    const documents = collect(`<script type="application/json"><!--{"price":5}${end}</script>`);
+    expect(documents[0]?.value).toEqual({ price: 5 });
+  });
+
   it("reads an inline window assignment", () => {
     const documents = collect(
       '<script>window.__INITIAL_STATE__ = {"product":{"price":42}};</script>'
