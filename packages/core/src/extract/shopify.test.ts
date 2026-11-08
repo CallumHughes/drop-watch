@@ -50,6 +50,15 @@ describe("extract — Shopify stock backfill", () => {
     expect(extract(shopifyPage(withoutFlag), { url: URL })).toMatchObject({ inStock: true });
   });
 
+  it("finds the product behind a pile of theme config blobs", () => {
+    const blobs = Array.from({ length: 15 }, (_, i) => `theme.s${i} = {"i":${i}};`).join("\n");
+    const html = shopifyPage({ ...product, available: false }).replace(
+      "<body>",
+      `<body><script>${blobs}</script>`
+    );
+    expect(extract(html, { url: URL })).toMatchObject({ inStock: false });
+  });
+
   it("ignores a product whose handle is not the tracked one", () => {
     const result = extract(shopifyPage({ ...product, handle: "other" }), { url: URL });
     expect(result).not.toHaveProperty("inStock");

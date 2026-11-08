@@ -24,13 +24,20 @@ export function shopifyHandle(url: string | undefined): string | null {
   }
 }
 
-function findProducts(value: unknown, handle: string, out: JsonRecord[], depth: number): void {
-  if (depth > MAX_WALK_DEPTH || out.length >= MAX_NODES) {
+interface Walk {
+  handle: string;
+  nodes: number;
+  products: JsonRecord[];
+}
+
+function findProducts(value: unknown, walk: Walk, depth: number): void {
+  if (depth > MAX_WALK_DEPTH || walk.nodes >= MAX_NODES) {
     return;
   }
+  walk.nodes += 1;
   if (Array.isArray(value)) {
     for (const entry of value) {
-      findProducts(entry, handle, out, depth + 1);
+      findProducts(entry, walk, depth + 1);
     }
     return;
   }
@@ -39,14 +46,14 @@ function findProducts(value: unknown, handle: string, out: JsonRecord[], depth: 
   }
   if (
     typeof value.handle === "string" &&
-    value.handle.toLowerCase() === handle &&
+    value.handle.toLowerCase() === walk.handle &&
     Array.isArray(value.variants)
   ) {
-    out.push(value);
+    walk.products.push(value);
     return;
   }
   for (const entry of Object.values(value)) {
-    findProducts(entry, handle, out, depth + 1);
+    findProducts(entry, walk, depth + 1);
   }
 }
 
@@ -77,10 +84,13 @@ export function shopifyAvailability(
   }
   const variantId = new URL(url).searchParams.get("variant");
 
-  const products: JsonRecord[] = [];
+  const walk: Walk = { handle, nodes: 0, products: [] };
   for (const document of documents) {
-    findProducts(document.value, handle, products, 0);
+    // Per document, so one bloated blob cannot starve the product embed after it.
+    walk.nodes = 0;
+    findProducts(document.value, walk, 0);
   }
+  const { products } = walk;
 
   const answers = new Set(
     products.map((product) => productAvailable(product, variantId)).filter((v) => v !== null)
