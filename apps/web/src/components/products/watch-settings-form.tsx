@@ -42,7 +42,7 @@ function RuleToggle({
       <Checkbox checked={checked} onCheckedChange={handleChange} />
       <span>
         {option.label}
-        <span className="text-muted-foreground block">{option.hint}</span>
+        <span className="block text-muted-foreground">{option.hint}</span>
       </span>
     </Label>
   );
@@ -169,7 +169,7 @@ export function WatchSettingsForm({ product }: { product: Product }) {
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-muted-foreground mb-2 text-xs">Alert rules</legend>
+        <legend className="mb-2 text-xs text-muted-foreground">Alert rules</legend>
         {RULE_OPTIONS.map((option) => (
           <RuleToggle
             checked={rules.includes(option.value)}

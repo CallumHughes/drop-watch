@@ -21,12 +21,12 @@ function PagePrice({ onPick, price }: { onPick: (amount: string) => void; price:
   return (
     <li>
       <button
-        className="hover:border-foreground/40 rounded border px-2 py-1 text-left text-xs"
+        className="rounded border px-2 py-1 text-left text-xs hover:border-foreground/40"
         onClick={pick}
         type="button"
       >
         <span className="block font-medium">{formatPrice(price.amount, price.currency)}</span>
-        <code className="text-muted-foreground block truncate">{price.context}</code>
+        <code className="block truncate text-muted-foreground">{price.context}</code>
       </button>
     </li>
   );
@@ -72,11 +72,11 @@ function Located({ outcome }: { outcome: Extract<LocatorOutcome, { kind: "locate
   return (
     <div className="flex flex-col gap-1 rounded-md border border-emerald-600/40 p-3">
       <p className="text-sm">Found that price here, and this listing will be tracked from it.</p>
-      <p className="bg-muted rounded px-2 py-1 text-xs">
+      <p className="rounded bg-muted px-2 py-1 text-xs">
         <span className="block truncate font-medium">{candidate.sample.value || "(no value)"}</span>
-        <code className="text-muted-foreground block truncate">{candidate.sample.context}</code>
+        <code className="block truncate text-muted-foreground">{candidate.sample.context}</code>
       </p>
-      <p className="text-muted-foreground text-xs">{candidate.reason}</p>
+      <p className="text-xs text-muted-foreground">{candidate.reason}</p>
     </div>
   );
 }
@@ -114,7 +114,7 @@ export function PriceLocator({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-muted-foreground text-xs" htmlFor={priceId}>
+        <label className="text-xs text-muted-foreground" htmlFor={priceId}>
           {expectedPriceLabel(currency)}
         </label>
         {/* No `pattern`: this input sits inside the listing settings form, and
@@ -130,7 +130,7 @@ export function PriceLocator({
           placeholder="24.99"
           value={expectedPrice}
         />
-        <p className="text-muted-foreground text-xs">{LOCATOR_HINT}</p>
+        <p className="text-xs text-muted-foreground">{LOCATOR_HINT}</p>
       </div>
 
       {unusable ? (
@@ -140,13 +140,13 @@ export function PriceLocator({
       ) : null}
 
       {automaticNote ? (
-        <p className="text-muted-foreground text-xs" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           {automaticNote}
         </p>
       ) : null}
 
       {outcome.kind === "searching" ? (
-        <p className="text-muted-foreground text-xs">Looking for that price on the page…</p>
+        <p className="text-xs text-muted-foreground">Looking for that price on the page…</p>
       ) : null}
 
       {outcome.kind === "failed" ? (

@@ -63,7 +63,7 @@ export default function Dashboard() {
       {sections.map((section) => (
         <div key={section.title ?? "all"}>
           {section.title ? (
-            <h2 className="text-muted-foreground mb-3 text-sm font-medium">
+            <h2 className="mb-3 text-sm font-medium text-muted-foreground">
               {section.title} ({section.products.length})
             </h2>
           ) : null}

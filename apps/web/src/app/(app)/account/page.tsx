@@ -37,7 +37,7 @@ export default async function AccountPage() {
     <main className="container mx-auto max-w-2xl overflow-y-auto px-4 py-6">
       <header className="mb-6">
         <h1 className="text-xl font-medium">Account</h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Signed in as {name}. This is the address the tracker uses to reach you.
         </p>
       </header>
@@ -45,7 +45,7 @@ export default async function AccountPage() {
       <section className="mb-8 space-y-2">
         <h2 className="text-sm font-medium">Email</h2>
         <p className="text-sm">{email}</p>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           {emailVerified ? "Confirmed." : "Not confirmed."}
           {emailVerified || !mailer ? null : (
             <>

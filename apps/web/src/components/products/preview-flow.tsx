@@ -29,11 +29,11 @@ export function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-muted-foreground text-xs" htmlFor={htmlFor}>
+      <label className="text-xs text-muted-foreground" htmlFor={htmlFor}>
         {label}
       </label>
       {children}
-      {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -61,25 +61,25 @@ function TransportReload({ reload }: { reload: NonNullable<PreviewFlowState["tra
         </Button>
       </div>
       {reload.unavailable ? (
-        <p className="text-muted-foreground text-xs" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           Browser rendering is not configured on this instance. Set <code>RENDER_URL</code> and
           restart to enable it.
         </p>
       ) : null}
       {reload.alreadyFailed ? (
-        <p className="text-muted-foreground text-xs" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           This preview already tried a browser and it failed: {reload.alreadyFailed}
         </p>
       ) : null}
       {reload.isPending ? (
-        <p className="text-muted-foreground text-xs" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           {targetsBrowser
             ? "Loading the page in a browser. Your HTTP preview remains available while this runs."
             : "Loading the page with plain HTTP. Your browser preview remains available while this runs."}
         </p>
       ) : null}
       {reload.error ? (
-        <p className="text-destructive text-xs" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {errorPrefix} {reload.error}{" "}
           {reload.disabled
             ? "This action is unavailable for the rest of this form."
@@ -122,7 +122,7 @@ function PreviewPanel({
         <CardTitle>Preview</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           {productHost(preview.url)} · HTTP {preview.httpStatus} ·{" "}
           {preview.htmlBytes.toLocaleString()} bytes cached
           {preview.render === "browser" ? " · rendered in a browser" : ""}
@@ -172,7 +172,7 @@ function PreviewPanel({
                 to open, and it is the escape hatch for a page whose price the
                 engine cannot read at all. */}
             <details className="rounded-md border border-dashed p-3">
-              <summary className="text-muted-foreground cursor-pointer text-xs">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
                 Advanced: point at the price with a CSS selector or JSONPath
               </summary>
               <div className="pt-3">
@@ -219,7 +219,7 @@ export function PreviewFlow({
     <>
       {lockUrl ? (
         <div className="flex flex-col gap-2">
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Re-preview this listing URL, then tell us the price its page shows now.
           </p>
           <div>

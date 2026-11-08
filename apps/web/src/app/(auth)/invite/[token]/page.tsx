@@ -48,7 +48,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             This invite link is no longer valid. Ask the admin to send a new one.
           </p>
           <Link
-            className="text-muted-foreground inline-block text-xs hover:underline"
+            className="inline-block text-xs text-muted-foreground hover:underline"
             href="/login"
           >
             Go to sign in →

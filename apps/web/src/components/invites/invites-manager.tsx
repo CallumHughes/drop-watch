@@ -35,7 +35,7 @@ function RevealedLink({ email, url }: { email: string; url: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border p-3 text-xs">
       <span className="text-muted-foreground">
-        Invite link for <span className="text-foreground font-medium">{email}</span>:
+        Invite link for <span className="font-medium text-foreground">{email}</span>:
       </span>
       <code className="break-all" data-testid="invite-url">
         {url}
@@ -73,12 +73,12 @@ function InviteRow({
         <span className="flex items-center gap-2 font-medium break-all">
           {invite.email}
           {invite.expired ? (
-            <span className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs">
+            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
               Expired
             </span>
           ) : null}
         </span>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-xs text-muted-foreground">
           Created {formatDateTime(invite.createdAt)} · {invite.expired ? "expired" : "expires"}{" "}
           {formatDateTime(invite.expiresAt)}
         </span>
@@ -213,7 +213,7 @@ export function InvitesManager() {
           {/* biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending. */}
           {invites.isPending ? <Skeleton className="h-24 w-full" /> : null}
           {invites.data && invites.data.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No pending invites. Anyone you invite shows up here until they accept.
             </p>
           ) : null}

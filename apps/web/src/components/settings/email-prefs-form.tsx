@@ -33,7 +33,7 @@ const CHANNEL_LABELS: Record<TestResult["name"], string> = {
 function TestResults({ results }: { results: TestResult[] }) {
   if (results.length === 0) {
     return (
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         Nothing is configured to receive alerts for your account, so nothing was sent. Tick email
         alerts above, or ask the admin whether alerting is switched on.
       </p>
@@ -51,7 +51,7 @@ function TestResults({ results }: { results: TestResult[] }) {
             </span>
             {result.httpStatus === null ? null : ` (HTTP ${result.httpStatus})`}
           </span>
-          <span className="text-muted-foreground break-all">{result.target}</span>
+          <span className="break-all text-muted-foreground">{result.target}</span>
           {result.error ? <span className="text-destructive">{result.error}</span> : null}
         </li>
       ))}
@@ -133,13 +133,13 @@ function Editor({
            * copy of a fact that is already known and would go stale the
            * moment you changed it.
            */}
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             Alerts for your products are emailed to the address on your account. There is nothing to
             enter here — change the address on your account page and alerts follow it. Only verified
             addresses are used, so an unverified account receives nothing.
           </p>
           {mailerConfigured ? null : (
-            <p className="text-muted-foreground text-xs">
+            <p className="text-xs text-muted-foreground">
               No mailer is configured on this instance, so this channel is unavailable. Set{" "}
               <code>RESEND_API_KEY</code> and restart to enable it.
             </p>
@@ -156,7 +156,7 @@ function Editor({
           {sendTest.isPending ? "Sending…" : "Send test"}
         </Button>
       </div>
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         The test uses the saved settings, so save before you send. It goes out on every channel your
         real alerts would use and reports each one separately. Home Assistant answers 200 even when
         no automation is listening — a green result proves the URL and id, not that your phone will
@@ -176,7 +176,7 @@ export function EmailPrefsForm() {
   }
 
   if (!prefs.data) {
-    return <p className="text-muted-foreground text-sm">Email preferences could not be loaded.</p>;
+    return <p className="text-sm text-muted-foreground">Email preferences could not be loaded.</p>;
   }
 
   // Remounted when the saved value changes so the checkbox re-seeds from the

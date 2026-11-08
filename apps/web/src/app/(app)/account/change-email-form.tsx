@@ -111,7 +111,7 @@ export default function ChangeEmailForm({
         }}
       </form.Field>
 
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         {verified
           ? `We will email ${currentEmail} to confirm. The address only changes once that link is opened.`
           : "We will email the new address to confirm. The address only changes once that link is opened."}

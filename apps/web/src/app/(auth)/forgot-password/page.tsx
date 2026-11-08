@@ -17,7 +17,7 @@ export default async function ForgotPasswordPage() {
     <main className="container mx-auto max-w-md overflow-y-auto px-4 py-10">
       <header className="mb-6">
         <h1 className="text-xl font-medium">Reset your password</h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Enter the address on the account and we will send a link to set a new password.
         </p>
       </header>
