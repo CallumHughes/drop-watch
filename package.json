@@ -47,7 +47,7 @@
     "@types/node": "catalog:",
     "husky": "latest",
     "minimatch": "catalog:",
-    "turbo": "^2.11.7",
+    "turbo": "^2.11.10",
     "typescript": "catalog:",
     "ultracite": "7.12.4"
   },
