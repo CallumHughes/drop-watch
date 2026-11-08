@@ -39,13 +39,15 @@
     "test:e2e": "turbo run test:e2e -F @drop-watch/e2e",
     "test:e2e:ui": "pnpm --filter @drop-watch/e2e test:e2e:ui",
     "test:integration": "turbo run test:integration -F @drop-watch/db",
-    "test:skills": "node --test .agents/skills/visual-recap/scripts/primitives-map.test.mjs"
+    "test:skills": "node --test .agents/skills/visual-recap/scripts/*.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
+    "jsdom": "^25.0.1",
+    "mermaid": "^11.17.2",
     "minimatch": "catalog:",
     "turbo": "^2.11.10",
     "typescript": "catalog:",

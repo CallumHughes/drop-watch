@@ -64,7 +64,7 @@ function main() {
 	const mermaidCheck = spawnSync(
 		process.execPath,
 		[
-			path.join(repoRoot, 'tools/check-mermaid-syntax.ts'),
+			path.join(import.meta.dirname, 'check-mermaid-syntax.mjs'),
 			'--stdin',
 			'--label',
 			blockFile,
