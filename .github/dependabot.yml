@@ -9,6 +9,8 @@ updates:
     groups:
       npm-minor-patch:
         patterns: ["*"]
+        # Biome moves with ultracite, which supports a narrow Biome range.
+        exclude-patterns: ["@biomejs/biome"]
         update-types: ["minor", "patch"]
     # @types/node tracks the runtime major: ahead of it, typecheck passes on
     # APIs the container doesn't have. Moves with the Node bump, not before it.
