@@ -29,6 +29,11 @@ describe("collectJsonDocuments", () => {
     expect(documents[0]?.value).toEqual({ "@type": "Product", offers: { price: "3.00" } });
   });
 
+  it.each(["-->", "--!>"])("unwraps a script body in an HTML comment ending %s", (end) => {
+    const documents = collect(`<script type="application/json"><!--{"price":5}${end}</script>`);
+    expect(documents[0]?.value).toEqual({ price: 5 });
+  });
+
   it("reads an inline window assignment", () => {
     const documents = collect(
       '<script>window.__INITIAL_STATE__ = {"product":{"price":42}};</script>'
@@ -48,6 +53,15 @@ describe("collectJsonDocuments", () => {
   it("ignores assignment-shaped text outside a script", () => {
     const documents = collect(`<pre>window.fake = {"price":1}</pre>
       <script>window.real = {"price":9};</script>`);
+
+    expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
+  });
+
+  it("finds an assignment after a string holding an emoji", () => {
+    const documents = collect(`<script>
+      const label = "🔥 deal";
+      window.real = {"price":9};
+    </script>`);
 
     expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
   });

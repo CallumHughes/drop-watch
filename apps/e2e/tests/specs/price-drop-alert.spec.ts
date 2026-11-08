@@ -63,7 +63,7 @@ test("a price drop alerts both channels with the right numbers", async ({
   await test.step("the same alert was emailed to the admin", async () => {
     // Every price-drop mail in the run lands in the one sink, so this test's
     // is the one naming its own product in the subject.
-    const subjectPattern = new RegExp(`^Price drop .*${fixtureProduct.title}`);
+    const subjectPattern = new RegExp(`^Price drop .*${fixtureProduct.title}`, "u");
     const dropMail = async () => (await emailSink.messagesWithSubject(subjectPattern)).at(0);
 
     await expect

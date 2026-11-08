@@ -37,7 +37,7 @@ function toPoints(samples: readonly PriceSample[]): string {
 export function Sparkline({ samples }: { samples: readonly PriceSample[] }) {
   if (samples.length === 0) {
     return (
-      <div className="flex h-8 items-center text-muted-foreground text-xs">No history yet</div>
+      <div className="text-muted-foreground flex h-8 items-center text-xs">No history yet</div>
     );
   }
 
@@ -45,7 +45,7 @@ export function Sparkline({ samples }: { samples: readonly PriceSample[] }) {
   return (
     <svg
       aria-label={`Price trend over the last ${samples.length} checks`}
-      className="h-8 w-full text-chart-brand"
+      className="text-chart-brand h-8 w-full"
       preserveAspectRatio="none"
       role="img"
       viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}

@@ -7,16 +7,16 @@ import { MARK, WORDMARK_HORIZONTAL, WORDMARK_STACKED } from "./paths.generated";
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), "../assets");
 
-const VIEW_BOX = /viewBox="([-\d.\s]+)"/;
-const PATH_DATA = /<path[^>]*\sd="([^"]+)"/g;
-const WHITESPACE = /\s+/;
+const VIEW_BOX = /viewBox="(?<viewBox>[-\d.\s]+)"/u;
+const PATH_DATA = /<path[^>]*\sd="(?<d>[^"]+)"/gu;
+const WHITESPACE = /\s+/u;
 
 const read = (name: string) => readFileSync(join(ASSETS, `${name}.svg`), "utf8");
 
 function art(svg: string) {
   return {
-    paths: [...svg.matchAll(PATH_DATA)].map((m) => m[1]),
-    viewBox: svg.match(VIEW_BOX)?.[1] ?? "",
+    paths: [...svg.matchAll(PATH_DATA)].map((m) => m.groups?.d),
+    viewBox: svg.match(VIEW_BOX)?.groups?.viewBox ?? "",
   };
 }
 

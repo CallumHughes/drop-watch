@@ -19,20 +19,20 @@
 const GROUP_DIGIT_COUNT = 3;
 
 /** Unicode spaces used as grouping separators (NBSP, narrow NBSP, thin, ideographic). */
-const SPACE_LIKE = /[\u00A0\u2000-\u200B\u202F\u3000]/g;
+const SPACE_LIKE = /[\u00A0\u2000-\u200B\u202F\u3000]/gu;
 
 /** A run of digits plus anything that can legally separate them. */
-const NUMBER_RUN = /-?\d[\d\s.,'’]*/;
+const NUMBER_RUN = /-?\d[\d\s.,'’]*/u;
 
 /** Trailing separators swept up by NUMBER_RUN, e.g. the space in "1 234,56 kr". */
-const TRAILING_SEPARATORS = /[\s.,'’]+$/;
+const TRAILING_SEPARATORS = /[\s.,'’]+$/u;
 
-const NON_DIGITS = /\D/g;
-const LEADING_ZEROS = /^0+(?=\d)/;
-const PLAIN_DECIMAL = /^-?\d+(?:\.\d+)?$/;
-const ISO_CODE_CANDIDATE = /(?<![A-Za-z])([A-Za-z]{3})(?![A-Za-z])/g;
-const THREE_LETTERS = /^[A-Z]{3}$/;
-const SINGLE_DIGIT = /\d/;
+const NON_DIGITS = /\D/gu;
+const LEADING_ZEROS = /^0+(?=\d)/u;
+const PLAIN_DECIMAL = /^-?\d+(?:\.\d+)?$/u;
+const ISO_CODE_CANDIDATE = /(?<![A-Za-z])(?<code>[A-Za-z]{3})(?![A-Za-z])/gu;
+const THREE_LETTERS = /^[A-Z]{3}$/u;
+const SINGLE_DIGIT = /\d/u;
 
 /**
  * ISO 4217 codes we recognise when a page writes the code rather than a symbol.
@@ -158,7 +158,7 @@ export function normalizeCurrency(input: string | undefined): string | undefined
 /** Finds a currency in free text: an ISO code first, then a known symbol. */
 export function detectCurrency(input: string): string | undefined {
   for (const match of input.matchAll(ISO_CODE_CANDIDATE)) {
-    const code = match[1]?.toUpperCase();
+    const code = match.groups?.code?.toUpperCase();
     if (code && KNOWN_CURRENCY_CODES.has(code)) {
       return code;
     }

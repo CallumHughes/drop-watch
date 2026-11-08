@@ -202,7 +202,7 @@ export interface TestExpressionOptions {
   url?: string;
 }
 
-const COLLAPSE_WHITESPACE = /\s+/g;
+const COLLAPSE_WHITESPACE = /\s+/gu;
 
 function truncate(value: string, limit: number): string {
   return value.length > limit ? `${value.slice(0, limit)}…` : value;

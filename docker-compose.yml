@@ -122,14 +122,13 @@ services:
     # for everyone. The worker degrades gracefully when RENDER_URL is unset
     # (see apps/worker/src/check-listing.ts), which is exactly what makes this
     # dependency unnecessary.
-
   # Headless-Chromium sidecar for browser-mode listings. Opt-in: gated behind
   # the `browser` profile so `pnpm docker:up` never pulls a ~2GB image for
   # someone who will not use it. Enable with `COMPOSE_PROFILES=browser` in the
   # root `.env` (see .env.example). Reached only by `web` and `worker`, over
   # the compose network — no published ports.
   renderer:
-    profiles: ["browser"]
+    profiles: [ "browser" ]
     build:
       context: .
       dockerfile: apps/renderer/Dockerfile
@@ -207,7 +206,7 @@ services:
     # runs next (db:push) fails against a database that does not exist yet.
     # Paired with `--wait` in the db:start script, which is what actually blocks.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d drop-watch"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d drop-watch" ]
       start_period: 30s
       interval: 2s
       timeout: 5s

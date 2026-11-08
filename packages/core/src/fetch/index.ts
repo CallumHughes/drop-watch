@@ -18,7 +18,7 @@ import { Agent, buildConnector, fetch as undiciFetch } from "undici";
 import { BlockedAddressError, checkLiteralHost, checkUrlScheme, guardedLookup } from "../net/guard";
 import { DEFAULT_ACCEPT_LANGUAGE, DEFAULT_USER_AGENT } from "../net/identity";
 
-const LEADING_WWW = /^www\./;
+const LEADING_WWW = /^www\./u;
 
 const DEFAULT_ACCEPT =
   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";

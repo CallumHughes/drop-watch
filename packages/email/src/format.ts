@@ -17,7 +17,7 @@
 import type { NotificationPayload } from "@drop-watch/core/notify";
 
 /** `www.` carries no information on a host label, so it is dropped. */
-const WWW_PREFIX = /^www\./;
+const WWW_PREFIX = /^www\./u;
 
 /**
  * Exact currency rendering of a `numeric(12,2)` string. Falls back to the bare

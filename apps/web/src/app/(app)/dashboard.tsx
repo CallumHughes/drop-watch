@@ -29,6 +29,7 @@ const SKELETON_CARDS = ["a", "b", "c"] as const;
 export default function Dashboard() {
   const products = useQuery(orpc.products.list.queryOptions({ refetchInterval: LIVE_REFETCH_MS }));
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending.
   if (products.isPending) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -62,7 +63,7 @@ export default function Dashboard() {
       {sections.map((section) => (
         <div key={section.title ?? "all"}>
           {section.title ? (
-            <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+            <h2 className="text-muted-foreground mb-3 text-sm font-medium">
               {section.title} ({section.products.length})
             </h2>
           ) : null}

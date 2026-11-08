@@ -21,12 +21,12 @@ function PagePrice({ onPick, price }: { onPick: (amount: string) => void; price:
   return (
     <li>
       <button
-        className="rounded border px-2 py-1 text-left text-xs hover:border-foreground/40"
+        className="hover:border-foreground/40 rounded border px-2 py-1 text-left text-xs"
         onClick={pick}
         type="button"
       >
         <span className="block font-medium">{formatPrice(price.amount, price.currency)}</span>
-        <code className="block truncate text-muted-foreground">{price.context}</code>
+        <code className="text-muted-foreground block truncate">{price.context}</code>
       </button>
     </li>
   );
@@ -72,9 +72,9 @@ function Located({ outcome }: { outcome: Extract<LocatorOutcome, { kind: "locate
   return (
     <div className="flex flex-col gap-1 rounded-md border border-emerald-600/40 p-3">
       <p className="text-sm">Found that price here, and this listing will be tracked from it.</p>
-      <p className="rounded bg-muted px-2 py-1 text-xs">
+      <p className="bg-muted rounded px-2 py-1 text-xs">
         <span className="block truncate font-medium">{candidate.sample.value || "(no value)"}</span>
-        <code className="block truncate text-muted-foreground">{candidate.sample.context}</code>
+        <code className="text-muted-foreground block truncate">{candidate.sample.context}</code>
       </p>
       <p className="text-muted-foreground text-xs">{candidate.reason}</p>
     </div>
@@ -134,7 +134,7 @@ export function PriceLocator({
       </div>
 
       {unusable ? (
-        <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+        <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
           {UNUSABLE_MESSAGE}
         </p>
       ) : null}
@@ -150,7 +150,7 @@ export function PriceLocator({
       ) : null}
 
       {outcome.kind === "failed" ? (
-        <p className="text-amber-700 text-sm dark:text-amber-300" role="alert">
+        <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
           {outcome.message}
         </p>
       ) : null}
@@ -170,7 +170,7 @@ export function PriceLocator({
 
       {outcome.kind === "unreachable" ? (
         <div className="flex flex-col gap-2">
-          <p className="text-amber-700 text-sm dark:text-amber-300" role="alert">
+          <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
             {UNREACHABLE_MESSAGE}
           </p>
           {outcome.prices.length > 0 ? (
@@ -184,13 +184,13 @@ export function PriceLocator({
       ) : null}
 
       {outcome.kind === "absent" ? (
-        <p className="text-amber-700 text-sm dark:text-amber-300" role="alert">
+        <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
           {ABSENT_MESSAGE}
         </p>
       ) : null}
 
       {currencyWarning ? (
-        <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+        <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
           {currencyWarning}
         </p>
       ) : null}

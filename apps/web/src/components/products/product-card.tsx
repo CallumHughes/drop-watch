@@ -57,7 +57,7 @@ function StoreLine({
 }) {
   if (listingCount > 1 && cheapestListing) {
     return (
-      <p className="truncate text-muted-foreground text-xs">
+      <p className="text-muted-foreground truncate text-xs">
         cheapest of {listingCount} stores · {productHost(cheapestListing.listing.url)}
       </p>
     );
@@ -66,7 +66,7 @@ function StoreLine({
     return null;
   }
   return (
-    <p className="truncate text-muted-foreground text-xs">{productHost(primaryListing.url)}</p>
+    <p className="text-muted-foreground truncate text-xs">{productHost(primaryListing.url)}</p>
   );
 }
 
@@ -94,13 +94,13 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
   const cheapestListing = listings.find((listing) => listing.listing.id === cheapestListingId);
 
   return (
-    <Card className="relative transition-colors hover:ring-foreground/25">
+    <Card className="hover:ring-foreground/25 relative transition-colors">
       <CardHeader>
         <div className="flex items-start gap-3">
           {product.imageUrl ? (
             <Image
               alt=""
-              className="size-14 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
+              className="ring-foreground/10 size-14 shrink-0 bg-white object-contain ring-1"
               height={THUMBNAIL_SIZE}
               src={product.imageUrl}
               unoptimized
@@ -132,7 +132,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
 
       <CardContent className="flex flex-col gap-2">
         <div className="flex items-baseline gap-2">
-          <span className="font-medium text-2xl tabular-nums">
+          <span className="text-2xl font-medium tabular-nums">
             {latest ? formatPrice(latest.price, latest.currency) : "—"}
           </span>
           <PriceChange changePercent={summary.changePercent} />
@@ -153,7 +153,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
 
         <Sparkline samples={history} />
 
-        <div className="flex justify-between text-muted-foreground text-xs">
+        <div className="text-muted-foreground flex justify-between text-xs">
           <span>
             {lastCheck ? `checked ${formatRelative(lastCheck.startedAt)}` : "never checked"}
           </span>

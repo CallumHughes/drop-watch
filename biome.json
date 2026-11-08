@@ -58,12 +58,9 @@
         "useExhaustiveDependencies": "info"
       },
       "nursery": {
-        "useSortedClasses": {
+        "useTailwindSortedClasses": {
           "level": "warn",
-          "fix": "safe",
-          "options": {
-            "functions": ["clsx", "cva", "cn"]
-          }
+          "fix": "safe"
         }
       },
       "style": {
@@ -84,6 +81,9 @@
     "formatter": {
       "quoteStyle": "double"
     }
+  },
+  "tailwind": {
+    "mergeFunctions": ["clsx", "cva", "cn"]
   },
   "css": {
     "parser": {

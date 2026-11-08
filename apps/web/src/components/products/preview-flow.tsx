@@ -132,7 +132,7 @@ function PreviewPanel({
           <>
             <PreviewSummary extraction={preview.extraction} url={preview.url} />
             {requiresManualRepair ? (
-              <p className="text-amber-700 text-sm dark:text-amber-300" role="alert">
+              <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
                 {automaticPreviewRepairMessage(preview)}
               </p>
             ) : (
@@ -172,7 +172,7 @@ function PreviewPanel({
                 to open, and it is the escape hatch for a page whose price the
                 engine cannot read at all. */}
             <details className="rounded-md border border-dashed p-3">
-              <summary className="cursor-pointer text-muted-foreground text-xs">
+              <summary className="text-muted-foreground cursor-pointer text-xs">
                 Advanced: point at the price with a CSS selector or JSONPath
               </summary>
               <div className="pt-3">

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { challengeReason, challengeVendor } from "./challenge";
 
-const GENERIC_SUBJECT = /^This site blocked this request\./;
-const ANY_GENERIC_SUBJECT = /^This site /;
+const GENERIC_SUBJECT = /^This site blocked this request\./u;
+const ANY_GENERIC_SUBJECT = /^This site /u;
 
 /**
  * Trimmed from the real 6,183-byte body boots.com served to a plain fetch —

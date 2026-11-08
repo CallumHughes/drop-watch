@@ -25,10 +25,10 @@ const MAX_DOCUMENT_CHARS = 2_000_000;
  * literal object or array can be a document.
  */
 const INLINE_ASSIGNMENT =
-  /(?:(?:window|globalThis|self)\s*\.\s*|(?:var|let|const)\s+)([A-Za-z_$][\w$]*)\s*=\s*(?=[{[])/g;
+  /(?:(?:window|globalThis|self)\s*\.\s*|(?:var|let|const)\s+)(?<name>[A-Za-z_$][\w$]*)\s*=\s*(?=[{[])/gu;
 const NON_CODE_TOKEN =
-  /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//g;
-const NON_NEWLINE = /[^\r\n]/g;
+  /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//gu;
+const NON_NEWLINE = /[^\r\n]/gu;
 const EXECUTABLE_SCRIPT_TYPES = new Set([
   "",
   "application/ecmascript",
@@ -102,14 +102,15 @@ function isExecutableScript(type: string | undefined): boolean {
 
 /** Blanks strings and comments without moving assignment positions. */
 function executableCode(source: string): string {
-  return source.replace(NON_CODE_TOKEN, (token) => token.replace(NON_NEWLINE, " "));
+  return source.replace(NON_CODE_TOKEN, (token) =>
+    token.replace(NON_NEWLINE, (char) => " ".repeat(char.length))
+  );
 }
 
 function scanInlineAssignments(source: string, documents: JsonDocument[]): void {
   const code = executableCode(source);
   INLINE_ASSIGNMENT.lastIndex = 0;
   let match = INLINE_ASSIGNMENT.exec(code);
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: exec returns null when no assignments remain.
   while (match !== null) {
     if (documents.length >= MAX_DOCUMENTS) {
       return;
@@ -117,7 +118,10 @@ function scanInlineAssignments(source: string, documents: JsonDocument[]): void 
     const literal = readJsonLiteral(source, match.index + match[0].length);
     if (literal) {
       try {
-        documents.push({ source: `${match[1]} =`, value: JSON.parse(literal.value) as unknown });
+        documents.push({
+          source: `${match.groups?.name} =`,
+          value: JSON.parse(literal.value) as unknown,
+        });
       } catch {
         // JavaScript, not JSON. Skipping is the point.
       }
@@ -182,6 +186,7 @@ export function describeJsonValue(value: unknown): string {
     return "undefined";
   }
   try {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: JSON.stringify returns undefined for functions and symbols.
     return JSON.stringify(value) ?? String(value);
   } catch {
     return String(value);

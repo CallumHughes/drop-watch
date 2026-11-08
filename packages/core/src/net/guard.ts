@@ -43,7 +43,7 @@ export function allowedPrivateHosts(): ReadonlySet<string> {
 /** Whether `hostname` is exempt from the address check. */
 export function isAllowedPrivateHost(hostname: string): boolean {
   // IPv6 URL hosts arrive bracketed; the allowlist is written without them.
-  const bare = hostname.replace(/^\[|]$/g, "").toLowerCase();
+  const bare = hostname.replace(/^\[|\]$/gu, "").toLowerCase();
   return allowedPrivateHosts().has(bare);
 }
 
@@ -79,7 +79,7 @@ export class BlockedAddressError extends Error {
  * host is already an IP literal. Names return ok here and are judged on resolve.
  */
 export function checkLiteralHost(hostname: string): UrlVerdict {
-  const bare = hostname.replace(/^\[|]$/g, "");
+  const bare = hostname.replace(/^\[|\]$/gu, "");
   if (net.isIP(bare) === 0 || isAllowedPrivateHost(bare)) {
     return { ok: true };
   }
@@ -136,7 +136,7 @@ export function guardedLookup(
  * prefer {@link guardedLookup} so the checked answer is also the one connected.
  */
 export function checkHostAddresses(hostname: string): Promise<UrlVerdict> {
-  const bare = hostname.replace(/^\[|]$/g, "");
+  const bare = hostname.replace(/^\[|\]$/gu, "");
   if (isAllowedPrivateHost(bare)) {
     return Promise.resolve({ ok: true });
   }

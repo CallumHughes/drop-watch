@@ -1,7 +1,7 @@
 import { ADMIN_EMAIL } from "../../../constants";
 import { expect, test } from "../../fixtures";
 
-const TEST_MAIL_SUBJECT_PATTERN = /^Test alert from /;
+const TEST_MAIL_SUBJECT_PATTERN = /^Test alert from /u;
 const HTTP_FORBIDDEN = 403;
 
 /**

@@ -8,7 +8,7 @@ import Link from "next/link";
  */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+    <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <Link aria-label={APP_NAME} href="/">
         <WordmarkStacked className="h-24 w-auto" />
       </Link>

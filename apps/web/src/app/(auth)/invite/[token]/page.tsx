@@ -41,14 +41,14 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     return (
       <main className="container mx-auto max-w-md overflow-y-auto px-4 py-10">
         <header className="mb-6">
-          <h1 className="font-medium text-xl">Invite not valid</h1>
+          <h1 className="text-xl font-medium">Invite not valid</h1>
         </header>
         <div className="space-y-4">
           <p className="text-sm">
             This invite link is no longer valid. Ask the admin to send a new one.
           </p>
           <Link
-            className="inline-block text-muted-foreground text-xs hover:underline"
+            className="text-muted-foreground inline-block text-xs hover:underline"
             href="/login"
           >
             Go to sign in →

@@ -45,15 +45,15 @@ export function CheckRunLog({ runs }: { runs: readonly CheckRun[] }) {
         <tbody>
           {runs.map((run) => (
             <tr className="border-foreground/5 border-b last:border-0" key={run.id}>
-              <td className="whitespace-nowrap py-1.5 pr-3 tabular-nums">
+              <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">
                 {formatDateTime(run.startedAt)}
               </td>
-              <td className={`whitespace-nowrap py-1.5 pr-3 ${statusClass(run)}`}>
+              <td className={`py-1.5 pr-3 whitespace-nowrap ${statusClass(run)}`}>
                 {checkStatusLabel(run.status)}
               </td>
               <td className="py-1.5 pr-3 tabular-nums">{run.httpStatus ?? "—"}</td>
               <td className="py-1.5 pr-3 tabular-nums">{formatDuration(run.durationMs)}</td>
-              <td className="py-1.5 text-muted-foreground">{detailFor(run)}</td>
+              <td className="text-muted-foreground py-1.5">{detailFor(run)}</td>
             </tr>
           ))}
         </tbody>

@@ -91,30 +91,30 @@ const MAX_SELECTOR_DEPTH = 3;
 /** Ancestors read for context — struck-through markup, a carousel wrapper. */
 const MAX_ANCESTOR_DEPTH = 6;
 
-const COLLAPSE_WHITESPACE = /\s+/g;
+const COLLAPSE_WHITESPACE = /\s+/gu;
 const LETTERS = /\p{L}/gu;
 /** Every numeric run in a string, so an element holding two prices is visible. */
-const NUMBER_RUNS = /-?\d[\d\s.,'’]*/g;
-const JSON_NAME = /^[A-Za-z_$][\w$-]*$/;
-const CSS_IDENTIFIER = /^-?[A-Za-z_][\w-]*$/;
-const QUOTES = /['"]/;
+const NUMBER_RUNS = /-?\d[\d\s.,'’]*/gu;
+const JSON_NAME = /^[A-Za-z_$][\w$-]*$/u;
+const CSS_IDENTIFIER = /^-?[A-Za-z_][\w-]*$/u;
+const QUOTES = /['"]/u;
 /** Characters that cannot survive even a quoted attribute selector. */
-const UNQUOTABLE = /[\\\n\r]/;
+const UNQUOTABLE = /[\\\n\r]/u;
 /**
  * A value that is nothing but a number, which on a price element is the price.
  * Baking it into the selector makes the pin break the moment the price moves.
  */
-const NUMERIC_VALUE = /^[-\d.,'’\s]+$/;
-const MANY_DIGITS = /\d{4,}/;
+const NUMERIC_VALUE = /^[-\d.,'’\s]+$/u;
+const MANY_DIGITS = /\d{4,}/u;
 /** `css-1x2y3z`, `sc-AbCdEf`, `jsx-123` — a build step's output, not a name. */
-const GENERATED_PREFIX = /^(?:css|sc|jsx|emotion|svelte|_)-/i;
+const GENERATED_PREFIX = /^(?:css|sc|jsx|emotion|svelte|_)-/iu;
 /** A trailing hash: a separator then a run mixing letters and digits. */
-const HASHED_SUFFIX = /[-_](?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{5,}$/i;
+const HASHED_SUFFIX = /[-_](?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{5,}$/iu;
 /** Names that say the element holds a price. */
-const PRICE_TOKEN = /price|amount|cost|money|total|value/i;
+const PRICE_TOKEN = /price|amount|cost|money|total|value/iu;
 /** Tailwind-shaped utilities: unstable and semantically empty. */
 const UTILITY_CLASS =
-  /^(?:text|font|bg|p|m|[pm][xytrbl]|w|h|min|max|flex|grid|gap|border|rounded|shadow|leading|tracking|items|justify|inline|block|hidden|absolute|relative|fixed|sticky|top|left|right|bottom|z|opacity|space|overflow|whitespace|align|order|col|row|gradient|from|to|via|sm|md|lg|xl|2xl)(?:-|$)/;
+  /^(?:text|font|bg|p|m|[pm][xytrbl]|w|h|min|max|flex|grid|gap|border|rounded|shadow|leading|tracking|items|justify|inline|block|hidden|absolute|relative|fixed|sticky|top|left|right|bottom|z|opacity|space|overflow|whitespace|align|order|col|row|gradient|from|to|via|sm|md|lg|xl|2xl)(?:-|$)/u;
 /** Attributes worth reading explicitly, most machine-readable first. */
 const ATTRIBUTE_PREFERENCE = ["content", "data-price", "data-product-price", "value"] as const;
 /**
@@ -221,9 +221,9 @@ function equalsExpected(price: string, expected: bigint): boolean {
 }
 
 /** `originalPrice` → `original price`, so a JSON key reads like a class name. */
-const CAMEL_BOUNDARY = /([a-z\d])([A-Z])/g;
+const CAMEL_BOUNDARY = /(?<lower>[a-z\d])(?<upper>[A-Z])/gu;
 /** Everything between one word of a name and the next, once lowercased. */
-const NAME_SEPARATORS = /[^a-z\d]+/;
+const NAME_SEPARATORS = /[^a-z\d]+/u;
 
 /**
  * The words a name is made of, lowercased.
@@ -236,7 +236,7 @@ const NAME_SEPARATORS = /[^a-z\d]+/;
  */
 function nameWords(value: string): string[] {
   return value
-    .replace(CAMEL_BOUNDARY, "$1 $2")
+    .replace(CAMEL_BOUNDARY, "$<lower> $<upper>")
     .toLowerCase()
     .split(NAME_SEPARATORS)
     .filter((word) => word.length > 0);

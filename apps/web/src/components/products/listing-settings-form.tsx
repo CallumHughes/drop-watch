@@ -85,7 +85,7 @@ function RepairPanel({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
       <div>
-        <p className="font-medium text-xs">Repair this listing’s price extraction</p>
+        <p className="text-xs font-medium">Repair this listing’s price extraction</p>
         <p className="text-muted-foreground text-xs">
           Re-preview the current URL, tell us the price its page shows, and save the verified
           extraction without recreating this listing.
@@ -114,7 +114,7 @@ function RepairPanel({
               </p>
             ) : null}
             {untestedPreview ? (
-              <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+              <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
                 Enter the price this page shows before applying this repair.
               </p>
             ) : null}
@@ -287,7 +287,7 @@ export function ListingSettingsForm({
   );
 
   return (
-    <form className="flex flex-col gap-3 border-foreground/10 border-t pt-3" onSubmit={onSubmit}>
+    <form className="border-foreground/10 flex flex-col gap-3 border-t pt-3" onSubmit={onSubmit}>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field htmlFor={intervalId} label="Check every (minutes)">
           <Input
@@ -346,7 +346,7 @@ export function ListingSettingsForm({
           />
           <span>
             Load the page in a headless browser
-            <span className="block text-muted-foreground">
+            <span className="text-muted-foreground block">
               For stores that build their price with JavaScript. Slower than a plain fetch.
             </span>
           </span>

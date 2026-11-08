@@ -74,7 +74,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
   const onSaved = useCallback(() => setEditing(false), []);
 
   return (
-    <div className="flex flex-col gap-2 border-foreground/10 border-b py-3 last:border-0">
+    <div className="border-foreground/10 flex flex-col gap-2 border-b py-3 last:border-0">
       <div className="flex flex-wrap items-center gap-3">
         <a
           className="inline-flex items-center gap-1 text-xs hover:underline"
@@ -98,7 +98,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          <Label className="gap-1.5 text-muted-foreground">
+          <Label className="text-muted-foreground gap-1.5">
             <Checkbox checked={listing.active} onCheckedChange={onToggleActive} />
             Active
           </Label>

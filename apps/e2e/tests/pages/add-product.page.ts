@@ -1,16 +1,16 @@
 import type { Locator, Page } from "@playwright/test";
 
-const PRODUCT_URL_PATTERN = /\/products\/(?<id>[0-9a-f-]{36})$/;
-const STRATEGY_NOTE_PATTERN = /found by/;
-const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/;
-const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/;
-const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/;
-const AUTOMATIC_REPAIR_PATTERN = /automatic price is ambiguous/;
-const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/;
-const ADVANCED_PATTERN = /^Advanced: point at the price/;
-const LOCATED_PATTERN = /^Found that price here/;
+const PRODUCT_URL_PATTERN = /\/products\/(?<id>[0-9a-f-]{36})$/u;
+const STRATEGY_NOTE_PATTERN = /found by/u;
+const NO_AUTO_MATCH_PATTERN = /Nothing matched automatically/u;
+const BROWSER_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? in browser/u;
+const HTTP_RELOAD_BUTTON_PATTERN = /Reload(?:ing)? with HTTP/u;
+const AUTOMATIC_REPAIR_PATTERN = /automatic price is ambiguous/u;
+const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/u;
+const ADVANCED_PATTERN = /^Advanced: point at the price/u;
+const LOCATED_PATTERN = /^Found that price here/u;
 /** The panel's line when a browser attempt in this same preview already failed. */
-const BROWSER_ALREADY_FAILED_PATTERN = /already tried a browser and it failed/;
+const BROWSER_ALREADY_FAILED_PATTERN = /already tried a browser and it failed/u;
 
 /** /products/new — paste a URL, preview the extraction, save. */
 export class AddProductPage {

@@ -27,8 +27,8 @@ const TRACKING_PARAMS = new Set([
   "wbraid",
   "yclid",
 ]);
-const DIMENSION_SEPARATOR = /(\d)\s*[x×]\s*(\d)/gi;
-const WHITESPACE = /\s+/g;
+const DIMENSION_SEPARATOR = /(?<before>\d)\s*[x×]\s*(?<after>\d)/giu;
+const WHITESPACE = /\s+/gu;
 
 export interface UrlIdentity {
   /** Parameters repeated with conflicting values cannot identify a variant. */
@@ -56,7 +56,7 @@ export function normalizeQueryValue(value: string): string {
 
 /** Includes the safe dimension spelling equivalence used by size-like URLs. */
 export function normalizeUrlParameterValue(value: string): string {
-  return normalizeQueryValue(value).replace(DIMENSION_SEPARATOR, "$1x$2");
+  return normalizeQueryValue(value).replace(DIMENSION_SEPARATOR, "$<before>x$<after>");
 }
 
 export function urlIdentity(value: unknown, base?: string): UrlIdentity | undefined {

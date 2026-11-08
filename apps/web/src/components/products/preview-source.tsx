@@ -38,7 +38,7 @@ export function PreviewSource({ previewId }: { previewId: string }) {
       {open && source.isPending ? <Skeleton className="h-64 w-full" /> : null}
       {open && source.data ? (
         <div className="flex flex-col gap-1">
-          <pre className="max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+          <pre className="bg-muted max-h-96 overflow-auto rounded-md p-3 text-xs leading-relaxed">
             <code>{source.data.html}</code>
           </pre>
           <p className="text-muted-foreground text-xs">

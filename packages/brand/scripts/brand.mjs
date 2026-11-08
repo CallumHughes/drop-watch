@@ -37,19 +37,19 @@ const MARKS = [
   { pad: 0.02, slug: "wordmark-stacked", token: "column" },
 ];
 
-const MASK_BLOCK = /<mask\b[\s\S]*?<\/mask>/g;
-const MASK_GROUP = /<g\s+mask="url\(#[^)]+\)"\s*>/;
-const GROUP_TAG = /<\/?g[\s>]/;
-const IMAGE_TAG = /<image\b[^>]*\/>/g;
-const CLIP_ATTR = /\s+clip-path="url\(#[^)]+\)"/g;
-const CLIP_BLOCK = /<clipPath\b[\s\S]*?<\/clipPath>/g;
-const VIEW_BOX = /viewBox="([-\d.\s]+)"/;
-const SVG_OPEN = /^[\s\S]*?<svg[^>]*>/;
-const SVG_CLOSE = /<\/svg>\s*$/;
-const MONOCHROME_FILL = /\s+fill="(?:#000000|#000|#ffffff|#fff)"/g;
-const ANY_FILL = /\s+fill="[^"]*"/g;
-const PATH_DATA = /<path[^>]*\sd="([^"]+)"/g;
-const WHITESPACE = /\s+/;
+const MASK_BLOCK = /<mask\b[\s\S]*?<\/mask>/gu;
+const MASK_GROUP = /<g\s+mask="url\(#[^)]+\)"\s*>/u;
+const GROUP_TAG = /<\/?g[\s>]/u;
+const IMAGE_TAG = /<image\b[^>]*\/>/gu;
+const CLIP_ATTR = /\s+clip-path="url\(#[^)]+\)"/gu;
+const CLIP_BLOCK = /<clipPath\b[\s\S]*?<\/clipPath>/gu;
+const VIEW_BOX = /viewBox="(?<viewBox>[-\d.\s]+)"/u;
+const SVG_OPEN = /^[\s\S]*?<svg[^>]*>/u;
+const SVG_CLOSE = /<\/svg>\s*$/u;
+const MONOCHROME_FILL = /\s+fill="(?:#000000|#000|#ffffff|#fff)"/gu;
+const ANY_FILL = /\s+fill="[^"]*"/gu;
+const PATH_DATA = /<path[^>]*\sd="(?<d>[^"]+)"/gu;
+const WHITESPACE = /\s+/u;
 
 // --- SVG surgery ---------------------------------------------------------
 
@@ -120,7 +120,7 @@ function viewBox(svg) {
   if (!found) {
     throw new Error("no viewBox");
   }
-  return found[1].trim().split(WHITESPACE).map(Number);
+  return found.groups.viewBox.trim().split(WHITESPACE).map(Number);
 }
 
 const inner = (svg) => svg.replace(SVG_OPEN, "").replace(SVG_CLOSE, "");
@@ -426,7 +426,7 @@ async function runGenerate() {
   );
 
   const art = (svg, box) => ({
-    paths: [...inner(svg).matchAll(PATH_DATA)].map((m) => m[1]),
+    paths: [...inner(svg).matchAll(PATH_DATA)].map((m) => m.groups.d),
     viewBox: box ?? viewBox(svg).join(" "),
   });
   const entry = (name, value) =>

@@ -15,7 +15,7 @@
 import { APP_NAME } from "@drop-watch/brand";
 import type { NotificationKind, NotificationPayload } from "./index";
 
-const WWW_PREFIX = /^www\./;
+const WWW_PREFIX = /^www\./u;
 
 /**
  * The store a listing's URL belongs to, `www.` stripped. Exported: a product

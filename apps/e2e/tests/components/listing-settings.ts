@@ -4,15 +4,15 @@ import type { Locator } from "@playwright/test";
  * The apply button names its outcome — "Apply tested CSS selector", "Apply
  * automatic extraction" — and reads "Apply repair" only while disabled.
  */
-const APPLY_REPAIR_PATTERN = /^Apply /;
+const APPLY_REPAIR_PATTERN = /^Apply /u;
 /** The read-only sentence that replaced the extractor select. */
-const EXTRACTION_NOTE_PATTERN = /^(Found automatically|Read from a spot)/;
-const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/;
-const ADVANCED_PATTERN = /^Advanced: point at the price/;
-const LOCATED_PATTERN = /^Found that price here/;
+const EXTRACTION_NOTE_PATTERN = /^(?:Found automatically|Read from a spot)/u;
+const EXPECTED_PRICE_PATTERN = /^What price does this page show\?/u;
+const ADVANCED_PATTERN = /^Advanced: point at the price/u;
+const LOCATED_PATTERN = /^Found that price here/u;
 /** Any of the three ways the locator says it has no spot to offer. */
 const NOT_FOUND_PATTERN =
-  /^(That price is not on the page|We could not find that price|That price is on the page, but)/;
+  /^(?:That price is not on the page|We could not find that price|That price is on the page, but)/u;
 
 /**
  * The inline per-listing settings editor a `ListingRow` opens via `edit()`.

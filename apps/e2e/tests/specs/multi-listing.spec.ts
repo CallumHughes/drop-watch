@@ -9,7 +9,7 @@ import type { AlertPayload } from "../support/webhook-sink";
  */
 const CHECK_TIMEOUT_MS = 45_000;
 const ALERT_TIMEOUT_MS = 20_000;
-const ONLY_LISTING_PATTERN = /only listing/;
+const ONLY_LISTING_PATTERN = /only listing/u;
 
 test("tracking a second store surfaces two listings, a two-line chart, and the cheaper dashboard price", async ({
   addProduct,

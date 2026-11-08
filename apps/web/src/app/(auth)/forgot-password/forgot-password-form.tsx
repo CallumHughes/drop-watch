@@ -120,7 +120,7 @@ export default function ForgotPasswordForm() {
         )}
       </form.Subscribe>
 
-      <Link className="inline-block text-muted-foreground text-xs hover:underline" href="/login">
+      <Link className="text-muted-foreground inline-block text-xs hover:underline" href="/login">
         ← Back to sign in
       </Link>
     </form>

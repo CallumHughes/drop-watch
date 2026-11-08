@@ -24,6 +24,7 @@ export default function LoginClient({ emailEnabled }: { emailEnabled: boolean })
   const handleSwitchToSignUp = useCallback(() => setShowSignUp(true), []);
   const handleSwitchToSignIn = useCallback(() => setShowSignUp(false), []);
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending.
   if (signupOpen.isPending) {
     return <Loader />;
   }

@@ -27,7 +27,7 @@ export type RenderMode = (typeof RENDER_MODES)[number];
  * some engines — the add-product form uses the source, zod uses the regex.
  */
 export const PRICE_PATTERN_SOURCE = String.raw`\d{1,10}(\.\d{1,2})?`;
-export const PRICE_PATTERN = new RegExp(`^${PRICE_PATTERN_SOURCE}$`);
+export const PRICE_PATTERN = new RegExp(`^${PRICE_PATTERN_SOURCE}$`, "u");
 
 /** Bounds on the free-text columns the add-product flow writes. */
 export const MAX_URL_LENGTH = 2048;

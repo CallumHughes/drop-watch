@@ -19,7 +19,7 @@ function Badge({ className, children }: { className?: string; children: React.Re
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 font-medium text-[11px] uppercase tracking-wide ring-1",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium tracking-wide uppercase ring-1",
         className
       )}
     >

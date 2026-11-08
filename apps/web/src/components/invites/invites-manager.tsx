@@ -35,7 +35,7 @@ function RevealedLink({ email, url }: { email: string; url: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border p-3 text-xs">
       <span className="text-muted-foreground">
-        Invite link for <span className="font-medium text-foreground">{email}</span>:
+        Invite link for <span className="text-foreground font-medium">{email}</span>:
       </span>
       <code className="break-all" data-testid="invite-url">
         {url}
@@ -70,10 +70,10 @@ function InviteRow({
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 border-b py-3 text-sm last:border-b-0">
       <div className="flex flex-col gap-0.5">
-        <span className="flex items-center gap-2 break-all font-medium">
+        <span className="flex items-center gap-2 font-medium break-all">
           {invite.email}
           {invite.expired ? (
-            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-destructive text-xs">
+            <span className="bg-destructive/10 text-destructive rounded-full px-2 py-0.5 text-xs">
               Expired
             </span>
           ) : null}
@@ -210,6 +210,7 @@ export function InvitesManager() {
           <CardTitle>Pending invites</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending. */}
           {invites.isPending ? <Skeleton className="h-24 w-full" /> : null}
           {invites.data && invites.data.length === 0 ? (
             <p className="text-muted-foreground text-sm">

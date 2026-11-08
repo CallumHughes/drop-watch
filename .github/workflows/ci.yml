@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -181,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [web, worker, renderer, migrate]
+        image: [ web, worker, renderer, migrate ]
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -203,7 +203,7 @@ jobs:
     # The registry scope is declared here rather than in the called workflow: a
     # called workflow cannot grant itself more than its caller holds.
     if: github.event_name == 'push'
-    needs: [lint, types, test, build, integration, e2e]
+    needs: [ lint, types, test, build, integration, e2e ]
     permissions:
       contents: read
       packages: write

@@ -16,8 +16,8 @@ export type ExpressionCheck = { ok: true } | { error: string; ok: false };
 
 const MAX_EXPRESSION_LENGTH = 500;
 
-const ATTRIBUTE_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]*$/;
-const ATTRIBUTE_SUFFIX = /::attr\(([^()]*)\)$/;
+const ATTRIBUTE_NAME = /^[A-Za-z_][A-Za-z0-9_.:-]*$/u;
+const ATTRIBUTE_SUFFIX = /::attr\((?<attribute>[^()]*)\)$/u;
 
 /** Finds an attribute-reader marker outside quoted CSS attribute values. */
 function selectorAttributeMarkers(expression: string): number[] {
@@ -84,7 +84,7 @@ export function parseSelectorExpression(
     return { error: "an attribute extraction expression needs a CSS selector before ::attr(name)" };
   }
 
-  const [, attribute] = suffix;
+  const attribute = suffix.groups?.attribute;
   if (!(attribute && ATTRIBUTE_NAME.test(attribute))) {
     return { error: "::attr(name) needs a valid HTML attribute name" };
   }

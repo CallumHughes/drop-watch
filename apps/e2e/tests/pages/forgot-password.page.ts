@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-const CONFIRMATION_PATTERN = /a reset link is on its way/;
+const CONFIRMATION_PATTERN = /a reset link is on its way/u;
 
 /** /forgot-password — asks for a reset link. Only exists while a mailer does. */
 export class ForgotPasswordPage {

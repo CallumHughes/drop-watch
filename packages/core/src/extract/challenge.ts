@@ -17,7 +17,7 @@ const SCAN_CHARS = 20_000;
 
 const HTTP_FORBIDDEN = 403;
 
-const LEADING_WWW = /^www\./;
+const LEADING_WWW = /^www\./u;
 
 interface ChallengeSignature {
   markers: readonly (RegExp | string)[];
@@ -30,7 +30,7 @@ const SIGNATURES: readonly ChallengeSignature[] = [
     // Deliberately not `_Incapsula_Resource`: that script is Imperva's sensor,
     // which a protected site also serves on the pages it delivers normally, so
     // matching it would name a block on a page that arrived intact.
-    markers: [/<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/i, "reeseSkipAutoLoad"],
+    markers: [/<title\b[^>]*>\s*Pardon Our Interruption\s*<\/title>/iu, "reeseSkipAutoLoad"],
     vendor: "Imperva",
   },
   // The broadest marker left, and a bare substring. It names the field Bot
@@ -41,8 +41,8 @@ const SIGNATURES: readonly ChallengeSignature[] = [
   {
     markers: [
       "cf_chl_opt",
-      /\/cdn-cgi\/challenge-platform\/h\/[^/\s"']+\/flow\//,
-      /<title\b[^>]*>\s*Just a moment(?:\.{3}|…)?\s*<\/title>/i,
+      /\/cdn-cgi\/challenge-platform\/h\/[^/\s"']+\/flow\//u,
+      /<title\b[^>]*>\s*Just a moment(?:\.{3}|…)?\s*<\/title>/iu,
     ],
     vendor: "Cloudflare",
   },

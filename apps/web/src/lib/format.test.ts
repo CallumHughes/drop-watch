@@ -4,7 +4,7 @@ import { formatDuration, formatPrice, formatRelative, formatStock, productHost }
 
 /** Intl inserts a narrow no-break space in some locales; normalise for comparison. */
 function plain(value: string): string {
-  return value.replace(/ | /g, " ");
+  return value.replace(/ | /gu, " ");
 }
 
 const NOW = new Date("2026-07-27T12:00:00.000Z").getTime();

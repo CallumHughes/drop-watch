@@ -52,10 +52,10 @@ export class EmailSink {
  * is why the match is unescaped before being returned.
  */
 export function extractAuthLink(email: CapturedEmail, apiPath: string): string {
-  const urls = `${email.text}\n${email.html}`.match(/https?:\/\/[^\s\]"'<>)]+/g) ?? [];
+  const urls = `${email.text}\n${email.html}`.match(/https?:\/\/[^\s\]"'<>)]+/gu) ?? [];
   const link = urls.find((url) => url.includes(apiPath));
   if (!link) {
     throw new Error(`no link containing ${apiPath} in mail "${email.subject}"`);
   }
-  return link.replace(/&amp;/g, "&");
+  return link.replace(/&amp;/gu, "&");
 }

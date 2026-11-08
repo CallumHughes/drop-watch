@@ -125,7 +125,6 @@ services:
     # for everyone. The worker degrades gracefully when RENDER_URL is unset
     # (see apps/worker/src/check-listing.ts), which is exactly what makes this
     # dependency unnecessary.
-
   # Headless-Chromium sidecar for browser-mode listings. Opt-in: gated behind
   # the `browser` profile so a default `docker compose up` never pulls a
   # ~2GB image for someone who will not use it. Enable with
@@ -133,7 +132,7 @@ services:
   # Reached only by `web` and `worker`, over the compose network — no
   # published ports.
   renderer:
-    profiles: ["browser"]
+    profiles: [ "browser" ]
     image: ${DROP_WATCH_IMAGE:-ghcr.io/callumhughes/drop-watch}/renderer:${DROP_WATCH_VERSION:-latest}
     init: true
     # The browser receives hostile page content. These limits contain CPU,
@@ -201,7 +200,7 @@ services:
   # so leaving the profile off switches it off cleanly.
   postgres:
     image: postgres:18
-    profiles: ["bundled-db"]
+    profiles: [ "bundled-db" ]
     container_name: drop-watch-postgres
     environment:
       POSTGRES_DB: drop-watch
@@ -220,7 +219,7 @@ services:
     # `pg_isready` answers on the init-time socket before `POSTGRES_DB` has been
     # created, so checking the server alone reports ready too early.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d drop-watch"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d drop-watch" ]
       start_period: 30s
       interval: 2s
       timeout: 5s
