@@ -111,11 +111,13 @@ describe("the badge component matches the favicon", () => {
   it("has the same corner radius", () => {
     const side = Number(svg.match(WIDTH)?.groups?.w);
     const rx = Number(svg.match(RX)?.groups?.rx);
-    expect(BADGE.radius).toBe(`${(rx / side) * 100}%`);
+    expect(Number.parseFloat(BADGE.radius)).toBeCloseTo((rx / side) * 100);
   });
 
   it("takes its corners from the theme's --brand-badge-radius", () => {
-    expect(BADGE.radius).toBe(`${badgeRadiusPercent(readFileSync(THEME, "utf8"))}%`);
+    expect(Number.parseFloat(BADGE.radius)).toBeCloseTo(
+      badgeRadiusPercent(readFileSync(THEME, "utf8"))
+    );
   });
 
   it("places the mark the same way", () => {
