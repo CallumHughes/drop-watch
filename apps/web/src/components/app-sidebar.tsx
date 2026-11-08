@@ -35,10 +35,11 @@ export function AppSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            {/* Collapsed, the button shrinks to the badge and clips it, so it
-                takes the badge's corners. */}
+            {/* The button's rounding changes instantly while its size animates,
+                so it mustn't clip the badge: only the wordmark is clipped. The
+                collapsed radius keeps the focus ring on the badge's corners. */}
             <SidebarMenuButton
-              className="group-data-[collapsible=icon]:rounded-badge"
+              className="overflow-visible group-data-[collapsible=icon]:rounded-badge"
               render={<Link href="/" />}
               size="lg"
             >
@@ -47,7 +48,9 @@ export function AppSidebar({
                   letterboxes a 3.8:1 wordmark down to a smudge. Full height
                   instead: the row has width to spare, so the cap band is what
                   runs out first. */}
-              <Wordmark className="h-8! w-auto!" />
+              <span className="flex min-w-0 overflow-hidden">
+                <Wordmark className="h-8! w-auto!" />
+              </span>
               {/* The wordmark is artwork, and the label is hidden with it when
                   the rail collapses, so the link keeps a name of its own. */}
               <span className="sr-only">{APP_NAME}</span>
