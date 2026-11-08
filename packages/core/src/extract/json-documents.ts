@@ -16,19 +16,26 @@ import type { StrategyContext } from "./types";
 
 /** Enough for a page that inlines several stores; a bound, not a target. */
 const MAX_DOCUMENTS = 20;
+/**
+ * Member targets (`theme.settings = {`) are common enough on storefronts to
+ * crowd out everything else, so they get their own budget after the rest.
+ */
+const MAX_MEMBER_DOCUMENTS = 20;
 /** Per-document ceiling, so one enormous blob cannot pin the event loop. */
 const MAX_DOCUMENT_CHARS = 2_000_000;
 
 /**
- * `window.__NEXT_DATA__ = {`, `var __NUXT__ = {`, `window.foo = [`. The
- * lookahead is what keeps this from matching ordinary assignments — only a
- * literal object or array can be a document.
+ * `window.__NEXT_DATA__ = {`, `var __NUXT__ = {`, `window.foo = [`, and
+ * member targets such as `_BISConfig.product = {`. The lookahead is what keeps
+ * this from matching ordinary assignments — only a literal object or array can
+ * be a document.
  */
 const INLINE_ASSIGNMENT =
-  /(?:(?:window|globalThis|self)\s*\.\s*|(?:var|let|const)\s+)(?<name>[A-Za-z_$][\w$]*)\s*=\s*(?=[{[])/gu;
+  /(?<![\w$.])(?:(?:window|globalThis|self)\s*\.\s*(?<global>[A-Za-z_$][\w$]*)|(?:var|let|const)\s+(?<declared>[A-Za-z_$][\w$]*)|(?<member>[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)+))\s*=\s*(?=[{[])/gu;
 const NON_CODE_TOKEN =
   /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\/[^\r\n]*|\/\*[\s\S]*?\*\//gu;
 const NON_NEWLINE = /[^\r\n]/gu;
+const WHITESPACE = /\s+/gu;
 const EXECUTABLE_SCRIPT_TYPES = new Set([
   "",
   "application/ecmascript",
@@ -44,10 +51,18 @@ export interface JsonDocument {
   value: unknown;
 }
 
+/** One parse per loaded page: the chain, the stock backfill and the suggester all ask. */
+const collected = new WeakMap<StrategyContext["$"], readonly JsonDocument[]>();
+
 export function collectJsonDocuments({
   $,
   html,
-}: Pick<StrategyContext, "$" | "html">): JsonDocument[] {
+}: Pick<StrategyContext, "$" | "html">): readonly JsonDocument[] {
+  const cached = collected.get($);
+  if (cached) {
+    return cached;
+  }
+
   const documents: JsonDocument[] = [];
 
   // A tracked URL that answers with JSON rather than a page.
@@ -59,9 +74,19 @@ export function collectJsonDocuments({
   // `__NEXT_DATA__` ships with exactly this type, so it lands here.
   collectScripts($, 'script[type="application/json"]', documents);
   collectScripts($, 'script[type="application/ld+json"]', documents);
-  collectInlineAssignments($, documents);
 
-  return documents.slice(0, MAX_DOCUMENTS);
+  const scripts = inlineScripts($);
+  for (const script of scripts) {
+    scanInlineAssignments(script, documents, "named", MAX_DOCUMENTS);
+  }
+  const members: JsonDocument[] = [];
+  for (const script of scripts) {
+    scanInlineAssignments(script, members, "member", MAX_MEMBER_DOCUMENTS);
+  }
+
+  const result = [...documents.slice(0, MAX_DOCUMENTS), ...members];
+  collected.set($, result);
+  return result;
 }
 
 function collectScripts(
@@ -82,17 +107,22 @@ function collectScripts(
   }
 }
 
-function collectInlineAssignments($: StrategyContext["$"], documents: JsonDocument[]): void {
+interface InlineScript {
+  /** The source with strings and comments blanked, so offsets line up. */
+  code: string;
+  source: string;
+}
+
+function inlineScripts($: StrategyContext["$"]): InlineScript[] {
+  const scripts: InlineScript[] = [];
   for (const element of $("script:not([src])").toArray()) {
-    if (documents.length >= MAX_DOCUMENTS) {
-      return;
-    }
     const node = $(element);
-    if (!isExecutableScript(node.attr("type"))) {
-      continue;
+    if (isExecutableScript(node.attr("type"))) {
+      const source = node.text();
+      scripts.push({ code: executableCode(source), source });
     }
-    scanInlineAssignments(node.text(), documents);
   }
+  return scripts;
 }
 
 function isExecutableScript(type: string | undefined): boolean {
@@ -107,19 +137,28 @@ function executableCode(source: string): string {
   );
 }
 
-function scanInlineAssignments(source: string, documents: JsonDocument[]): void {
-  const code = executableCode(source);
+/** `named` is `window.x` and `var x`; `member` is `a.b`. */
+type AssignmentKind = "member" | "named";
+
+function scanInlineAssignments(
+  { code, source }: InlineScript,
+  documents: JsonDocument[],
+  kind: AssignmentKind,
+  limit: number
+): void {
   INLINE_ASSIGNMENT.lastIndex = 0;
   let match = INLINE_ASSIGNMENT.exec(code);
-  while (match !== null) {
-    if (documents.length >= MAX_DOCUMENTS) {
-      return;
-    }
-    const literal = readJsonLiteral(source, match.index + match[0].length);
+  while (match !== null && documents.length < limit) {
+    const member = match.groups?.member;
+    const name = member ?? match.groups?.global ?? match.groups?.declared;
+    const literal =
+      (member ? "member" : "named") === kind
+        ? readJsonLiteral(source, match.index + match[0].length)
+        : null;
     if (literal) {
       try {
         documents.push({
-          source: `${match.groups?.name} =`,
+          source: `${name?.replace(WHITESPACE, "")} =`,
           value: JSON.parse(literal.value) as unknown,
         });
       } catch {

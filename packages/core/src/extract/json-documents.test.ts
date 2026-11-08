@@ -50,6 +50,37 @@ describe("collectJsonDocuments", () => {
     });
   });
 
+  it("reads a member assignment and names it by its full target", () => {
+    const documents = collect(
+      '<script>var _BIS = _BIS || {};\n_BIS.product = {"handle":"widget"};</script>'
+    );
+    expect(documents).toEqual([{ source: "_BIS.product =", value: { handle: "widget" } }]);
+  });
+
+  it("does not read a member chain from its middle", () => {
+    expect(collect('<script>a.b.c = {"price":1};</script>')).toEqual([
+      { source: "a.b.c =", value: { price: 1 } },
+    ]);
+  });
+
+  it("keeps window and var documents ahead of any number of member blobs", () => {
+    const blobs = Array.from({ length: 25 }, (_, i) => `theme.s${i} = {"i":${i}};`).join("\n");
+    const documents = collect(`<script>${blobs}\nwindow.__NUXT__ = {"price":7};</script>`);
+
+    expect(documents[0]).toEqual({ source: "__NUXT__ =", value: { price: 7 } });
+    expect(documents).toHaveLength(21);
+  });
+
+  it("parses a page once however many times it is asked", () => {
+    const html = '<script>window.state = {"price":5};</script>';
+    const $ = load(html);
+    expect(collectJsonDocuments({ $, html })).toBe(collectJsonDocuments({ $, html }));
+  });
+
+  it("ignores comparisons against a literal", () => {
+    expect(collect("<script>if (a.b == {}) {}</script>")).toEqual([]);
+  });
+
   it("ignores assignment-shaped text outside a script", () => {
     const documents = collect(`<pre>window.fake = {"price":1}</pre>
       <script>window.real = {"price":9};</script>`);
