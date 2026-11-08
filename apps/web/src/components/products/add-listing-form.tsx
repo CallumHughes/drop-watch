@@ -82,7 +82,7 @@ export function AddListingForm({
             <CardTitle>Save</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <p className="text-muted-foreground text-xs">{note}</p>
+            <p className="text-xs text-muted-foreground">{note}</p>
             <div>
               <Button
                 disabled={!chosen || addListing.isPending || isTransportReloadPending}

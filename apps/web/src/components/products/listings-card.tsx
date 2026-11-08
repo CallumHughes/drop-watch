@@ -74,7 +74,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
   const onSaved = useCallback(() => setEditing(false), []);
 
   return (
-    <div className="border-foreground/10 flex flex-col gap-2 border-b py-3 last:border-0">
+    <div className="flex flex-col gap-2 border-b border-foreground/10 py-3 last:border-0">
       <div className="flex flex-wrap items-center gap-3">
         <a
           className="inline-flex items-center gap-1 text-xs hover:underline"
@@ -88,7 +88,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
         <span className="text-sm tabular-nums">
           {latest ? formatPrice(latest.price, latest.currency) : "—"}
         </span>
-        <span className="text-muted-foreground text-xs">
+        <span className="text-xs text-muted-foreground">
           {latest ? formatAvailability(latest.availability, latest.inStock) : "—"}
         </span>
         <StatusBadge
@@ -98,7 +98,7 @@ function ListingRow({ summary }: { summary: ListingSummary }) {
         />
 
         <div className="ml-auto flex items-center gap-2">
-          <Label className="text-muted-foreground gap-1.5">
+          <Label className="gap-1.5 text-muted-foreground">
             <Checkbox checked={listing.active} onCheckedChange={onToggleActive} />
             Active
           </Label>

@@ -27,14 +27,14 @@ function detailFor(run: CheckRun): string {
  */
 export function CheckRunLog({ runs }: { runs: readonly CheckRun[] }) {
   if (runs.length === 0) {
-    return <p className="text-muted-foreground text-sm">No checks recorded yet.</p>;
+    return <p className="text-sm text-muted-foreground">No checks recorded yet.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
         <thead className="text-muted-foreground">
-          <tr className="border-foreground/10 border-b">
+          <tr className="border-b border-foreground/10">
             <th className="py-1.5 pr-3 font-medium">Started</th>
             <th className="py-1.5 pr-3 font-medium">Result</th>
             <th className="py-1.5 pr-3 font-medium">HTTP</th>
@@ -44,7 +44,7 @@ export function CheckRunLog({ runs }: { runs: readonly CheckRun[] }) {
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr className="border-foreground/5 border-b last:border-0" key={run.id}>
+            <tr className="border-b border-foreground/5 last:border-0" key={run.id}>
               <td className="py-1.5 pr-3 whitespace-nowrap tabular-nums">
                 {formatDateTime(run.startedAt)}
               </td>
@@ -53,7 +53,7 @@ export function CheckRunLog({ runs }: { runs: readonly CheckRun[] }) {
               </td>
               <td className="py-1.5 pr-3 tabular-nums">{run.httpStatus ?? "—"}</td>
               <td className="py-1.5 pr-3 tabular-nums">{formatDuration(run.durationMs)}</td>
-              <td className="text-muted-foreground py-1.5">{detailFor(run)}</td>
+              <td className="py-1.5 text-muted-foreground">{detailFor(run)}</td>
             </tr>
           ))}
         </tbody>

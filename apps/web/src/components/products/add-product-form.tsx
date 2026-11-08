@@ -57,7 +57,7 @@ function SavePanel({
           />
         </Field>
 
-        <p className="text-muted-foreground text-xs">{note}</p>
+        <p className="text-xs text-muted-foreground">{note}</p>
 
         <div>
           <Button disabled={!chosen || isSaveDisabled} onClick={onSave} type="button">

@@ -28,13 +28,13 @@ export default async function SettingsPage() {
       <header className="mb-6">
         <h1 className="text-xl font-medium">Settings</h1>
         {isAdmin ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Alerts are pushed to a Home Assistant webhook. The webhook id is the secret — pair it
             with <code className="text-xs">local_only: true</code> in the automation to keep it on
             the LAN.
           </p>
         ) : (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Choose whether alerts for the products you track are emailed to you.
           </p>
         )}

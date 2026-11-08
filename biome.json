@@ -83,7 +83,7 @@
     }
   },
   "tailwind": {
-    "mergeFunctions": ["clsx", "cva", "cn"]
+    "stylesheet": "./packages/ui/src/styles/globals.css"
   },
   "css": {
     "parser": {
