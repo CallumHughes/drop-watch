@@ -73,7 +73,7 @@ that could not scale.
 
 | Output | From |
 | --- | --- |
-| `assets/badge.svg`, `assets/icon-scheme.svg` | `mark.svg`, centred in a rounded square |
+| `assets/badge.svg`, `assets/icon-scheme.svg` | `mark.svg`, centred in a square with the theme's `--brand-badge-radius` corners |
 | `assets/badge-maskable.svg` | `mark.svg`, smaller and full bleed |
 | `assets/wordmark-on-{light,dark}.svg` | `wordmark-horizontal.svg`, ink baked in |
 | `apps/web/src/app/favicon.ico` | `badge.svg` at 16, 32 and 48 |
@@ -82,7 +82,7 @@ that could not scale.
 | `apps/web/src/app/opengraph-image.png` | `wordmark-horizontal.svg` on the dark ground |
 | `apps/web/public/icon-{192,512}.png` | `badge.svg` |
 | `apps/web/public/icon-maskable-512.png` | `badge-maskable.svg` |
-| `src/paths.generated.ts` | all three marks, for the React components |
+| `src/paths.generated.ts` | all three marks and the badge geometry, for the React components |
 
 The horizontal wordmark is the one place the generated module and the asset
 disagree, and deliberately: the asset's box stops at the "p" descender, so
@@ -111,11 +111,16 @@ import { APP_NAME, APP_DESCRIPTION, APP_TAGLINE } from "@drop-watch/brand";
 ```
 
 ```tsx
-import { Mark, Wordmark, WordmarkStacked } from "@drop-watch/brand/components/logo";
+import { Badge, Mark, Wordmark, WordmarkStacked } from "@drop-watch/brand/components/logo";
 ```
 
 The components take any `<svg>` prop and inherit their colour, so size and ink
 come from the caller: `<Mark className="h-4 w-auto text-muted-foreground" />`.
+`Badge` is the mark in its square, placed as in the favicon, with the theme's
+`--brand-badge-radius` corners (`--radius` minus 4px, set on `:root`); the caller gives it a size, a `bg-*` for the square and a
+`text-*` for the mark. The favicon bakes that in as a share of the 32px
+sidebar badge, so after changing `--radius` in `@drop-watch/ui`, re-run
+`brand:generate` (the tests fail until you do).
 They are `aria-hidden` by default, since they almost always sit beside text that
 already names the product — a caller using one on its own gives the surrounding
 link or heading the accessible name.

@@ -34,6 +34,9 @@
      product page it opens show the same line. */
   --chart-brand: var(--chart-3);
   --radius: 0.625rem;
+  /* The logo badge's corners. Resolved here so the sidebar's local --radius
+     can't change them; brand:generate bakes the same value into the favicon. */
+  --brand-badge-radius: calc(var(--radius) - 4px);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -118,6 +121,7 @@
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   --radius-sm: calc(var(--radius) - 4px);
+  --radius-badge: var(--brand-badge-radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);

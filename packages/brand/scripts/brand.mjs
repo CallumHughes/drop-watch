@@ -17,9 +17,12 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { optimize } from "svgo";
 
+import { badgeRadiusPercent } from "../src/theme.ts";
+
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(PKG, "../..");
 const ASSETS = join(PKG, "assets");
+const THEME = join(REPO, "packages/ui/src/styles/globals.css");
 
 /** Near-black, matching `--foreground` / dark `--background` (oklch(0.145 0 0)). */
 const INK = "#0a0a0a";
@@ -332,15 +335,22 @@ function module_(name, lines) {
  * a smudge. Every app icon therefore sits in a filled square, which also gives
  * maskable icons the safe zone they need.
  */
+const BADGE_SIDE = 100;
+const BADGE_FRACTION = 0.58;
+
+function placement(box, fraction) {
+  const scale = (BADGE_SIDE * fraction) / box.h;
+  const x = BADGE_SIDE / 2 - (box.x + box.w / 2) * scale;
+  const y = BADGE_SIDE / 2 - (box.y + box.h / 2) * scale;
+  return `translate(${round(x)} ${round(y)}) scale(${scale.toFixed(6)})`;
+}
+
 function badge({ art, box, fraction, radius, scheme }) {
-  const side = 100;
-  const scale = (side * fraction) / box.h;
-  const x = side / 2 - (box.x + box.w / 2) * scale;
-  const y = side / 2 - (box.y + box.h / 2) * scale;
+  const side = BADGE_SIDE;
   const flip = scheme
     ? `@media(prefers-color-scheme:dark){.bg{fill:${PAPER}}.fg{fill:${INK}}}`
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}"><style>.bg{fill:${INK}}.fg{fill:${PAPER}}${flip}</style><rect class="bg" width="${side}" height="${side}"${radius ? ` rx="${radius}"` : ""}/><g class="fg" transform="translate(${round(x)} ${round(y)}) scale(${scale.toFixed(6)})">${art.replaceAll(ANY_FILL, "")}</g></svg>\n`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}"><style>.bg{fill:${INK}}.fg{fill:${PAPER}}${flip}</style><rect class="bg" width="${side}" height="${side}"${radius ? ` rx="${radius}"` : ""}/><g class="fg" transform="${placement(box, fraction)}">${art.replaceAll(ANY_FILL, "")}</g></svg>\n`;
 }
 
 /**
@@ -348,15 +358,15 @@ function badge({ art, box, fraction, radius, scheme }) {
  * built here rather than in `import` so that an edit to `assets/mark.svg`
  * reaches the favicon and the app icons, not just the components.
  */
-async function badges(markSvg) {
+async function badges(markSvg, radius) {
   const art = inner(markSvg);
   const box = await inkBox(markSvg);
   return {
-    badge: badge({ art, box, fraction: 0.58, radius: 22, scheme: false }),
+    badge: badge({ art, box, fraction: BADGE_FRACTION, radius, scheme: false }),
     // Maskable icons are cropped to the launcher's own shape, so this one runs
     // full bleed and keeps the mark well inside the safe zone.
     maskable: badge({ art, box, fraction: 0.42, radius: 0, scheme: false }),
-    scheme: badge({ art, box, fraction: 0.58, radius: 22, scheme: true }),
+    scheme: badge({ art, box, fraction: BADGE_FRACTION, radius, scheme: true }),
   };
 }
 
@@ -364,7 +374,9 @@ async function runGenerate() {
   const read = (slug) => readFile(join(ASSETS, `${slug}.svg`), "utf8");
   const slugs = ["mark", "wordmark-horizontal", "wordmark-stacked"];
   const [markSvg, horizontal, stacked] = await Promise.all(slugs.map(read));
-  const { badge: badgeSvg, maskable, scheme } = await badges(markSvg);
+  // The badge takes its corners from the theme, so the favicon matches the UI.
+  const radius = badgeRadiusPercent(await readFile(THEME, "utf8"));
+  const { badge: badgeSvg, maskable, scheme } = await badges(markSvg, radius);
   const square = (svg, size) => png(svg, size, size).toBuffer();
 
   // favicon.ico carries the legacy sizes; icon.svg covers everything modern and
@@ -440,6 +452,8 @@ async function runGenerate() {
     entry("WORDMARK_HORIZONTAL", art(horizontal, await balanced(horizontal))),
     "",
     entry("WORDMARK_STACKED", art(stacked)),
+    "",
+    `export const BADGE = {\n  radius: "${radius}%",\n  transform: "${placement(await inkBox(markSvg), BADGE_FRACTION)}",\n  viewBox: "0 0 ${BADGE_SIDE} ${BADGE_SIDE}",\n} as const;`,
   ]);
   console.log("src/paths.generated.ts");
 }

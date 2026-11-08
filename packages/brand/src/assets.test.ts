@@ -3,13 +3,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { MARK, WORDMARK_HORIZONTAL, WORDMARK_STACKED } from "./paths.generated";
+import { BADGE, MARK, WORDMARK_HORIZONTAL, WORDMARK_STACKED } from "./paths.generated";
+import { badgeRadiusPercent } from "./theme";
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), "../assets");
+const THEME = join(dirname(fileURLToPath(import.meta.url)), "../../ui/src/styles/globals.css");
 
 const VIEW_BOX = /viewBox="(?<viewBox>[-\d.\s]+)"/u;
 const PATH_DATA = /<path[^>]*\sd="(?<d>[^"]+)"/gu;
 const WHITESPACE = /\s+/u;
+const WIDTH = /width="(?<w>[\d.]+)"/u;
+const RX = /rx="(?<rx>[\d.]+)"/u;
 
 const read = (name: string) => readFileSync(join(ASSETS, `${name}.svg`), "utf8");
 
@@ -98,5 +102,25 @@ describe("every asset is clean vector", () => {
     const svg = readFileSync(join(ASSETS, file), "utf8");
     expect(svg).not.toContain("<image");
     expect(svg).not.toContain("base64");
+  });
+});
+
+describe("the badge component matches the favicon", () => {
+  const svg = read("badge");
+
+  it("has the same corner radius", () => {
+    const side = Number(svg.match(WIDTH)?.groups?.w);
+    const rx = Number(svg.match(RX)?.groups?.rx);
+    expect(Number.parseFloat(BADGE.radius)).toBeCloseTo((rx / side) * 100);
+  });
+
+  it("takes its corners from the theme's --brand-badge-radius", () => {
+    expect(Number.parseFloat(BADGE.radius)).toBeCloseTo(
+      badgeRadiusPercent(readFileSync(THEME, "utf8"))
+    );
+  });
+
+  it("places the mark the same way", () => {
+    expect(svg).toContain(`transform="${BADGE.transform}"`);
   });
 });
