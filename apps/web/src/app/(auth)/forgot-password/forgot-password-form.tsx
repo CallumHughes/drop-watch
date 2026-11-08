@@ -77,7 +77,7 @@ export default function ForgotPasswordForm() {
           If that address has an account here, a reset link is on its way to it. The link is
           single-use and expires in an hour.
         </p>
-        <Link className="text-muted-foreground text-xs hover:underline" href="/login">
+        <Link className="text-xs text-muted-foreground hover:underline" href="/login">
           ← Back to sign in
         </Link>
       </div>
@@ -120,7 +120,7 @@ export default function ForgotPasswordForm() {
         )}
       </form.Subscribe>
 
-      <Link className="text-muted-foreground inline-block text-xs hover:underline" href="/login">
+      <Link className="inline-block text-xs text-muted-foreground hover:underline" href="/login">
         ← Back to sign in
       </Link>
     </form>

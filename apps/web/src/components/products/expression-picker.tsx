@@ -60,8 +60,8 @@ function ModeButton({
       aria-pressed={active}
       className={
         active
-          ? "border-foreground/40 bg-muted rounded border px-2 py-1 text-xs font-medium"
-          : "text-muted-foreground hover:text-foreground rounded border px-2 py-1 text-xs"
+          ? "rounded border border-foreground/40 bg-muted px-2 py-1 text-xs font-medium"
+          : "rounded border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
       }
       onClick={pick}
       type="button"
@@ -81,7 +81,7 @@ function Suggestion({
   const pick = useCallback(() => onPick(expression), [expression, onPick]);
   return (
     <button
-      className="text-muted-foreground hover:text-foreground rounded border px-2 py-0.5 text-xs"
+      className="rounded border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
       onClick={pick}
       type="button"
     >
@@ -95,11 +95,11 @@ function MatchList({ samples }: { samples: ExpressionPreview["samples"] }) {
     <ul className="flex flex-col gap-1">
       {samples.map((sample) => (
         <li
-          className="bg-muted rounded px-2 py-1 text-xs"
+          className="rounded bg-muted px-2 py-1 text-xs"
           key={`${sample.context}:${sample.value}`}
         >
           <span className="block truncate font-medium">{sample.value || "(no value)"}</span>
-          <code className="text-muted-foreground block truncate">{sample.context}</code>
+          <code className="block truncate text-muted-foreground">{sample.context}</code>
         </li>
       ))}
     </ul>
@@ -122,16 +122,16 @@ function ExtractionVerdict({ test, url }: { test: ExpressionPreview; url: string
       </p>
     );
   }
-  return <p className="text-muted-foreground text-xs">{test.extractionError}</p>;
+  return <p className="text-xs text-muted-foreground">{test.extractionError}</p>;
 }
 
 function Verdict({ test, url }: { test: ExpressionPreview; url: string }) {
   if (test.invalidExpression) {
-    return <p className="text-muted-foreground text-xs">{test.invalidReason}</p>;
+    return <p className="text-xs text-muted-foreground">{test.invalidReason}</p>;
   }
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-muted-foreground text-xs">
+      <p className="text-xs text-muted-foreground">
         {test.matchCount === 1 ? "1 match" : `${test.matchCount} matches`}
       </p>
       <MatchList samples={test.samples} />
@@ -179,7 +179,7 @@ export function ExpressionPicker({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        <span className="text-muted-foreground text-xs">How do you want to find the price?</span>
+        <span className="text-xs text-muted-foreground">How do you want to find the price?</span>
         <div className="flex flex-wrap gap-2">
           {MODES.map((entry) => (
             <ModeButton
@@ -194,7 +194,7 @@ export function ExpressionPicker({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-muted-foreground text-xs" htmlFor={expressionId}>
+        <label className="text-xs text-muted-foreground" htmlFor={expressionId}>
           {active.label} for the price
         </label>
         <Input
@@ -213,10 +213,10 @@ export function ExpressionPicker({
       </div>
 
       {expression.trim().length === 0 ? (
-        <p className="text-muted-foreground text-xs">{active.hint}</p>
+        <p className="text-xs text-muted-foreground">{active.hint}</p>
       ) : null}
       {isPending && expression.trim().length > 0 ? (
-        <p className="text-muted-foreground text-xs">Testing…</p>
+        <p className="text-xs text-muted-foreground">Testing…</p>
       ) : null}
       {test && !isPending ? <Verdict test={test} url={url} /> : null}
 

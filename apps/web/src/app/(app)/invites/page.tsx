@@ -26,7 +26,7 @@ export default async function InvitesPage() {
     <main className="container mx-auto max-w-2xl overflow-y-auto px-4 py-6">
       <header className="mb-6">
         <h1 className="text-xl font-medium">Invites</h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-sm text-muted-foreground">
           Signup is invite-only. Send someone a link and they can create an account for the invited
           address — links are single-use and expire after 48 hours.
         </p>
