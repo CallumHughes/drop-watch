@@ -30,7 +30,7 @@ export function PreviewSummary({
       {extraction.imageUrl ? (
         <Image
           alt=""
-          className="ring-foreground/10 size-16 shrink-0 bg-white object-contain ring-1"
+          className="size-16 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
           height={THUMBNAIL_SIZE}
           src={extraction.imageUrl}
           unoptimized
@@ -43,12 +43,12 @@ export function PreviewSummary({
           <span className="text-2xl font-medium tabular-nums">
             {formatPrice(extraction.price, extraction.currency)}
           </span>
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             {extraction.currency ?? "currency unknown"}
           </span>
-          <span className="text-muted-foreground text-xs">{formatStock(extraction.inStock)}</span>
+          <span className="text-xs text-muted-foreground">{formatStock(extraction.inStock)}</span>
         </p>
-        <p className="text-muted-foreground mt-1 text-xs">
+        <p className="mt-1 text-xs text-muted-foreground">
           found by <span className="text-foreground">{STRATEGY_LABELS[extraction.strategy]}</span>
           {extraction.availability ? ` · availability: ${extraction.availability}` : null}
         </p>

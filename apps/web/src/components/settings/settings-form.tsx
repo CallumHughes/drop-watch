@@ -195,7 +195,7 @@ function Editor({ settings }: { settings: Settings }) {
             <Checkbox checked={alertsEnabled} onCheckedChange={setAlertsEnabled} />
             Send alerts
           </Label>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             The master switch, for every account. With it off nothing is sent on any channel to
             anyone, and no alert is remembered — so turning it back on does not release a backlog.
           </p>
@@ -233,7 +233,7 @@ function Editor({ settings }: { settings: Settings }) {
               value={haWebhookId}
             />
           </Field>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-xs text-muted-foreground">
             The webhook is the admin's channel: it fires only for products on your own account.
             Leave both fields empty to switch it off without losing anything else.
           </p>
@@ -333,7 +333,7 @@ export function SettingsForm() {
   }
 
   if (!settings.data) {
-    return <p className="text-muted-foreground text-sm">Settings could not be loaded.</p>;
+    return <p className="text-sm text-muted-foreground">Settings could not be loaded.</p>;
   }
 
   // Remounted when the row changes so the inputs re-seed from the saved values

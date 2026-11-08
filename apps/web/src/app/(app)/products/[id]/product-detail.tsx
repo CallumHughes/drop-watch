@@ -32,9 +32,9 @@ const LOG_ROWS = 50;
 function Stat({ hint, label, value }: { hint?: string; label: string; value: string }) {
   return (
     <div>
-      <div className="text-muted-foreground text-xs">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-sm tabular-nums">{value}</div>
-      {hint ? <div className="text-muted-foreground text-xs">{hint}</div> : null}
+      {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
     </div>
   );
 }
@@ -100,14 +100,14 @@ function StoreLocation({
   primaryListing: Listing | undefined;
 }) {
   if (listingCount > 1) {
-    return <p className="text-muted-foreground text-xs">{listingCount} stores</p>;
+    return <p className="text-xs text-muted-foreground">{listingCount} stores</p>;
   }
   if (!primaryListing) {
     return null;
   }
   return (
     <a
-      className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
       href={primaryListing.url}
       rel="noopener noreferrer"
       target="_blank"
@@ -173,7 +173,7 @@ function ProductDetailView({ productId }: { productId: string }) {
   }
 
   if (!detail.data) {
-    return <p className="text-muted-foreground text-sm">This product could not be loaded.</p>;
+    return <p className="text-sm text-muted-foreground">This product could not be loaded.</p>;
   }
 
   const { cheapestListingId, lastCheck, latest, listings, nextCheckAt, product } = detail.data;
@@ -188,7 +188,7 @@ function ProductDetailView({ productId }: { productId: string }) {
         {product.imageUrl ? (
           <Image
             alt=""
-            className="ring-foreground/10 size-18 shrink-0 bg-white object-contain ring-1"
+            className="size-18 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
             height={THUMBNAIL_SIZE}
             src={product.imageUrl}
             unoptimized

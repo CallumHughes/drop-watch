@@ -86,7 +86,7 @@ function RepairPanel({
     <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
       <div>
         <p className="text-xs font-medium">Repair this listing’s price extraction</p>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           Re-preview the current URL, tell us the price its page shows, and save the verified
           extraction without recreating this listing.
         </p>
@@ -109,7 +109,7 @@ function RepairPanel({
               {repairActionLabel(plan)}
             </Button>
             {plan ? (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 {repairSummary(plan, current, tracked)}
               </p>
             ) : null}
@@ -287,7 +287,7 @@ export function ListingSettingsForm({
   );
 
   return (
-    <form className="border-foreground/10 flex flex-col gap-3 border-t pt-3" onSubmit={onSubmit}>
+    <form className="flex flex-col gap-3 border-t border-foreground/10 pt-3" onSubmit={onSubmit}>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field htmlFor={intervalId} label="Check every (minutes)">
           <Input
@@ -346,7 +346,7 @@ export function ListingSettingsForm({
           />
           <span>
             Load the page in a headless browser
-            <span className="text-muted-foreground block">
+            <span className="block text-muted-foreground">
               For stores that build their price with JavaScript. Slower than a plain fetch.
             </span>
           </span>
@@ -355,13 +355,13 @@ export function ListingSettingsForm({
             disabled checkbox with no stated reason is the case that most
             needs the reason read out. */}
         {browserToggle.hint.kind === "unavailable-off" ? (
-          <p className="text-muted-foreground text-xs" id={renderHintId}>
+          <p className="text-xs text-muted-foreground" id={renderHintId}>
             No renderer is configured on this instance, so this option is unavailable. Set{" "}
             <code>RENDER_URL</code> and restart to enable it.
           </p>
         ) : null}
         {browserToggle.hint.kind === "unavailable-on" ? (
-          <p className="text-muted-foreground text-xs" id={renderHintId}>
+          <p className="text-xs text-muted-foreground" id={renderHintId}>
             This listing is set to use a browser, but no renderer is configured — its checks are
             failing. Set <code>RENDER_URL</code> and restart, or untick this.
           </p>

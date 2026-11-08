@@ -57,7 +57,7 @@ function StoreLine({
 }) {
   if (listingCount > 1 && cheapestListing) {
     return (
-      <p className="text-muted-foreground truncate text-xs">
+      <p className="truncate text-xs text-muted-foreground">
         cheapest of {listingCount} stores · {productHost(cheapestListing.listing.url)}
       </p>
     );
@@ -66,7 +66,7 @@ function StoreLine({
     return null;
   }
   return (
-    <p className="text-muted-foreground truncate text-xs">{productHost(primaryListing.url)}</p>
+    <p className="truncate text-xs text-muted-foreground">{productHost(primaryListing.url)}</p>
   );
 }
 
@@ -94,13 +94,13 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
   const cheapestListing = listings.find((listing) => listing.listing.id === cheapestListingId);
 
   return (
-    <Card className="hover:ring-foreground/25 relative transition-colors">
+    <Card className="relative transition-colors hover:ring-foreground/25">
       <CardHeader>
         <div className="flex items-start gap-3">
           {product.imageUrl ? (
             <Image
               alt=""
-              className="ring-foreground/10 size-14 shrink-0 bg-white object-contain ring-1"
+              className="size-14 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
               height={THUMBNAIL_SIZE}
               src={product.imageUrl}
               unoptimized
@@ -153,7 +153,7 @@ export function ProductCard({ summary }: { summary: ProductSummary }) {
 
         <Sparkline samples={history} />
 
-        <div className="text-muted-foreground flex justify-between text-xs">
+        <div className="flex justify-between text-xs text-muted-foreground">
           <span>
             {lastCheck ? `checked ${formatRelative(lastCheck.startedAt)}` : "never checked"}
           </span>
