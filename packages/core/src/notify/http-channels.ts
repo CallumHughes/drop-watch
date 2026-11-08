@@ -14,7 +14,7 @@ const HTTP_BAD_REQUEST = 400;
 
 /** HTTP headers are Latin-1; anything outside printable ASCII becomes `?`. */
 function asciiSafe(text: string): string {
-  return text.replace(/[^\x20-\x7e]/g, "?");
+  return text.replace(/[^\x20-\x7e]/gu, "?");
 }
 
 async function post(

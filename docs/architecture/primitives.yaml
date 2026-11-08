@@ -43,7 +43,7 @@ primitives:
       - apps/web/src/lib/**
       - apps/web/src/utils/**
       - apps/web/public/**
-    depends_on: [api-router, auth, ui-kit, brand, env-config]
+    depends_on: [ api-router, auth, ui-kit, brand, env-config ]
 
   - id: api-router
     group: surfaces
@@ -53,7 +53,7 @@ primitives:
       user-owned data.
     code:
       - packages/api/**
-    depends_on: [app-db, job-queue, auth, extractor, email, alert-rules, brand]
+    depends_on: [ app-db, job-queue, auth, extractor, email, alert-rules, brand ]
 
   - id: worker-process
     group: surfaces
@@ -63,15 +63,14 @@ primitives:
       Deliberately not booted from inside Next.js.
     code:
       - apps/worker/**
-    depends_on:
-      [job-queue, app-db, fetcher, extractor, alert-rules, notifier, email, renderer]
+    depends_on: [ job-queue, app-db, fetcher, extractor, alert-rules, notifier, email, renderer ]
 
   - id: url-cli
     group: surfaces
     summary: One-off `test-url` command for checking extraction against a live URL.
     code:
       - packages/core/src/bin/**
-    depends_on: [fetcher, extractor]
+    depends_on: [ fetcher, extractor ]
 
   - id: renderer
     group: surfaces
@@ -80,7 +79,7 @@ primitives:
       over HTTP. No database access, no queue, no cron.
     code:
       - apps/renderer/**
-    depends_on: [outbound-network-guard]
+    depends_on: [ outbound-network-guard ]
 
   - id: fetcher
     group: domain
@@ -90,7 +89,7 @@ primitives:
     code:
       - packages/core/src/fetch/**
       - packages/core/src/render/**
-    depends_on: [outbound-network-guard]
+    depends_on: [ outbound-network-guard ]
 
   - id: browser-identity
     group: domain
@@ -132,7 +131,7 @@ primitives:
       text column rather than a pg enum.
     code:
       - packages/core/src/extract/**
-    depends_on: [money]
+    depends_on: [ money ]
 
   - id: alert-rules
     group: domain
@@ -141,7 +140,7 @@ primitives:
       the cooldown, keyed by (productId, rule). No database, no clock.
     code:
       - packages/core/src/rules/**
-    depends_on: [money]
+    depends_on: [ money ]
 
   - id: notifier
     group: domain
@@ -151,7 +150,7 @@ primitives:
       fail a check.
     code:
       - packages/core/src/notify/**
-    depends_on: [brand]
+    depends_on: [ brand ]
 
   - id: money
     group: domain
@@ -171,7 +170,7 @@ primitives:
       - packages/db/src/queue.ts
       - packages/db/src/migrate.ts
       - packages/db/src/schema/auth.ts
-    depends_on: [env-config]
+    depends_on: [ env-config ]
 
   - id: job-queue
     group: storage
@@ -199,7 +198,7 @@ primitives:
     code:
       - packages/auth/**
       - packages/db/src/schema/auth.ts
-    depends_on: [app-db, email, env-config, brand]
+    depends_on: [ app-db, email, env-config, brand ]
 
   - id: email
     group: platform
@@ -208,7 +207,7 @@ primitives:
       reset, change-email, watch-broken.
     code:
       - packages/email/**
-    depends_on: [env-config, money, brand]
+    depends_on: [ env-config, money, brand ]
 
   - id: env-config
     group: platform
@@ -237,7 +236,7 @@ primitives:
       build (NEXT_DIST_DIR=.next-e2e) and its own database.
     code:
       - apps/e2e/**
-    depends_on: [brand]
+    depends_on: [ brand ]
 
 invariants:
   - id: per-user-isolation
@@ -246,33 +245,33 @@ invariants:
       a user. Uniqueness is per `(userId, url)` on listings; a product groups
       one user's listings of the same item. No query may read or write
       another user's rows.
-    guarded_by: [api-router, app-db]
+    guarded_by: [ api-router, app-db ]
 
   - id: single-scheduler
     statement: >
       Only the worker migrates and supervises the pgboss schema and registers
       the cron. Every other process is a sender only — a second cron worker
       double-fires the dispatcher.
-    guarded_by: [worker-process, job-queue]
+    guarded_by: [ worker-process, job-queue ]
 
   - id: notification-never-fails-a-check
     statement: >
       A failing webhook or email must not fail a check, lose a price point, or
       burn a pg-boss retry.
-    guarded_by: [notifier, worker-process]
+    guarded_by: [ notifier, worker-process ]
 
   - id: alert-dedupe
     statement: >
       A rule fires only when the condition holds AND (never alerted OR a new
       low OR past cooldown). Losing this makes the app cry wolf.
-    guarded_by: [alert-rules]
+    guarded_by: [ alert-rules ]
 
   - id: invite-gated-signup
     statement: Signup requires a valid unused invite; there is no open registration.
-    guarded_by: [auth, app-db]
+    guarded_by: [ auth, app-db ]
 
   - id: migration-parity
     statement: >
       The Drizzle schema and the migration history must produce identical
       databases — enforced by the parity integration test.
-    guarded_by: [migrations, app-db]
+    guarded_by: [ migrations, app-db ]

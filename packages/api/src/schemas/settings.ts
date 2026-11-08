@@ -24,7 +24,7 @@ export const MAX_TOKEN_LENGTH = 500;
  * BotFather's shape: numeric bot id, colon, base64ish secret. Anything else
  * would be interpolated into the Bot API URL path, so it is rejected here.
  */
-export const TELEGRAM_BOT_TOKEN_PATTERN = /^\d+:[\w-]+$/;
+export const TELEGRAM_BOT_TOKEN_PATTERN = /^\d+:[\w-]+$/u;
 
 /**
  * All channel fields are nullable so the page can clear them, which is

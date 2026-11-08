@@ -327,6 +327,7 @@ function Editor({ settings }: { settings: Settings }) {
 export function SettingsForm() {
   const settings = useQuery(orpc.settings.get.queryOptions());
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending.
   if (settings.isPending) {
     return <Skeleton className="h-96 w-full" />;
   }

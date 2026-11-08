@@ -12,8 +12,8 @@ export const MAX_WALK_DEPTH = 12;
 /** Node cap, so a pathological document cannot pin the event loop. */
 export const MAX_NODES = 2000;
 
-const CDATA_WRAPPER = /^\s*(?:\/\*\s*)?<!\[CDATA\[|\]\]>(?:\s*\*\/)?\s*$/g;
-const HTML_COMMENT = /^\s*<!--|-->\s*$/g;
+const CDATA_WRAPPER = /^\s*(?:\/\*\s*)?<!\[CDATA\[|\]\]>(?:\s*\*\/)?\s*$/gu;
+const HTML_COMMENT = /^\s*<!--|-->\s*$/gu;
 
 export type JsonRecord = Record<string, unknown>;
 

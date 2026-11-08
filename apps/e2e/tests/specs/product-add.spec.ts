@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures";
 
-const ALREADY_TRACKED_PATTERN = /already being tracked/;
+const ALREADY_TRACKED_PATTERN = /already being tracked/u;
 
 test("tracks a product found by the automatic JSON-LD extraction", async ({
   addProduct,

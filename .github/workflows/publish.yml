@@ -28,8 +28,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [web, worker, renderer, migrate]
-        arch: [amd64, arm64]
+        image: [ web, worker, renderer, migrate ]
+        arch: [ amd64, arm64 ]
     steps:
       # GHCR rejects uppercase repository names, and github.repository keeps
       # the owner's casing (CallumHughes/drop-watch). Lowercasing it here
@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [web, worker, renderer, migrate]
+        image: [ web, worker, renderer, migrate ]
     steps:
       - id: repo
         run: echo "lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"

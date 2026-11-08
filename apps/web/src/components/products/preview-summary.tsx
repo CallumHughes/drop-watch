@@ -30,7 +30,7 @@ export function PreviewSummary({
       {extraction.imageUrl ? (
         <Image
           alt=""
-          className="size-16 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
+          className="ring-foreground/10 size-16 shrink-0 bg-white object-contain ring-1"
           height={THUMBNAIL_SIZE}
           src={extraction.imageUrl}
           unoptimized
@@ -40,7 +40,7 @@ export function PreviewSummary({
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{extraction.title ?? productHost(url)}</p>
         <p className="flex flex-wrap items-baseline gap-x-3">
-          <span className="font-medium text-2xl tabular-nums">
+          <span className="text-2xl font-medium tabular-nums">
             {formatPrice(extraction.price, extraction.currency)}
           </span>
           <span className="text-muted-foreground text-xs">
@@ -48,7 +48,7 @@ export function PreviewSummary({
           </span>
           <span className="text-muted-foreground text-xs">{formatStock(extraction.inStock)}</span>
         </p>
-        <p className="mt-1 text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-1 text-xs">
           found by <span className="text-foreground">{STRATEGY_LABELS[extraction.strategy]}</span>
           {extraction.availability ? ` · availability: ${extraction.availability}` : null}
         </p>

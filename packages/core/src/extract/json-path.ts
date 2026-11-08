@@ -28,9 +28,9 @@ export interface JsonPathError {
   error: string;
 }
 
-const NAME_START = /[A-Za-z_$]/;
-const NAME_CHAR = /[A-Za-z0-9_$-]/;
-const DIGITS = /^\d+$/;
+const NAME_START = /[A-Za-z_$]/u;
+const NAME_CHAR = /[A-Za-z0-9_$-]/u;
+const DIGITS = /^\d+$/u;
 
 interface NameRead {
   end: number;

@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
-const HA_RESULT_PATTERN = /Home Assistant:/;
-const EMAIL_RESULT_PATTERN = /Email:/;
+const HA_RESULT_PATTERN = /Home Assistant:/u;
+const EMAIL_RESULT_PATTERN = /Email:/u;
 
 /**
  * /settings — two forms on one page since settings split by owner.

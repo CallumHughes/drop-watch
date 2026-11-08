@@ -9,7 +9,7 @@ import {
   timezoneForLocale,
 } from "./identity";
 
-const PLAIN_CHROME_SUFFIX = / Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/;
+const PLAIN_CHROME_SUFFIX = / Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/u;
 
 describe("timezoneForLocale", () => {
   it.each([

@@ -40,6 +40,7 @@ export class InvitesPage {
     await this.emailInput.fill(email);
     await this.inviteButton.click();
     await this.revealedLink.waitFor();
+    // biome-ignore lint/performance/useDomNodeTextContent: a Playwright locator, not a DOM node; innerText reads only the visible link.
     return await this.revealedLink.innerText();
   }
 

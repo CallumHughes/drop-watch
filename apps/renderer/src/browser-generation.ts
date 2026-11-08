@@ -113,7 +113,7 @@ export class BrowserGenerationManager<T> {
     }
     await Promise.all(
       generations.map((generation) =>
-        this.settleByDeadline(
+        settleByDeadline(
           generation.launch.then(
             () => undefined,
             () => undefined
@@ -125,7 +125,7 @@ export class BrowserGenerationManager<T> {
     await Promise.all(
       generations.map((generation) =>
         generation.closePromise
-          ? this.settleByDeadline(generation.closePromise, deadlineAt)
+          ? settleByDeadline(generation.closePromise, deadlineAt)
           : Promise.resolve()
       )
     );
@@ -178,17 +178,17 @@ export class BrowserGenerationManager<T> {
       }
     }
   }
+}
 
-  private async settleByDeadline(promise: Promise<void>, deadlineAt: number): Promise<void> {
-    const remainingMs = Math.max(0, deadlineAt - Date.now());
-    if (remainingMs === 0) {
-      return;
-    }
-    try {
-      await withDeadline(promise, remainingMs, "browser manager shutdown");
-    } catch {
-      // Generation teardown continues independently after the manager has
-      // detached it; shutdown itself must respect its absolute deadline.
-    }
+async function settleByDeadline(promise: Promise<void>, deadlineAt: number): Promise<void> {
+  const remainingMs = Math.max(0, deadlineAt - Date.now());
+  if (remainingMs === 0) {
+    return;
+  }
+  try {
+    await withDeadline(promise, remainingMs, "browser manager shutdown");
+  } catch {
+    // Generation teardown continues independently after the manager has
+    // detached it; shutdown itself must respect its absolute deadline.
   }
 }

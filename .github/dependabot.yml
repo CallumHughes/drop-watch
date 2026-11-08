@@ -8,15 +8,15 @@ updates:
     open-pull-requests-limit: 5
     groups:
       npm-minor-patch:
-        patterns: ["*"]
+        patterns: [ "*" ]
         # Biome moves with ultracite, which supports a narrow Biome range.
-        exclude-patterns: ["@biomejs/biome"]
-        update-types: ["minor", "patch"]
+        exclude-patterns: [ "@biomejs/biome" ]
+        update-types: [ "minor", "patch" ]
     # @types/node tracks the runtime major: ahead of it, typecheck passes on
     # APIs the container doesn't have. Moves with the Node bump, not before it.
     ignore:
       - dependency-name: "@types/node"
-        update-types: ["version-update:semver-major"]
+        update-types: [ "version-update:semver-major" ]
 
   - package-ecosystem: github-actions
     directory: /
@@ -25,7 +25,7 @@ updates:
       day: monday
     groups:
       github-actions:
-        patterns: ["*"]
+        patterns: [ "*" ]
 
   - package-ecosystem: docker
     directories:
@@ -38,9 +38,9 @@ updates:
       day: monday
     groups:
       docker:
-        patterns: ["*"]
+        patterns: [ "*" ]
     # Node majors move .nvmrc, engines and @types/node together, so they still
     # land by hand, on the LTS schedule, rather than as an independent bump here.
     ignore:
       - dependency-name: "node"
-        update-types: ["version-update:semver-major"]
+        update-types: [ "version-update:semver-major" ]

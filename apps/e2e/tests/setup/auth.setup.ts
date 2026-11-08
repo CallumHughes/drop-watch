@@ -8,7 +8,7 @@ import {
 } from "../../constants";
 import { expect, test } from "../fixtures";
 
-const VERIFY_SUBJECT_PATTERN = /^Verify your .* email address$/;
+const VERIFY_SUBJECT_PATTERN = /^Verify your .* email address$/u;
 
 /**
  * The storageState producer, and the one test that sees the instance before it

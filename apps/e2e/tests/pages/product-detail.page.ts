@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { ListingRow } from "../components/listing-row";
 
-const STORE_COUNT_PATTERN = /^\d+ stores$/;
+const STORE_COUNT_PATTERN = /^\d+ stores$/u;
 
 /** /products/[id] — stats, history, check log and the watch settings form. */
 export class ProductDetailPage {

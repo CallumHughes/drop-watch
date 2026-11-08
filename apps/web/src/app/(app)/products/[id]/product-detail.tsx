@@ -39,7 +39,7 @@ function Stat({ hint, label, value }: { hint?: string; label: string; value: str
   );
 }
 
-const TRAILING_SLASHES = /\/+$/;
+const TRAILING_SLASHES = /\/+$/u;
 
 /** The last path segment, for telling apart two listings that share a host. */
 function pathTail(url: string): string {
@@ -107,7 +107,7 @@ function StoreLocation({
   }
   return (
     <a
-      className="inline-flex items-center gap-1 text-muted-foreground text-xs hover:underline"
+      className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
       href={primaryListing.url}
       rel="noopener noreferrer"
       target="_blank"
@@ -167,6 +167,7 @@ function ProductDetailView({ productId }: { productId: string }) {
     })
   );
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending.
   if (detail.isPending) {
     return <Skeleton className="h-96 w-full" />;
   }
@@ -187,7 +188,7 @@ function ProductDetailView({ productId }: { productId: string }) {
         {product.imageUrl ? (
           <Image
             alt=""
-            className="size-18 shrink-0 bg-white object-contain ring-1 ring-foreground/10"
+            className="ring-foreground/10 size-18 shrink-0 bg-white object-contain ring-1"
             height={THUMBNAIL_SIZE}
             src={product.imageUrl}
             unoptimized
@@ -196,7 +197,7 @@ function ProductDetailView({ productId }: { productId: string }) {
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-medium text-xl">{title}</h1>
+            <h1 className="text-xl font-medium">{title}</h1>
             <StatusBadge
               active={product.active}
               consecutiveFailures={detail.data.consecutiveFailures}
@@ -250,6 +251,7 @@ function ProductDetailView({ productId }: { productId: string }) {
               <Stat label="Observations" value={String(stats.data.count)} />
             </div>
           ) : null}
+          {/* biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending. */}
           {history.isPending ? (
             <Skeleton className="h-72 w-full" />
           ) : (
@@ -279,6 +281,7 @@ function ProductDetailView({ productId }: { productId: string }) {
             <CardTitle>Check log</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending. */}
             {runs.isPending ? (
               <Skeleton className="h-48 w-full" />
             ) : (

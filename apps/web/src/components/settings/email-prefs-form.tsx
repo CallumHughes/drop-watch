@@ -51,7 +51,7 @@ function TestResults({ results }: { results: TestResult[] }) {
             </span>
             {result.httpStatus === null ? null : ` (HTTP ${result.httpStatus})`}
           </span>
-          <span className="break-all text-muted-foreground">{result.target}</span>
+          <span className="text-muted-foreground break-all">{result.target}</span>
           {result.error ? <span className="text-destructive">{result.error}</span> : null}
         </li>
       ))}
@@ -170,6 +170,7 @@ function Editor({
 export function EmailPrefsForm() {
   const prefs = useQuery(orpc.settings.emailPrefs.queryOptions());
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: Biome resolves useQuery to its initialData overload; this query can be pending.
   if (prefs.isPending) {
     return <Skeleton className="h-40 w-full" />;
   }

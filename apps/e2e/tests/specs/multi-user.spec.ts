@@ -97,7 +97,7 @@ test("a plain user's price drop mails only them and skips the webhook", async ({
   });
 
   await test.step("the drop mail went to the owner and not the admin", async () => {
-    const subjectPattern = new RegExp(`^Price drop .*${secondFixtureProduct.title}`);
+    const subjectPattern = new RegExp(`^Price drop .*${secondFixtureProduct.title}`, "u");
     const dropMail = async () => (await emailSink.messagesWithSubject(subjectPattern)).at(0);
 
     await expect

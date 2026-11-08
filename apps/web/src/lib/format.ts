@@ -61,7 +61,7 @@ export function formatDuration(durationMs: number | null): string {
 }
 
 /** `www.` carries no information on a host label, so it is dropped. */
-const WWW_PREFIX = /^www\./;
+const WWW_PREFIX = /^www\./u;
 
 /**
  * The bare host of a product URL, as every view labels one. Falls back to the

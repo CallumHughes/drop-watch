@@ -166,10 +166,10 @@ export function headedBrandsFromVersion(version: string): UserAgentBrand[] {
  * itself so the pair cannot disagree. Chromium's own spelling of each name.
  */
 const UA_PLATFORMS: readonly (readonly [RegExp, string])[] = [
-  [/Windows/, "Windows"],
-  [/Macintosh|Mac OS X/, "macOS"],
-  [/CrOS/, "Chrome OS"],
-  [/Android/, "Android"],
+  [/Windows/u, "Windows"],
+  [/Macintosh|Mac OS X/u, "macOS"],
+  [/CrOS/u, "Chrome OS"],
+  [/Android/u, "Android"],
 ];
 
 /** Chromium's platform name for `userAgent`; Linux is its own fallback too. */

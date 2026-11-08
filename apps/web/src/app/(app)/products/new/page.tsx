@@ -20,7 +20,7 @@ export default async function NewProductPage() {
   return (
     <main className="container mx-auto max-w-3xl overflow-y-auto px-4 py-6">
       <header className="mb-6">
-        <h1 className="font-medium text-xl">Track a new product</h1>
+        <h1 className="text-xl font-medium">Track a new product</h1>
         <p className="text-muted-foreground text-sm">
           Paste a product URL. Most shops publish structured data and need no further setup; the
           rest need a CSS selector for the price.

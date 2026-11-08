@@ -52,6 +52,15 @@ describe("collectJsonDocuments", () => {
     expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
   });
 
+  it("finds an assignment after a string holding an emoji", () => {
+    const documents = collect(`<script>
+      const label = "🔥 deal";
+      window.real = {"price":9};
+    </script>`);
+
+    expect(documents).toEqual([{ source: "real =", value: { price: 9 } }]);
+  });
+
   it("ignores assignments inside script comments and strings", () => {
     const documents = collect(`<script>
       // window.lineComment = {"price":1};

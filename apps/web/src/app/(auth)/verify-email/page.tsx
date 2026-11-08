@@ -27,7 +27,7 @@ export default async function VerifyEmailPage() {
   return (
     <main className="container mx-auto max-w-md overflow-y-auto px-4 py-10">
       <header className="mb-6">
-        <h1 className="font-medium text-xl">Confirm your email</h1>
+        <h1 className="text-xl font-medium">Confirm your email</h1>
         <p className="text-muted-foreground text-sm">
           We sent a link to the address on the account. Opening it confirms the address and signs
           you in; until then, signing in is blocked.
@@ -36,14 +36,14 @@ export default async function VerifyEmailPage() {
 
       <ResendVerificationForm defaultEmail={session?.user.email} />
 
-      <p className="mt-6 text-muted-foreground text-xs">
+      <p className="text-muted-foreground mt-6 text-xs">
         Nothing arrived? Check the spam folder, and check that the mailer is allowed to deliver to
         this address — Resend's shared sender only delivers to the address that owns the Resend
         account.
       </p>
 
       <Link
-        className="mt-4 inline-block text-muted-foreground text-xs hover:underline"
+        className="text-muted-foreground mt-4 inline-block text-xs hover:underline"
         href="/login"
       >
         ← Back to sign in

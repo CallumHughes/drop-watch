@@ -32,7 +32,7 @@ export default async function ResetPasswordPage({
   return (
     <main className="container mx-auto max-w-md overflow-y-auto px-4 py-10">
       <header className="mb-6">
-        <h1 className="font-medium text-xl">Set a new password</h1>
+        <h1 className="text-xl font-medium">Set a new password</h1>
         {token ? (
           <p className="text-muted-foreground text-sm">
             Pick something at least 8 characters long. You will be signed out of nothing else — this
@@ -50,7 +50,7 @@ export default async function ResetPasswordPage({
             are sent.
           </p>
           <Link
-            className="inline-block text-muted-foreground text-xs hover:underline"
+            className="text-muted-foreground inline-block text-xs hover:underline"
             href="/forgot-password"
           >
             Send a new one →

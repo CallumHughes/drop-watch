@@ -99,7 +99,7 @@ function ChartTooltip({
     return null;
   }
   return (
-    <div className="bg-popover px-2 py-1.5 text-xs ring-1 ring-foreground/15">
+    <div className="bg-popover ring-foreground/15 px-2 py-1.5 text-xs ring-1">
       {showSeriesLabel && entry?.name ? (
         <div className="text-muted-foreground">{entry.name}</div>
       ) : null}
@@ -144,7 +144,7 @@ export function PriceHistoryChart({
 
   if (allPoints.length === 0) {
     return (
-      <div className="flex h-72 items-center justify-center text-muted-foreground text-sm">
+      <div className="text-muted-foreground flex h-72 items-center justify-center text-sm">
         No price history recorded yet.
       </div>
     );

@@ -78,7 +78,7 @@ export default function SignInForm({
   return (
     <Card>
       <CardHeader className="text-center">
-        <h1 className="font-medium text-xl">Welcome Back</h1>
+        <h1 className="text-xl font-medium">Welcome Back</h1>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit}>

@@ -10,14 +10,13 @@
 
 // biome-ignore-all lint/suspicious/noBitwiseOperators: prefix masking is what this file does.
 
-const IPV4_PATTERN = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-const IPV4_OCTETS = 4;
+const IPV4_PATTERN = /^(?<a>\d{1,3})\.(?<b>\d{1,3})\.(?<c>\d{1,3})\.(?<d>\d{1,3})$/u;
 const IPV6_GROUPS = 8;
 const IPV6_BITS_PER_GROUP = 16;
 const MAX_OCTET = 255;
 const MAX_GROUP = 0xff_ff;
 const HEX = 16;
-const IPV6_GROUP_PATTERN = /^[0-9a-f]{1,4}$/i;
+const IPV6_GROUP_PATTERN = /^[0-9a-f]{1,4}$/iu;
 
 interface Prefix {
   /** Network address as an unsigned 32-bit integer. */
@@ -105,7 +104,8 @@ function parseIpv4(value: string): number[] | null {
   if (!match) {
     return null;
   }
-  const octets = match.slice(1, 1 + IPV4_OCTETS).map(Number);
+  const { a, b, c, d } = match.groups ?? {};
+  const octets = [a, b, c, d].map(Number);
   return octets.every((octet) => octet >= 0 && octet <= MAX_OCTET) ? octets : null;
 }
 

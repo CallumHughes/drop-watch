@@ -12,7 +12,7 @@
  */
 
 /** `numeric(12,2)`, optionally signed. Anything else is a bug, not user input. */
-const DECIMAL_PATTERN = /^-?\d+(\.\d+)?$/;
+const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/u;
 
 /** Money is scale 2 throughout the schema. */
 const SCALE = 2;

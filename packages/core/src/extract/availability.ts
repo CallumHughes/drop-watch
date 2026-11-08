@@ -8,8 +8,8 @@
 
 import type { Availability } from "./types";
 
-const URL_SEGMENT = /[#/]/;
-const SEPARATORS = /[\s_-]/g;
+const URL_SEGMENT = /[#/]/u;
+const SEPARATORS = /[\s_-]/gu;
 
 /** Tokens that mean the item can be bought right now. */
 const IN_STOCK_TOKENS: ReadonlySet<string> = new Set([

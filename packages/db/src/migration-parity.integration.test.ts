@@ -32,7 +32,7 @@ const PKG_DIR = path.join(REPO_ROOT, "packages/db");
 
 const PARITY_TIMEOUT_MS = 120_000;
 
-const TRAILING_COMMA = /,$/;
+const TRAILING_COMMA = /,$/u;
 
 async function withAdmin(run: (client: Client) => Promise<void>): Promise<void> {
   const client = new Client({

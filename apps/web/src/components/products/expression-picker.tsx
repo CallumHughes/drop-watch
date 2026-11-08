@@ -60,8 +60,8 @@ function ModeButton({
       aria-pressed={active}
       className={
         active
-          ? "rounded border border-foreground/40 bg-muted px-2 py-1 font-medium text-xs"
-          : "rounded border px-2 py-1 text-muted-foreground text-xs hover:text-foreground"
+          ? "border-foreground/40 bg-muted rounded border px-2 py-1 text-xs font-medium"
+          : "text-muted-foreground hover:text-foreground rounded border px-2 py-1 text-xs"
       }
       onClick={pick}
       type="button"
@@ -81,7 +81,7 @@ function Suggestion({
   const pick = useCallback(() => onPick(expression), [expression, onPick]);
   return (
     <button
-      className="rounded border px-2 py-0.5 text-muted-foreground text-xs hover:text-foreground"
+      className="text-muted-foreground hover:text-foreground rounded border px-2 py-0.5 text-xs"
       onClick={pick}
       type="button"
     >
@@ -95,11 +95,11 @@ function MatchList({ samples }: { samples: ExpressionPreview["samples"] }) {
     <ul className="flex flex-col gap-1">
       {samples.map((sample) => (
         <li
-          className="rounded bg-muted px-2 py-1 text-xs"
+          className="bg-muted rounded px-2 py-1 text-xs"
           key={`${sample.context}:${sample.value}`}
         >
           <span className="block truncate font-medium">{sample.value || "(no value)"}</span>
-          <code className="block truncate text-muted-foreground">{sample.context}</code>
+          <code className="text-muted-foreground block truncate">{sample.context}</code>
         </li>
       ))}
     </ul>
@@ -116,7 +116,7 @@ function ExtractionVerdict({ test, url }: { test: ExpressionPreview; url: string
   }
   if (test.matchCount > 1) {
     return (
-      <p className="text-amber-700 text-xs dark:text-amber-300" role="alert">
+      <p className="text-xs text-amber-700 dark:text-amber-300" role="alert">
         This expression matches {test.matchCount} values. Narrow the CSS selector or JSONPath to
         exactly one price before applying it.
       </p>

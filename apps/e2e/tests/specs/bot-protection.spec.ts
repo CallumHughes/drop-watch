@@ -11,8 +11,8 @@ const PREVIEW_RPC = "**/api/rpc/preview/page";
 const CHECK_TIMEOUT_MS = 45_000;
 
 /** The named block first, the chain's own verdict kept behind it. */
-const BLOCK_BEFORE_NO_PRICE = /blocked this request[\s\S]*no price found \(tried:/;
-const BLOCK_BEFORE_STRATEGIES = /blocked this request[\s\S]*tried: jsonld/;
+const BLOCK_BEFORE_NO_PRICE = /blocked this request[\s\S]*no price found \(tried:/u;
+const BLOCK_BEFORE_STRATEGIES = /blocked this request[\s\S]*tried: jsonld/u;
 
 /**
  * The journey this suite exists for: a shop that refuses a headless browser.

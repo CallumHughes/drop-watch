@@ -26,7 +26,7 @@ export default async function SettingsPage() {
   return (
     <main className="container mx-auto max-w-2xl overflow-y-auto px-4 py-6">
       <header className="mb-6">
-        <h1 className="font-medium text-xl">Settings</h1>
+        <h1 className="text-xl font-medium">Settings</h1>
         {isAdmin ? (
           <p className="text-muted-foreground text-sm">
             Alerts are pushed to a Home Assistant webhook. The webhook id is the secret — pair it

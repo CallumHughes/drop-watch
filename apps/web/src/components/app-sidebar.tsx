@@ -36,7 +36,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link href="/" />} size="lg">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                 <Mark className="h-5! w-auto!" />
               </div>
               {/* The menu button sizes every descendant svg to 16 square, which

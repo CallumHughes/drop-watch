@@ -3,8 +3,8 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../../constants";
 import { expect, test } from "../fixtures";
 
 const HTTP_OK = 200;
-const INVALID_CREDENTIALS_PATTERN = /invalid email or password/i;
-const APP_TITLE_PATTERN = new RegExp(APP_NAME);
+const INVALID_CREDENTIALS_PATTERN = /invalid email or password/iu;
+const APP_TITLE_PATTERN = new RegExp(APP_NAME, "u");
 
 /**
  * Every test here runs without the shared storage state: they exercise the

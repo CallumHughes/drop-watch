@@ -12,7 +12,7 @@ import { parsePrice } from "./price";
 import type { CheerioSelection, PriceCandidate, StrategyContext } from "./types";
 
 /** Collapses the whitespace cheerio's text() preserves from the source HTML. */
-const WHITESPACE = /\s+/g;
+const WHITESPACE = /\s+/gu;
 
 export function extractBySelector({
   $,
