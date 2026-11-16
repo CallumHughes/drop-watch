@@ -42,7 +42,7 @@
     "test:skills": "node --test .agents/skills/visual-recap/scripts/*.test.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.7",
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
