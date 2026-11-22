@@ -7,7 +7,7 @@
 # the whole workspace, so an install here arrives with the Next.js `apps/web`
 # needs. See apps/worker/rolldown.config.ts.
 
-FROM node:24-slim AS base
+FROM node:26-slim AS base
 RUN npm install --global pnpm@11
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/pnpm-store pnpm install --frozen-lockfile --store
 COPY --from=pruner /app/out/full/ .
 RUN pnpm exec turbo build --filter=@drop-watch/worker
 
-FROM node:24-slim AS runner
+FROM node:26-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 

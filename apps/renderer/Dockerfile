@@ -15,7 +15,7 @@
 # the `FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble` below.
 ARG PLAYWRIGHT_VERSION=1.64.0
 
-FROM node:24-slim AS base
+FROM node:26-slim AS base
 RUN npm install --global pnpm@11
 WORKDIR /app
 
