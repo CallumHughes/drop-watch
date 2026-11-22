@@ -1,12 +1,11 @@
 import { APP_NAME } from "@drop-watch/brand";
 import { createDb } from "@drop-watch/db";
 import { findPendingInvite, markInviteAccepted } from "@drop-watch/db/invites";
-// biome-ignore lint/performance/noNamespaceImport: drizzle adapter requires the full schema object.
 import * as schema from "@drop-watch/db/schema/auth";
 import { signupOpen } from "@drop-watch/db/signup";
+import type { SendEmailResult } from "@drop-watch/email";
 import {
   emailEnabled,
-  type SendEmailResult,
   sendChangeEmailVerification,
   sendPasswordResetEmail,
   sendVerificationEmail,

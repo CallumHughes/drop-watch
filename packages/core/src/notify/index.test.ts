@@ -1,9 +1,10 @@
-import { createServer, type Server } from "node:http";
+import type { Server } from "node:http";
+import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
-
-import { type NotificationPayload, sendNotification, webhookUrl } from "./index";
+import type { NotificationPayload } from "./index";
+import { sendNotification, webhookUrl } from "./index";
 
 const payload: NotificationPayload = {
   consecutiveFailures: null,

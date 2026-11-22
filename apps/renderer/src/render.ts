@@ -41,11 +41,8 @@ import type {
   Response as PlaywrightResponse,
 } from "playwright";
 import { chromium } from "playwright";
-import {
-  type BrowserGeneration,
-  BrowserGenerationManager,
-  withDeadline,
-} from "./browser-generation";
+import type { BrowserGeneration } from "./browser-generation";
+import { BrowserGenerationManager, withDeadline } from "./browser-generation";
 import {
   classifyError,
   exceedsByteCap,
@@ -53,7 +50,8 @@ import {
   shouldBlockResource,
   stalledFor,
 } from "./classify";
-import { type GuardedSocksProxy, startGuardedSocksProxy } from "./guarded-socks-proxy";
+import type { GuardedSocksProxy } from "./guarded-socks-proxy";
+import { startGuardedSocksProxy } from "./guarded-socks-proxy";
 
 /**
  * Best-effort settle after `goto` resolves, to catch SPA hydration that keeps

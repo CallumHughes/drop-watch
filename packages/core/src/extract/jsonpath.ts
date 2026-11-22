@@ -13,7 +13,8 @@
 import { isRecord } from "./json";
 import { collectJsonDocuments } from "./json-documents";
 import { evaluateJsonPath, parseJsonPath } from "./json-path";
-import { type ParsedPrice, parsePrice } from "./price";
+import type { ParsedPrice } from "./price";
+import { parsePrice } from "./price";
 import type { PriceCandidate, StrategyContext } from "./types";
 
 export function extractByJsonPath({

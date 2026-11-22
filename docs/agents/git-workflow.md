@@ -39,14 +39,14 @@ CI runs six jobs in parallel, so expect several failures per round rather than
 one. Read the failing job with `gh run view <run-id> --log-failed`, then
 reproduce it locally with its script before pushing:
 
-| CI job | Locally |
-| --- | --- |
-| Lint | `pnpm check` (`pnpm fix` autofixes) |
-| Types | `pnpm check-types` |
-| Unit tests | `pnpm test` |
-| Build | `SKIP_ENV_VALIDATION=1 pnpm build` |
+| CI job            | Locally                                  |
+| ----------------- | ---------------------------------------- |
+| Lint              | `pnpm check` (`pnpm fix` autofixes)      |
+| Types             | `pnpm check-types`                       |
+| Unit tests        | `pnpm test`                              |
+| Build             | `SKIP_ENV_VALIDATION=1 pnpm build`       |
 | Integration tests | `pnpm db:start && pnpm test:integration` |
-| E2E tests | `pnpm db:start && pnpm test:e2e` |
+| E2E tests         | `pnpm db:start && pnpm test:e2e`         |
 
 When an E2E failure isn't obvious from the log, download the
 `playwright-report` artifact from the run.

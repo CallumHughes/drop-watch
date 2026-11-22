@@ -2,15 +2,15 @@
 
 import type { SuggestedPrice } from "@drop-watch/api/routers/preview";
 import { Input } from "@drop-watch/ui/components/input";
-import { type ChangeEvent, useCallback, useId } from "react";
+import type { ChangeEvent } from "react";
+import { useCallback, useId } from "react";
 import { formatPrice } from "@/lib/format";
-
+import type { LocatorOutcome } from "./locate-price";
 import {
   ABSENT_MESSAGE,
   ELSEWHERE_MESSAGE,
   expectedPriceLabel,
   LOCATOR_HINT,
-  type LocatorOutcome,
   missingCurrencyWarning,
   UNREACHABLE_MESSAGE,
   UNUSABLE_MESSAGE,

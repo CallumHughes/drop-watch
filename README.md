@@ -3,7 +3,6 @@
   <img src="packages/brand/assets/wordmark-on-light.svg" alt="DropWATCH" height="40">
 </picture>
 
-
 DropWATCH keeps an eye on product pages and tells you if the price drops. You
 give it a URL, it checks the page on a schedule and records what it finds.
 Self-hosted: your machine, your Postgres.
@@ -126,13 +125,13 @@ See [Development](docs/development.md) for running without Docker at all.
 
 The variables most people touch, all in the root `.env`:
 
-| Variable | Required | Notes |
-|---|---|---|
-| `BETTER_AUTH_SECRET` | yes | ≥32 chars. `openssl rand -base64 32`. |
-| `BETTER_AUTH_URL` | no | The URL the browser uses. Defaults to `http://localhost:3001`; set it to e.g. `http://server.local:3001` on a home server. |
-| `CORS_ORIGIN` | no | Normally identical to `BETTER_AUTH_URL`. |
-| `TZ` | no | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp. |
-| `RESEND_API_KEY` | no | Turns email on. Leave it unset for a webhook-only instance. |
+| Variable             | Required | Notes                                                                                                                      |
+| -------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `BETTER_AUTH_SECRET` | yes      | ≥32 chars. `openssl rand -base64 32`.                                                                                      |
+| `BETTER_AUTH_URL`    | no       | The URL the browser uses. Defaults to `http://localhost:3001`; set it to e.g. `http://server.local:3001` on a home server. |
+| `CORS_ORIGIN`        | no       | Normally identical to `BETTER_AUTH_URL`.                                                                                   |
+| `TZ`                 | no       | Defaults to `Europe/London`. Affects scheduling and every rendered timestamp.                                              |
+| `RESEND_API_KEY`     | no       | Turns email on. Leave it unset for a webhook-only instance.                                                                |
 
 Home Assistant is configured on the settings page rather than the environment,
 along with the alert cooldown and failure threshold. Per-product settings —

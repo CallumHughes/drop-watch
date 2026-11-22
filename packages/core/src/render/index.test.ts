@@ -1,4 +1,5 @@
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import type { IncomingMessage, Server } from "node:http";
+import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { RenderResponse } from "./contract";

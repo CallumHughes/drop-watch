@@ -13,7 +13,8 @@
  */
 
 import { env } from "@drop-watch/env/db";
-import { PgBoss, type Queue, type SendOptions } from "pg-boss";
+import type { Queue, SendOptions } from "pg-boss";
+import { PgBoss } from "pg-boss";
 
 /** Re-exported so callers can type a boss without depending on pg-boss directly. */
 export type { PgBoss } from "pg-boss";

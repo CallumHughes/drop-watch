@@ -59,7 +59,8 @@ const WHITESPACE = /\s+/u;
 /** Removes `<g>` subtrees whose opening tag matches, counting nesting. */
 function dropGroups(source, opening) {
   let out = source;
-  for (;;) {
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: exits via return.
+  while (true) {
     const found = out.match(opening);
     if (!found) {
       return out;
@@ -67,7 +68,8 @@ function dropGroups(source, opening) {
     const start = found.index;
     let depth = 0;
     let at = start;
-    for (;;) {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: exits via return or break.
+    while (true) {
       const next = out.slice(at).search(GROUP_TAG);
       if (next === -1) {
         return out;

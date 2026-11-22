@@ -13,7 +13,8 @@
  * pg-boss stop, SIGKILL if that takes longer than it should.
  */
 
-import { type ChildProcess, execSync, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 

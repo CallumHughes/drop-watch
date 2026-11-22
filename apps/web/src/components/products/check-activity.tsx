@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-
-import { CHECK_WAIT_CAP_MS, type PendingCheck } from "@/lib/check-refetch";
+import type { PendingCheck } from "@/lib/check-refetch";
+import { CHECK_WAIT_CAP_MS } from "@/lib/check-refetch";
 
 interface CheckActivity {
   /** Reported by a check-now button once the server has taken the job. */

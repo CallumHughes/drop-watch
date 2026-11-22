@@ -1,5 +1,6 @@
 import { auth } from "@drop-watch/auth";
-import { type BetterAuthInstance, createAuthMiddleware } from "evlog/better-auth";
+import type { BetterAuthInstance } from "evlog/better-auth";
+import { createAuthMiddleware } from "evlog/better-auth";
 
 import { useLogger } from "@/lib/evlog";
 

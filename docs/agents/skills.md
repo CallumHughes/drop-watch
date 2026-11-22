@@ -20,14 +20,14 @@ most of them come from third-party repositories.
 
 ## What each one needs
 
-| Skill | Needs | Runs here |
-| --- | --- | --- |
-| `review-and-recommend` | nothing | yes |
-| `visual-recap` | `gh`, Node | yes |
-| `orchestrate` | nothing | yes |
-| `prefer-local-kody-execute` | a Kody account, Node 22+ | yes |
-| `friction-log` | `@kentcdodds/friction-log` | falls back |
-| `ship-pr` | nothing | yes — ours, not Kent's |
+| Skill                       | Needs                      | Runs here              |
+| --------------------------- | -------------------------- | ---------------------- |
+| `review-and-recommend`      | nothing                    | yes                    |
+| `visual-recap`              | `gh`, Node                 | yes                    |
+| `orchestrate`               | nothing                    | yes                    |
+| `prefer-local-kody-execute` | a Kody account, Node 22+   | yes                    |
+| `friction-log`              | `@kentcdodds/friction-log` | falls back             |
+| `ship-pr`                   | nothing                    | yes — ours, not Kent's |
 
 `ship-pr` is this repo's own: it drives a PR with `gh` and the local scripts,
 needing no account. Kent Dodds's `ship-pr` was installed over it briefly and
@@ -50,7 +50,7 @@ kody.codes.
 
 Kody's MCP tools (`search`, `execute`, `api`) are connected at the session
 level, so Kody is available to try whenever you want it. What is deliberately
-*not* installed is `use-kody`, which instructs agents to default to Kody for
+_not_ installed is `use-kody`, which instructs agents to default to Kody for
 every task and to persist reusable work as Kody packages rather than as scripts
 in this repo. Reach for Kody when you mean to, not by default.
 

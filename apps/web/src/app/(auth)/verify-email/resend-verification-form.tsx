@@ -4,7 +4,8 @@ import { Button } from "@drop-watch/ui/components/button";
 import { Input } from "@drop-watch/ui/components/input";
 import { Label } from "@drop-watch/ui/components/label";
 import { useForm } from "@tanstack/react-form";
-import { type ChangeEvent, type FormEvent, useCallback } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import z from "zod";
 

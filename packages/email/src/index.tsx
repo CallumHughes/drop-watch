@@ -23,8 +23,8 @@
 
 import type { NotificationPayload } from "@drop-watch/core/notify";
 import type { AlertChannel, ChannelSendResult } from "@drop-watch/core/notify/channels";
-
-import { appUrl, type SendEmailResult, sendEmail } from "./client";
+import type { SendEmailResult } from "./client";
+import { appUrl, sendEmail } from "./client";
 import { CHANGE_EMAIL_SUBJECT, ChangeEmail } from "./templates/change-email";
 import { INVITE_SUBJECT, Invite } from "./templates/invite";
 import { PriceAlert, priceAlertSubject } from "./templates/price-alert";
@@ -37,7 +37,6 @@ import { WatchBroken, watchBrokenSubject } from "./templates/watch-broken";
 // a consumer reaching past the entry point is a consumer one step away from
 // reading `RESEND_API_KEY` for itself, which is the one thing this package
 // exists to prevent.
-// biome-ignore lint/performance/noBarrelFile: three named symbols, not a re-export of the world.
 export { EMAIL_NOT_CONFIGURED, emailEnabled, type SendEmailResult } from "./client";
 
 /** A Better Auth callback's mail: one recipient, one tokenised link. */

@@ -6,11 +6,11 @@ mode caveats. This page is about choosing and writing one.
 
 ## Which suite
 
-| | Where | Needs |
-| --- | --- | --- |
-| Unit (vitest) | `apps/web`, `apps/worker`, `packages/{api,core,email}` | nothing — `pnpm test` |
-| Integration (vitest) | `packages/db` | compose Postgres — `pnpm db:start && pnpm test:integration` |
-| E2E (Playwright) | `apps/e2e` | Postgres + `pnpm exec playwright install` |
+|                      | Where                                                  | Needs                                                       |
+| -------------------- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| Unit (vitest)        | `apps/web`, `apps/worker`, `packages/{api,core,email}` | nothing — `pnpm test`                                       |
+| Integration (vitest) | `packages/db`                                          | compose Postgres — `pnpm db:start && pnpm test:integration` |
+| E2E (Playwright)     | `apps/e2e`                                             | Postgres + `pnpm exec playwright install`                   |
 
 Default to a unit test in `packages/core` — extraction, rules and notification
 shaping are pure, so most behaviour can be tested there without a database.

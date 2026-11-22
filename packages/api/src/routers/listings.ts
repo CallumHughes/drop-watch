@@ -30,8 +30,10 @@ import {
   expressionIsValid,
   PINNED_NEEDS_EXPRESSION,
 } from "../schemas/products";
-import { type ProductSummary, pulledInNextCheckAt } from "../summary";
-import { type CheckNowResult, loadProduct, summariseOne } from "./products";
+import type { ProductSummary } from "../summary";
+import { pulledInNextCheckAt } from "../summary";
+import type { CheckNowResult } from "./products";
+import { loadProduct, summariseOne } from "./products";
 
 /**
  * A listing *belonging to the requester*, or NOT_FOUND. Same rationale as

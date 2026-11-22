@@ -1,7 +1,7 @@
 import type { CheckRun, Listing, Product } from "@drop-watch/db/schema/products";
 import { describe, expect, it } from "vitest";
-
-import { type PriceSample, pulledInNextCheckAt, summarise } from "./summary";
+import type { PriceSample } from "./summary";
+import { pulledInNextCheckAt, summarise } from "./summary";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 

@@ -8,7 +8,8 @@
  */
 
 import { extract } from "../extract/index";
-import { EXPRESSION_MODES, type ExpressionMode } from "../extract/strategies";
+import type { ExpressionMode } from "../extract/strategies";
+import { EXPRESSION_MODES } from "../extract/strategies";
 import { fetchPage } from "../fetch/index";
 
 const USAGE = `usage: test-url <url> [--mode ${EXPRESSION_MODES.join("|")}] [--expression <value>]

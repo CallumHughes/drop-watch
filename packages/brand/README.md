@@ -13,12 +13,12 @@ re-run that one command, and every derived file follows.
 Canva's filenames use the wrong words for these, which is worth knowing before
 you re-export:
 
-| Here | Canva calls it | What it is |
-| --- | --- | --- |
-| `mark` | "icon" | The symbol alone — the falling arrow |
-| `wordmark-horizontal` | "text row" | "DropWATCH" on one line. No arrow |
-| `wordmark-stacked` | "text column" | "Drop" above "WATCH". No arrow |
-| `badge` | — | The mark inside a filled square. An app-icon treatment, not a logo |
+| Here                  | Canva calls it | What it is                                                         |
+| --------------------- | -------------- | ------------------------------------------------------------------ |
+| `mark`                | "icon"         | The symbol alone — the falling arrow                               |
+| `wordmark-horizontal` | "text row"     | "DropWATCH" on one line. No arrow                                  |
+| `wordmark-stacked`    | "text column"  | "Drop" above "WATCH". No arrow                                     |
+| `badge`               | —              | The mark inside a filled square. An app-icon treatment, not a logo |
 
 ## Re-exporting from Canva
 
@@ -71,18 +71,18 @@ that could not scale.
 
 ## What `generate` produces
 
-| Output | From |
-| --- | --- |
+| Output                                       | From                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------- |
 | `assets/badge.svg`, `assets/icon-scheme.svg` | `mark.svg`, centred in a square with the theme's `--brand-badge-radius` corners |
-| `assets/badge-maskable.svg` | `mark.svg`, smaller and full bleed |
-| `assets/wordmark-on-{light,dark}.svg` | `wordmark-horizontal.svg`, ink baked in |
-| `apps/web/src/app/favicon.ico` | `badge.svg` at 16, 32 and 48 |
-| `apps/web/src/app/icon.svg` | `icon-scheme.svg` |
-| `apps/web/src/app/apple-icon.png` | `badge.svg`, flattened — Apple composites transparency on black |
-| `apps/web/src/app/opengraph-image.png` | `wordmark-horizontal.svg` on the dark ground |
-| `apps/web/public/icon-{192,512}.png` | `badge.svg` |
-| `apps/web/public/icon-maskable-512.png` | `badge-maskable.svg` |
-| `src/paths.generated.ts` | all three marks and the badge geometry, for the React components |
+| `assets/badge-maskable.svg`                  | `mark.svg`, smaller and full bleed                                              |
+| `assets/wordmark-on-{light,dark}.svg`        | `wordmark-horizontal.svg`, ink baked in                                         |
+| `apps/web/src/app/favicon.ico`               | `badge.svg` at 16, 32 and 48                                                    |
+| `apps/web/src/app/icon.svg`                  | `icon-scheme.svg`                                                               |
+| `apps/web/src/app/apple-icon.png`            | `badge.svg`, flattened — Apple composites transparency on black                 |
+| `apps/web/src/app/opengraph-image.png`       | `wordmark-horizontal.svg` on the dark ground                                    |
+| `apps/web/public/icon-{192,512}.png`         | `badge.svg`                                                                     |
+| `apps/web/public/icon-maskable-512.png`      | `badge-maskable.svg`                                                            |
+| `src/paths.generated.ts`                     | all three marks and the badge geometry, for the React components                |
 
 The horizontal wordmark is the one place the generated module and the asset
 disagree, and deliberately: the asset's box stops at the "p" descender, so

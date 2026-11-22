@@ -19,12 +19,8 @@ import { db } from "@drop-watch/db";
 import { user } from "@drop-watch/db/schema/auth";
 import { listings, products } from "@drop-watch/db/schema/products";
 import type { Settings } from "@drop-watch/db/schema/settings";
-import {
-  alertTargets,
-  loadSettings,
-  type SettingsPatch,
-  saveSettings,
-} from "@drop-watch/db/settings";
+import type { SettingsPatch } from "@drop-watch/db/settings";
+import { alertTargets, loadSettings, saveSettings } from "@drop-watch/db/settings";
 import { emailChannel, emailEnabled } from "@drop-watch/email";
 import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
