@@ -47,6 +47,11 @@
       matchUpdateTypes: ["major"],
       groupName: "Node.js",
     },
+    // npm semver doesn't know LTS, so hold @types/node to even majors.
+    {
+      matchPackageNames: ["@types/node"],
+      allowedVersions: "/^\\d*[02468]\\./",
+    },
     {
       matchPackageNames: ["playwright", "@playwright/test"],
       groupName: "Playwright",
@@ -80,10 +85,12 @@
       matchUpdateTypes: ["major"],
       groupName: "Tailwind CSS",
     },
+    // A server major can't start on an existing data volume, so upgrade by hand.
     {
-      matchPackageNames: ["postgres"],
+      matchDepNames: ["postgres"],
+      matchManagers: ["docker-compose"],
       matchUpdateTypes: ["major"],
-      groupName: "Postgres",
+      enabled: false,
     },
   ],
   customManagers: [

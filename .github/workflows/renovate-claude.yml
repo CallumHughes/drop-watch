@@ -6,10 +6,6 @@ on:
   pull_request:
     types: [ opened, reopened, labeled ]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -21,6 +17,10 @@ jobs:
       github.event.pull_request.user.login == 'renovate[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.action != 'labeled' || github.event.label.name == 'claude-verify')
+    # Job-level, so skipped runs for other labels don't cancel a verify.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -32,6 +32,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          # The action configures its own push credential.
+          persist-credentials: false
       - uses: pnpm/action-setup@v6.1.1
       - uses: actions/setup-node@v7
         with:
@@ -68,7 +70,9 @@ jobs:
                `SKIP_ENV_VALIDATION=1 pnpm build`. Fix what breaks, plus any
                breaking or deprecated usage the checks miss. Keep fixes minimal.
             4. Commit fixes to this branch as conventional commits, each ending
-               with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+               with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`,
+               then push with exactly
+               `git push origin HEAD:${{ github.event.pull_request.head.ref }}`.
                CI runs the integration and e2e suites on the push.
             5. Comment once on the PR: what changed upstream, what you fixed,
                what you verified, and anything a human should check. If an
@@ -76,4 +80,4 @@ jobs:
           claude_args: |
             --model claude-sonnet-5-5
             --max-turns 80
-            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm install:*),Bash(pnpm check:*),Bash(pnpm check-types:*),Bash(pnpm fix:*),Bash(pnpm test:*),Bash(pnpm build:*),Bash(SKIP_ENV_VALIDATION=1 pnpm build:*),Bash(pnpm why:*),Bash(pnpm list:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm install),Bash(pnpm check:*),Bash(pnpm check-types:*),Bash(pnpm fix:*),Bash(pnpm test:*),Bash(pnpm build:*),Bash(SKIP_ENV_VALIDATION=1 pnpm build:*),Bash(pnpm why:*),Bash(pnpm list:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:${{ github.event.pull_request.head.ref }}),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
