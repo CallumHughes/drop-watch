@@ -27,6 +27,7 @@
 /** @jsxImportSource react */
 
 import { APP_NAME } from "@drop-watch/brand";
+import type { CSSProperties, ReactNode } from "react";
 import {
   Body,
   Container,
@@ -38,8 +39,7 @@ import {
   Preview,
   Section,
   Text,
-} from "@react-email/components";
-import type { CSSProperties, ReactNode } from "react";
+} from "react-email";
 
 const FONT_STACK =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';

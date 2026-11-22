@@ -17,8 +17,8 @@
 import { APP_NAME } from "@drop-watch/brand";
 import type { NotificationPayload } from "@drop-watch/core/notify";
 import { productHost } from "@drop-watch/core/notify/message";
-import { Link, Text } from "@react-email/components";
 import type { CSSProperties } from "react";
+import { Link, Text } from "react-email";
 
 import { productLabel } from "../format";
 import { buttonStyle, EmailLayout, linkStyle, mutedStyle, paragraphStyle } from "./layout";

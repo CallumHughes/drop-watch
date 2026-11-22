@@ -12,7 +12,7 @@
 /** @jsxImportSource react */
 
 import { APP_NAME } from "@drop-watch/brand";
-import { Text } from "@react-email/components";
+import { Text } from "react-email";
 
 import { CallToAction, EmailLayout, mutedStyle, paragraphStyle } from "./layout";
 
