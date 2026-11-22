@@ -24,7 +24,7 @@ primitives:
       - packages/config/**
       - turbo.json
       - .github/workflows/**
-      - .github/dependabot.yml
+      - .github/renovate.json5
       - "**/Dockerfile"
       - .dockerignore
       - docker-compose*.yml

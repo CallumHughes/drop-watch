@@ -1,0 +1,106 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    "helpers:pinGitHubActionDigestsToSemver",
+  ],
+  schedule: ["before 6am on monday"],
+  semanticCommitType: "chore",
+  // Nothing opens a PR until it is ticked on the Dependency Dashboard issue.
+  dependencyDashboardApproval: true,
+  minimumReleaseAge: "3 days",
+  postUpdateOptions: ["pnpmDedupe"],
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 6am on the first day of the month"],
+  },
+  // Fixes for Dependabot alerts skip the dashboard and the schedule. The
+  // dashboard issue is public, so it carries no vulnerability summary.
+  vulnerabilityAlerts: {
+    dependencyDashboardApproval: false,
+    minimumReleaseAge: null,
+  },
+  dependencyDashboard: {
+    osvVulnerabilitySummary: "none",
+  },
+  packageRules: [
+    {
+      matchUpdateTypes: ["minor", "patch", "pin", "digest"],
+      groupName: "non-major dependencies",
+    },
+    {
+      matchManagers: ["github-actions"],
+      groupName: "GitHub Actions",
+    },
+    {
+      matchManagers: ["dockerfile", "docker-compose"],
+      groupName: "Docker images",
+    },
+    // Ultracite supports a narrow Biome range, so they move together at any level.
+    {
+      matchPackageNames: ["ultracite", "@biomejs/biome"],
+      groupName: "Ultracite and Biome",
+    },
+    // .nvmrc, engines, the node images and @types/node, on the LTS schedule.
+    {
+      matchDepNames: ["node", "@types/node"],
+      matchUpdateTypes: ["major"],
+      groupName: "Node.js",
+    },
+    // npm semver doesn't know LTS, so hold @types/node to even majors.
+    {
+      matchPackageNames: ["@types/node"],
+      allowedVersions: "/^\\d*[02468]\\./",
+    },
+    {
+      matchPackageNames: ["playwright", "@playwright/test"],
+      groupName: "Playwright",
+    },
+    {
+      matchPackageNames: ["react", "react-dom", "@types/react", "@types/react-dom"],
+      matchUpdateTypes: ["major"],
+      groupName: "React",
+    },
+    {
+      matchPackageNames: ["drizzle-orm", "drizzle-kit"],
+      groupName: "Drizzle",
+    },
+    {
+      matchPackageNames: ["@orpc/**"],
+      matchUpdateTypes: ["major"],
+      groupName: "oRPC",
+    },
+    {
+      matchPackageNames: ["better-auth", "@better-auth/**"],
+      matchUpdateTypes: ["major"],
+      groupName: "Better Auth",
+    },
+    {
+      matchPackageNames: ["@react-email/**", "resend"],
+      matchUpdateTypes: ["major"],
+      groupName: "React Email",
+    },
+    {
+      matchPackageNames: ["tailwindcss", "@tailwindcss/**"],
+      matchUpdateTypes: ["major"],
+      groupName: "Tailwind CSS",
+    },
+    // A server major can't start on an existing data volume, so upgrade by hand.
+    {
+      matchDepNames: ["postgres"],
+      matchManagers: ["docker-compose"],
+      matchUpdateTypes: ["major"],
+      enabled: false,
+    },
+  ],
+  customManagers: [
+    {
+      customType: "regex",
+      description: "The renderer's Playwright image and install track the npm package",
+      managerFilePatterns: ["/(^|/)Dockerfile$/"],
+      matchStrings: ["ARG PLAYWRIGHT_VERSION=(?<currentValue>\\S+)"],
+      depNameTemplate: "playwright",
+      datasourceTemplate: "npm",
+    },
+  ],
+}
