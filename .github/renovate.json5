@@ -76,7 +76,7 @@
       groupName: "Better Auth",
     },
     {
-      matchPackageNames: ["@react-email/**", "resend"],
+      matchPackageNames: ["react-email", "@react-email/**", "resend"],
       matchUpdateTypes: ["major"],
       groupName: "React Email",
     },

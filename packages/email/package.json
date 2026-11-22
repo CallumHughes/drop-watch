@@ -18,10 +18,10 @@
     "@drop-watch/brand": "workspace:*",
     "@drop-watch/core": "workspace:*",
     "@drop-watch/env": "workspace:*",
-    "@react-email/components": "catalog:",
     "@react-email/render": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-email": "catalog:",
     "resend": "catalog:"
   },
   "devDependencies": {

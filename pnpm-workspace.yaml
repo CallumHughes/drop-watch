@@ -34,7 +34,7 @@ catalog:
   playwright: 1.65.1
   better-auth: 1.7.26
   resend: ^6.37.0
-  "@react-email/components": ^1.0.12
+  react-email: ^6.11.16
   "@react-email/render": ^2.2.0
   "@tailwindcss/postcss": ^4.3.4
   "@types/react": ^19.3.0
