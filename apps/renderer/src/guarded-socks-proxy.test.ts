@@ -151,7 +151,7 @@ describe("startGuardedSocksProxy", () => {
     await new Promise<void>((resolve) => client.once("connect", resolve));
     const response = new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
-      client.on("data", (chunk) => chunks.push(chunk));
+      client.on("data", (chunk: Buffer) => chunks.push(chunk));
       client.once("error", reject);
       client.once("close", () => resolve(Buffer.concat(chunks)));
     });

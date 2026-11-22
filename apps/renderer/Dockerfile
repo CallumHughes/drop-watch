@@ -15,7 +15,7 @@
 # the `FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble` below.
 ARG PLAYWRIGHT_VERSION=1.64.0
 
-FROM node:24-slim AS base
+FROM node:26-slim AS base
 RUN npm install --global pnpm@12
 WORKDIR /app
 
@@ -32,6 +32,7 @@ RUN --mount=type=cache,target=/pnpm-store pnpm install --frozen-lockfile --store
 COPY --from=pruner /app/out/full/ .
 RUN pnpm exec turbo build --filter=@drop-watch/renderer
 
+# Runs on the image's own Node (24 at Playwright 1.64), not `.nvmrc`'s.
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble AS runner
 WORKDIR /app
 ENV NODE_ENV=production
