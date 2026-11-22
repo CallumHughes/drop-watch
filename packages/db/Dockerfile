@@ -29,6 +29,8 @@ FROM node:26-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+COPY LICENSE ./LICENSE
+
 # Includes the migration SQL, which the migrator reads from disk.
 COPY --from=builder /app/packages/db/dist ./dist
 

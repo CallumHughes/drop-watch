@@ -37,6 +37,8 @@ FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+COPY LICENSE ./LICENSE
+
 COPY --from=builder /app/apps/renderer/dist ./dist
 
 # A plain `npm install` in a clean directory, deliberately not `pnpm install`
