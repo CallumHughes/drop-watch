@@ -42,7 +42,7 @@
     "test:skills": "node --test .agents/skills/visual-recap/scripts/*.test.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.8",
     "@drop-watch/config": "workspace:*",
     "@types/node": "catalog:",
     "husky": "latest",
@@ -51,7 +51,7 @@
     "minimatch": "catalog:",
     "turbo": "^2.11.10",
     "typescript": "catalog:",
-    "ultracite": "8.1.1"
+    "ultracite": "8.3.1"
   },
   "packageManager": "pnpm@12.21.0+sha512.66fd8278ee28935ce951792d34367ff3af5c432a2756445823029533835b8da529bbe0be5130afd56ed0713fb8789e47bad82d93bd5ae2fe54b15562d6276ef0",
   "engines": {
