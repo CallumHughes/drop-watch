@@ -136,3 +136,14 @@ lint rule rather than formatting.
 
 `pnpm run` lists the rest — the Drizzle (`db:*`) and container (`docker:*`)
 scripts are covered in [Installation](installation.md) and above.
+
+## Dependency updates
+
+Renovate ([config](../.github/renovate.json5)) lists pending updates on the
+Dependency Dashboard issue, grouping packages that have to move together. Tick
+one there to open its PR. Fixes for security alerts skip the dashboard and open
+straight away.
+
+When Renovate opens a PR, the `Renovate verify` workflow has Claude read the
+changelogs, run the checks, push any fixes to the branch and comment with what
+it did. Add the `claude-verify` label to run it again. Merging stays manual.
