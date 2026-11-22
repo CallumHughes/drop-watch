@@ -2,6 +2,7 @@
   "name": "@drop-watch/web",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "build": "next build",
     "check-types": "tsc --noEmit",

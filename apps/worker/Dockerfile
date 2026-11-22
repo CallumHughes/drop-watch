@@ -28,6 +28,8 @@ FROM node:26-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+COPY LICENSE ./LICENSE
+
 COPY --from=builder /app/apps/worker/dist ./dist
 
 # `node` directly, so compose's SIGTERM reaches the graceful-shutdown handler in

@@ -194,3 +194,14 @@ pnpm dev            # web on http://localhost:3001, plus the worker
 Next.js, oRPC, Drizzle and Postgres, pg-boss, Better Auth, Turborepo. Full setup
 in [Development](docs/development.md). Scaffolded with
 [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack).
+
+## License
+
+Copyright (C) 2026 Callum Hughes
+
+DropWATCH is licensed under the [GNU Affero General Public License v3.0 or
+later](LICENSE). You are free to self-host, modify and share it. If you offer a
+modified version to others over a network, you must make its source available
+under the same license.
+
+You are responsible for following the terms of the sites you track.
