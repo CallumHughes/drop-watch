@@ -37,7 +37,8 @@ import { protectedProcedure } from "../index";
 import { buildListingInsert } from "../listing-insert";
 import { getSenderBoss } from "../queue";
 import { productCreateInput, productUpdateInput } from "../schemas/products";
-import { type PriceSample, type ProductSummary, summarise } from "../summary";
+import type { PriceSample, ProductSummary } from "../summary";
+import { summarise } from "../summary";
 
 /** Points behind each dashboard sparkline, *per listing*. Enough shape, one small query. */
 const SPARKLINE_POINTS = 24;

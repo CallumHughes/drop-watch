@@ -6,11 +6,11 @@ with no mailer, nothing about the logs or the webhook path differs from an
 instance that never had one. Delivery failures on either channel are logged and
 never fail a check.
 
-| Configuration | Set | Alerts go to | Auth |
-|---|---|---|---|
-| Webhook-only | `ha_url` + `ha_webhook_id` (settings page) | Home Assistant | Sign in immediately; no verification, no password reset |
-| Email-only | `RESEND_API_KEY`, then tick **Email alerts** | Your account's inbox | Verification required, password reset and change email available |
-| Both | both of the above | Both, independently | As above |
+| Configuration | Set                                          | Alerts go to         | Auth                                                             |
+| ------------- | -------------------------------------------- | -------------------- | ---------------------------------------------------------------- |
+| Webhook-only  | `ha_url` + `ha_webhook_id` (settings page)   | Home Assistant       | Sign in immediately; no verification, no password reset          |
+| Email-only    | `RESEND_API_KEY`, then tick **Email alerts** | Your account's inbox | Verification required, password reset and change email available |
+| Both          | both of the above                            | Both, independently  | As above                                                         |
 
 An alert fires once per configured channel, and the dedupe in `alert_state` is
 per `(product, rule)` rather than per channel, so a price that stays below its
@@ -65,28 +65,28 @@ it LAN-bound.
 Every field is always present, `null` where it does not apply, so a template can
 address `trigger.json.previousPrice` without guarding first:
 
-| Field | Notes |
-|---|---|
-| `productId`, `url` | Always set. `url` is the *cheapest* tracked store's, not necessarily the one that was just checked — a product can track more than one. |
-| `listingId` | Which store `url` belongs to. `null` only for the settings page's test notification, which has no listing. |
-| `title`, `imageUrl`, `currency` | `null` until a check has extracted them. |
-| `price`, `previousPrice`, `pctChange` | Decimal **strings**, never floats. `pctChange` is signed, one decimal place. |
-| `inStock` | `null` when the page did not say. |
-| `rule` | `target`, `drop_percent`, `restock`, `watch_broken`, or `test`. |
-| `consecutiveFailures` | Length of the failure streak on `watch_broken`; `null` otherwise. |
-| `error` | Failure detail on `watch_broken`; `null` otherwise. |
+| Field                                 | Notes                                                                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `productId`, `url`                    | Always set. `url` is the _cheapest_ tracked store's, not necessarily the one that was just checked — a product can track more than one. |
+| `listingId`                           | Which store `url` belongs to. `null` only for the settings page's test notification, which has no listing.                              |
+| `title`, `imageUrl`, `currency`       | `null` until a check has extracted them.                                                                                                |
+| `price`, `previousPrice`, `pctChange` | Decimal **strings**, never floats. `pctChange` is signed, one decimal place.                                                            |
+| `inStock`                             | `null` when the page did not say.                                                                                                       |
+| `rule`                                | `target`, `drop_percent`, `restock`, `watch_broken`, or `test`.                                                                         |
+| `consecutiveFailures`                 | Length of the failure streak on `watch_broken`; `null` otherwise.                                                                       |
+| `error`                               | Failure detail on `watch_broken`; `null` otherwise.                                                                                     |
 
 Branch on `watch_broken` if you want a different notification for it:
 
 ```yaml
-  action:
-    - choose:
-        - conditions: "{{ trigger.json.rule == 'watch_broken' }}"
-          sequence:
-            - service: notify.mobile_app_yourphone
-              data:
-                title: "Watch broken: {{ trigger.json.title }}"
-                message: "{{ trigger.json.consecutiveFailures }} failed checks — {{ trigger.json.error }}"
+action:
+  - choose:
+      - conditions: "{{ trigger.json.rule == 'watch_broken' }}"
+        sequence:
+          - service: notify.mobile_app_yourphone
+            data:
+              title: "Watch broken: {{ trigger.json.title }}"
+              message: "{{ trigger.json.consecutiveFailures }} failed checks — {{ trigger.json.error }}"
 ```
 
 The settings page's **send test** button posts the same shape with `rule:
@@ -127,13 +127,13 @@ With a mailer configured, Better Auth gains `requireEmailVerification`,
 verification mail on signup, password reset and change email — and
 `/forgot-password`, `/verify-email` and the change-email half of `/account` start
 being served. Without one, all of that is off: `requireEmailVerification` is
-*not* hardcoded `true`, because on a box whose signup endpoint closes after the
+_not_ hardcoded `true`, because on a box whose signup endpoint closes after the
 first account it would lock that account behind a mail that can never be sent.
 
 ### Locked out? `pnpm db:verify-user`
 
 That is the same trap in its other form: signup closes once the first account
-exists, so an account created *before* the key was set — or one whose
+exists, so an account created _before_ the key was set — or one whose
 verification mail bounced — is a locked box with no second account to rescue it
 from. The escape hatch:
 

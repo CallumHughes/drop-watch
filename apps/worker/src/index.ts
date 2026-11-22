@@ -12,22 +12,22 @@
  * cannot yet handle what it enqueues.
  */
 
+import type { CheckListingJob, PgBoss } from "@drop-watch/db/queue";
 import {
   CHECK_LISTING_NOW_QUEUE,
   CHECK_LISTING_QUEUE,
-  type CheckListingJob,
   createWorkerBoss,
   ENQUEUE_DUE_CHECKS_CRON,
   ENQUEUE_DUE_CHECKS_QUEUE,
   ensureQueues,
-  type PgBoss,
   PURGE_CHECK_RUNS_CRON,
   PURGE_CHECK_RUNS_QUEUE,
 } from "@drop-watch/db/queue";
 import { env } from "@drop-watch/env/worker";
 import { initLogger, log } from "evlog";
 import type { Job } from "pg-boss";
-import { type CheckSource, checkListing } from "./check-listing";
+import type { CheckSource } from "./check-listing";
+import { checkListing } from "./check-listing";
 import { enqueueDueChecks } from "./enqueue-due-checks";
 import { purgeCheckRuns } from "./purge-check-runs";
 

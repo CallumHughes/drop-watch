@@ -1,6 +1,7 @@
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from "../../constants";
 import { expect, test } from "../fixtures";
-import { type CapturedEmail, extractAuthLink } from "../support/email-sink";
+import type { CapturedEmail } from "../support/email-sink";
+import { extractAuthLink } from "../support/email-sink";
 
 const RESET_SUBJECT_PATTERN = /^Reset your .* password$/u;
 const EMAIL_TIMEOUT_MS = 15_000;

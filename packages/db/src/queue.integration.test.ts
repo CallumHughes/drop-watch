@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { closeDb } from "../test/helpers";
 import { db } from "./index";
+import type { PgBoss } from "./queue";
 import {
   CHECK_LISTING_NOW_QUEUE,
   CHECK_LISTING_QUEUE,
@@ -11,7 +12,6 @@ import {
   createWorkerBoss,
   ENQUEUE_DUE_CHECKS_QUEUE,
   ensureQueues,
-  type PgBoss,
   PURGE_CHECK_RUNS_QUEUE,
   QUEUE_DEFINITIONS,
   sendCheckNow,

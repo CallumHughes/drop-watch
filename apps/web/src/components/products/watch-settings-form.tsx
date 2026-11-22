@@ -11,7 +11,8 @@ import { Checkbox } from "@drop-watch/ui/components/checkbox";
 import { Input } from "@drop-watch/ui/components/input";
 import { Label } from "@drop-watch/ui/components/label";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";

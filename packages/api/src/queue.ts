@@ -13,7 +13,8 @@
  *    started instance is stashed on `globalThis` for exactly that reason.
  */
 
-import { createSenderBoss, type PgBoss } from "@drop-watch/db/queue";
+import type { PgBoss } from "@drop-watch/db/queue";
+import { createSenderBoss } from "@drop-watch/db/queue";
 import { log } from "evlog";
 
 const globalForBoss = globalThis as { __dropWatchSenderBoss?: Promise<PgBoss> };

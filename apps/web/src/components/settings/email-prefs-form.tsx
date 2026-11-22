@@ -8,7 +8,8 @@ import { Label } from "@drop-watch/ui/components/label";
 import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send } from "lucide-react";
-import { type FormEvent, useCallback, useState } from "react";
+import type { FormEvent } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";

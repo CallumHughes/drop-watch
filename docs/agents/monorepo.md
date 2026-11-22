@@ -6,18 +6,18 @@ since the CLI differs between versions.
 
 ## Who owns what
 
-| Workspace | Owns |
-| --- | --- |
-| `apps/web` | Next.js App Router UI; Server Components call the API router in-process, client components use the oRPC client |
-| `apps/worker` | pg-boss job handlers — scheduled checks, alert dispatch |
-| `apps/renderer` | Browser render mode, behind a contract in `@drop-watch/core/render/contract` |
-| `apps/e2e` | Playwright suite |
-| `packages/api` | oRPC router — the only transport boundary |
-| `packages/core` | Pure logic: extraction, alert rules, notification shaping, fetching. No database, no clock, no network of its own |
-| `packages/db` | Drizzle schema, migrations, queue wiring. Owns every row |
-| `packages/auth` | Better Auth config — see the `better-auth-best-practices` skill |
-| `packages/brand` | The product name and the logo artwork, plus the Canva import/generate script. Every other brand asset is derived from `assets/*.svg` |
-| `packages/email`, `env`, `ui`, `config` | Templates, validated env, shadcn components, shared tsconfig/biome |
+| Workspace                               | Owns                                                                                                                                 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/web`                              | Next.js App Router UI; Server Components call the API router in-process, client components use the oRPC client                       |
+| `apps/worker`                           | pg-boss job handlers — scheduled checks, alert dispatch                                                                              |
+| `apps/renderer`                         | Browser render mode, behind a contract in `@drop-watch/core/render/contract`                                                         |
+| `apps/e2e`                              | Playwright suite                                                                                                                     |
+| `packages/api`                          | oRPC router — the only transport boundary                                                                                            |
+| `packages/core`                         | Pure logic: extraction, alert rules, notification shaping, fetching. No database, no clock, no network of its own                    |
+| `packages/db`                           | Drizzle schema, migrations, queue wiring. Owns every row                                                                             |
+| `packages/auth`                         | Better Auth config — see the `better-auth-best-practices` skill                                                                      |
+| `packages/brand`                        | The product name and the logo artwork, plus the Canva import/generate script. Every other brand asset is derived from `assets/*.svg` |
+| `packages/email`, `env`, `ui`, `config` | Templates, validated env, shadcn components, shared tsconfig/biome                                                                   |
 
 `docs/architecture/primitives.yaml` maps path globs to these primitives and is
 the authority. A change that adds or reshapes a primitive updates that file in

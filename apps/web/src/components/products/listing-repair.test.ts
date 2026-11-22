@@ -1,9 +1,8 @@
 import type { ExpressionPreview, PreviewExtraction } from "@drop-watch/api/routers/preview";
 import { describe, expect, it } from "vitest";
-
+import type { ListingExtractionSettings } from "./listing-repair";
 import {
   isSingleMatchExtraction,
-  type ListingExtractionSettings,
   listingExtractionNote,
   listingExtractionSettings,
   repairActionLabel,

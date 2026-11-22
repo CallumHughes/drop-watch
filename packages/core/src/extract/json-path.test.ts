@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { evaluateJsonPath, type ParsedJsonPath, parseJsonPath } from "./json-path";
+import type { ParsedJsonPath } from "./json-path";
+import { evaluateJsonPath, parseJsonPath } from "./json-path";
 
 function resolve(expression: string, value: unknown): unknown[] {
   const path = parseJsonPath(expression);

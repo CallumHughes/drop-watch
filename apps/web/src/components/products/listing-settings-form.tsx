@@ -12,21 +12,22 @@ import { Checkbox } from "@drop-watch/ui/components/checkbox";
 import { Input } from "@drop-watch/ui/components/input";
 import { Label } from "@drop-watch/ui/components/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";
+import type { ListingExtractionSettings, TrackedPriceChange } from "./listing-repair";
 import {
-  type ListingExtractionSettings,
   listingExtractionNote,
   listingExtractionSettings,
   repairActionLabel,
   repairSummary,
-  type TrackedPriceChange,
 } from "./listing-repair";
 import { PreviewFlow } from "./preview-flow";
 import { browserToggleState } from "./render-mode";
-import { type PreviewFlow as PreviewFlowState, usePreviewFlow } from "./use-preview-flow";
+import type { PreviewFlow as PreviewFlowState } from "./use-preview-flow";
+import { usePreviewFlow } from "./use-preview-flow";
 
 /**
  * A labelled control. The caller owns the id and hands the same one to its

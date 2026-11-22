@@ -14,7 +14,8 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { createDb } from "./index";
 import { account, user } from "./schema/auth";
-import { listings, type NewListing, type NewProduct, products } from "./schema/products";
+import type { NewListing, NewProduct } from "./schema/products";
+import { listings, products } from "./schema/products";
 
 interface SeedEntry {
   listings: Omit<NewListing, "productId" | "userId">[];

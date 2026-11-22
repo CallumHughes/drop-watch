@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-
+import type { ListingInsertInput } from "./listing-insert";
 import {
   buildListingInsert,
   buildListingPatch,
   buildListingUpdatePatch,
   extractionSettingsChanged,
-  type ListingInsertInput,
 } from "./listing-insert";
 import type { ListingUpdateInput } from "./schemas/listings";
 

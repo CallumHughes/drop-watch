@@ -6,7 +6,8 @@
  * so a related product or a cart blob cannot answer for the tracked one.
  */
 
-import { isRecord, type JsonRecord, MAX_NODES, MAX_WALK_DEPTH } from "./json";
+import type { JsonRecord } from "./json";
+import { isRecord, MAX_NODES, MAX_WALK_DEPTH } from "./json";
 import type { JsonDocument } from "./json-documents";
 import type { Availability } from "./types";
 

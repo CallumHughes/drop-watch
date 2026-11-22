@@ -12,12 +12,8 @@
  */
 
 import { db } from "@drop-watch/db";
-import {
-  CHECK_LISTING_QUEUE,
-  type CheckListingJob,
-  checkListingSendOptions,
-  type PgBoss,
-} from "@drop-watch/db/queue";
+import type { CheckListingJob, PgBoss } from "@drop-watch/db/queue";
+import { CHECK_LISTING_QUEUE, checkListingSendOptions } from "@drop-watch/db/queue";
 import { listings, products } from "@drop-watch/db/schema/products";
 import { and, eq, lte } from "drizzle-orm";
 import { createLogger } from "evlog";

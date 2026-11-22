@@ -14,16 +14,20 @@
  * through `testExpression`, so nothing here is trusted on its own.
  */
 
-import { type CheerioAPI, load } from "cheerio";
+import type { CheerioAPI } from "cheerio";
+import { load } from "cheerio";
 import { toMinorUnits } from "../decimal";
 import { isAmbiguousExtraction } from "./evidence";
 import { parseSelectorExpression } from "./expression-guard";
-import { type ExpressionMatch, extract } from "./index";
+import type { ExpressionMatch } from "./index";
+import { extract } from "./index";
 import { isRecord, MAX_NODES, MAX_WALK_DEPTH } from "./json";
-import { collectJsonDocuments, describeJsonValue, type JsonDocument } from "./json-documents";
+import type { JsonDocument } from "./json-documents";
+import { collectJsonDocuments, describeJsonValue } from "./json-documents";
 import { evaluateJsonPath, parseJsonPath } from "./json-path";
 import { jsonValuePrice } from "./jsonpath";
-import { type ParsedPrice, parsePrice } from "./price";
+import type { ParsedPrice } from "./price";
+import { parsePrice } from "./price";
 import { extractBySelector } from "./selector";
 import type { CheerioElement, ExpressionMode, StrategyContext } from "./types";
 

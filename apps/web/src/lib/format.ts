@@ -6,7 +6,8 @@
  * "never through a float" rule intact all the way to the pixel.
  */
 
-import { type AvailabilityState, availabilityState } from "@drop-watch/core/extract/availability";
+import type { AvailabilityState } from "@drop-watch/core/extract/availability";
+import { availabilityState } from "@drop-watch/core/extract/availability";
 
 /** Live views poll rather than push. SSE is the upgrade path. */
 export const LIVE_REFETCH_MS = 15_000;

@@ -26,14 +26,15 @@ import { env } from "@drop-watch/env/worker";
 import { and, eq, sql } from "drizzle-orm";
 import { createLogger } from "evlog";
 import { runAlerting } from "./alerting";
+import type { PersistResult } from "./check-persistence";
 import {
   completePersistedCheck,
-  type PersistResult,
   STALE_CHECK_DISCARD_MESSAGE,
   validatorUpdate,
 } from "./check-persistence";
 import { extractionOptions } from "./extraction";
-import { type CheckOutcome, toCheckOutcome } from "./outcome";
+import type { CheckOutcome } from "./outcome";
+import { toCheckOutcome } from "./outcome";
 import { renderTarget, unconfiguredRenderResult } from "./retrieve";
 import { nextCheckAt } from "./schedule";
 

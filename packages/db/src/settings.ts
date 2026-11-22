@@ -14,7 +14,8 @@ import { eq } from "drizzle-orm";
 
 import { db } from "./index";
 import { productOwner } from "./recipients";
-import { type NewSettings, SETTINGS_ID, type Settings, settings } from "./schema/settings";
+import type { NewSettings, Settings } from "./schema/settings";
+import { SETTINGS_ID, settings } from "./schema/settings";
 
 /** The columns the (admin-only) settings page may change. */
 export type SettingsPatch = Partial<

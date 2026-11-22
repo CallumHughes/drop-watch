@@ -36,10 +36,12 @@
  */
 
 import { lookup } from "node:dns/promises";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:http";
 
 import { FIXTURE_HOSTS, FIXTURE_PORT } from "../constants";
-import { type FixtureProductState, type FixtureRequest, renderProductPage } from "./templates";
+import type { FixtureProductState, FixtureRequest } from "./templates";
+import { renderProductPage } from "./templates";
 
 const products = new Map<string, FixtureProductState>();
 const webhooks = new Map<string, unknown[]>();

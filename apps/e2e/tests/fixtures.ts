@@ -7,7 +7,8 @@
  * actually names.
  */
 
-import { test as base, expect as baseExpect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { test as base, expect as baseExpect } from "@playwright/test";
 
 import { BASE_URL } from "../constants";
 import { Sidebar } from "./components/sidebar";

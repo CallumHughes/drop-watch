@@ -8,13 +8,13 @@ covered further down.
 
 ## The services
 
-| Service | Image | Role |
-|---|---|---|
-| `migrate` | `ghcr.io/callumhughes/drop-watch/migrate` | One-shot. Waits for Postgres, applies migrations, exits. |
-| `web` | `ghcr.io/callumhughes/drop-watch/web` | Next.js dashboard on port 3001. |
-| `worker` | `ghcr.io/callumhughes/drop-watch/worker` | pg-boss: the minutely dispatcher and every check. |
+| Service    | Image                                      | Role                                                                                                                                                                                              |
+| ---------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrate`  | `ghcr.io/callumhughes/drop-watch/migrate`  | One-shot. Waits for Postgres, applies migrations, exits.                                                                                                                                          |
+| `web`      | `ghcr.io/callumhughes/drop-watch/web`      | Next.js dashboard on port 3001.                                                                                                                                                                   |
+| `worker`   | `ghcr.io/callumhughes/drop-watch/worker`   | pg-boss: the minutely dispatcher and every check.                                                                                                                                                 |
 | `renderer` | `ghcr.io/callumhughes/drop-watch/renderer` | Optional headless-Chromium sidecar on port 3002, for listings whose price is composed by JavaScript. Opt-in behind the `browser` profile; reached only over the compose network, never published. |
-| `postgres` | `postgres:18` | Optional. Bundled database, behind the `bundled-db` profile. |
+| `postgres` | `postgres:18`                              | Optional. Bundled database, behind the `bundled-db` profile.                                                                                                                                      |
 
 Each image is built for `linux/amd64` and `linux/arm64`, and each is public —
 pulling needs no GitHub account and no `docker login`.
@@ -60,11 +60,11 @@ match.
 `bundled-db`, which is the zero-configuration path: Postgres runs in a container
 and `DATABASE_URL` already points at it.
 
-| Value | Effect |
-|---|---|
-| `bundled-db` | Runs Postgres in a container, with a named volume for its data. |
-| `browser` | Runs the `renderer` sidecar. See below. |
-| `bundled-db,browser` | Both. |
+| Value                | Effect                                                          |
+| -------------------- | --------------------------------------------------------------- |
+| `bundled-db`         | Runs Postgres in a container, with a named volume for its data. |
+| `browser`            | Runs the `renderer` sidecar. See below.                         |
+| `bundled-db,browser` | Both.                                                           |
 
 The bundled database publishes port 5432 on loopback only, so `psql` works from
 the host without exposing it to the rest of the network.

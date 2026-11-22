@@ -5,7 +5,8 @@ import { Input } from "@drop-watch/ui/components/input";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, useCallback } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 import z from "zod";
 

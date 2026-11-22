@@ -8,13 +8,10 @@
  */
 
 import { parseAvailability } from "./availability";
-import { asArray, isRecord, type JsonRecord, MAX_NODES, MAX_WALK_DEPTH, parseScript } from "./json";
-import {
-  normalizeQueryValue,
-  normalizeUrlParameterValue,
-  type UrlIdentity,
-  urlIdentity,
-} from "./page-url";
+import type { JsonRecord } from "./json";
+import { asArray, isRecord, MAX_NODES, MAX_WALK_DEPTH, parseScript } from "./json";
+import type { UrlIdentity } from "./page-url";
+import { normalizeQueryValue, normalizeUrlParameterValue, urlIdentity } from "./page-url";
 import { parsePrice } from "./price";
 import type { PriceCandidate, StrategyContext } from "./types";
 

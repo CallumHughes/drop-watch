@@ -14,7 +14,8 @@ import { Input } from "@drop-watch/ui/components/input";
 import { Label } from "@drop-watch/ui/components/label";
 import { Skeleton } from "@drop-watch/ui/components/skeleton";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ChangeEvent, type FormEvent, useCallback, useId, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { orpc } from "@/utils/orpc";

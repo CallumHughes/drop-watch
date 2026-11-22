@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
-
+import type { AlertConfig, AlertMemory, AlertStateKey, Observation } from "./index";
 import {
-  type AlertConfig,
-  type AlertMemory,
-  type AlertStateKey,
   conditionsMet,
   cooldownMs,
   countLeadingFailures,
   DEFAULT_COOLDOWN_MINUTES,
   evaluateAlerts,
-  type Observation,
   shouldFire,
   shouldReportBroken,
 } from "./index";
