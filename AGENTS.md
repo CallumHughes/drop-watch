@@ -3,7 +3,7 @@
 Self-hosted price tracker: watches product pages on a schedule, records price
 history, and alerts on target price, percentage drop, or restock.
 
-pnpm 11 workspaces + Turborepo, Node 24. Never `npm` or `yarn`.
+pnpm 12 workspaces + Turborepo, Node 26. Never `npm` or `yarn`.
 
 ## Commands
 

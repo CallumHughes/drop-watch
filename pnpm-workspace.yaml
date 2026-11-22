@@ -32,7 +32,7 @@ catalog:
   pg: ^8.23.1
   pg-boss: ^12.38.0
   playwright: 1.64.1
-  better-auth: 1.7.17
+  better-auth: 1.7.26
   resend: ^6.37.0
   "@react-email/components": ^1.0.12
   "@react-email/render": ^2.2.0
@@ -42,4 +42,4 @@ catalog:
   tailwindcss: ^4.3.4
   tsx: ^4.23.15
   vitest: ^5.1.0
-  minimatch: 11.0.4
+  minimatch: 11.0.9

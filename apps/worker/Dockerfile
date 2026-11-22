@@ -8,7 +8,7 @@
 # needs. See apps/worker/rolldown.config.ts.
 
 FROM node:26-slim AS base
-RUN npm install --global pnpm@11
+RUN npm install --global pnpm@12
 WORKDIR /app
 
 FROM base AS pruner
